@@ -44,3 +44,31 @@ npm run db:generate
 npm run db:migrate
 ```
 
+## Database Schema (Data Models)
+
+Here is the current structure of our database tables defined in `src/db/schema.ts`.
+
+### 1. `users` Table
+This table stores user credentials and preferences for personalizing the feed.
+
+| Column Name  | Data Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, Default: uuid_generate_v4() | Unique identifier for each user |
+| `email` | `varchar(255)` | Unique, Not Null | User's email address used for login |
+| `password` | `varchar(255)` | Not Null | Hashed password (managed by security module) |
+| `name` | `varchar(100)` | Not Null | User's full name or display name |
+| `created_at` | `timestamp` | Default: now() | Account creation timestamp |
+
+### 2. `articles` Table
+This table aggregates content collected by our background scrapers from various platforms.
+
+| Column Name | Data Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, Default: uuid_generate_v4() | Unique identifier for each article |
+| `title` | `varchar(255)` | Not Null | Title of the article or video |
+| `url` | `text` | Unique, Not Null | Direct link to the source content |
+| `source` | `varchar(50)` | Not Null | Platform origin (e.g., `youtube`, `reddit`, `rss`) |
+| `content` | `text` | - | Snippet, description, or raw content text |
+| `published_at`| `timestamp` | Not Null | When the content was originally published |
+| `created_at` | `timestamp` | Default: now() | When the article was scraped into our DB |
+
