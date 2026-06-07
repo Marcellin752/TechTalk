@@ -1,0 +1,45 @@
+name: Security & Secret Scan
+
+on:
+  push:
+    branches: [ main, master]
+  pull_request:
+    branches: [ main, master]
+
+jobs:
+  scan-secrets:
+    name: Check for unwanted files and secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Essentiel pour que Gitleaks puisse inspecter tout l'historique des commits
+
+      - name: Run Gitleaks (Secret & .env Scanner)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Block explicit unwanted files (.env, .DS_Store, etc.)
+        run: |
+          echo "Checking for forbidden files..."
+          FORBIDDEN_PATTERNS=(".env" ".env.local" ".env.production" "*.pem" "*.key" ".DS_Store")
+          
+          FOUND_FORBIDDEN=false
+          
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            FILES=$(find . -type f -name "$pattern" -not -path "*/node_modules/*" -not -path "*/.git/*")
+            if [ ! -z "$FILES" ]; then
+              echo "[ERROR] Forbidden file(s) found matching '$pattern':"
+              echo "$FILES"
+              FOUND_FORBIDDEN=true
+            fi
+          done
+          
+          if [ "$FOUND_FORBIDDEN" = true ]; then
+            echo "Pipeline failed. Please remove these files from the repository and update your .gitignore."
+            exit 1
+          else
+            echo "[SUCCESS] No forbidden files found."
+          fi
