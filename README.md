@@ -1,6 +1,11 @@
 # Tech Talk Project
 
-## 📂 Project Structure
+TechTalk is an educational scrolling application designed for tech professionals and students. It aggregates tech articles, videos, and news from top-tier platforms (like YouTube, Reddit, and RSS feeds) into a single, personalized feed based on user specialties and interests. 
+
+The goal is to transform passive scrolling moments into natural, productive, and engaging tech watch sessions.
+
+---
+##  Project Structure
 
 ```text
 techtalk/
