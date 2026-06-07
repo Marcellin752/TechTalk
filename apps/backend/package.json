@@ -1,0 +1,29 @@
+{
+  "name": "teachtalk-backend",
+  "version": "0.1.0",
+  "description": "REST API and content aggregation service for TechTalk",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "fastify",
+    "typescript",
+    "api",
+    "scraper",
+    "teachtalk"
+  ],
+  "author": "Flavio & Gloria & Marcellin & Obafemi",
+  "license": "MIT",
+  "dependencies": {
+    "fastify": "^5.8.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
