@@ -21,6 +21,7 @@
   "author": "Flavio & Gloria & Marcellin & Obafemi",
   "license": "MIT",
   "dependencies": {
+    "@fastify/jwt": "^9.0.1",
     "bcrypt": "^6.0.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.0",

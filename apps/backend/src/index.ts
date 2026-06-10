@@ -1,24 +1,39 @@
 import Fastify from 'fastify';
+import fastifyJwt from '@fastify/jwt';
 import { authRoutes } from './routes/auth.routes.js';
 import { articlesRoutes } from './routes/articles.routes.js';
 
 const fastify = Fastify({ logger: true });
 
-// Registering route plugins with their respective global prefixes
+// 1. Register JWT Plugin with the secret key from .env
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is missing!');
+}
+
+fastify.register(fastifyJwt, {
+  secret: process.env.JWT_SECRET
+});
+
+// Decorator to easily protect routes later
+fastify.decorate('authenticate', async (request: any, reply: any) => {
+  try {
+    await request.jwtVerify();
+  } catch (err) {
+    reply.send(err);
+  }
+});
+
+// 2. Registering route plugins
 fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(articlesRoutes, { prefix: '/api/articles' });
 
-// Health check route to ensure the API is running smoothly
-fastify.get('/api/health', async (request, reply) => {
+fastify.get('/api/health', async () => {
   return { status: 'OK', message: 'TechTalk API is running smoothly' };
 });
 
 const start = async () => {
   try {
-    // Dynamically fetch the port from environment variables, or default to 5000
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
-
-    // Start the Fastify server
     await fastify.listen({ port, host: '0.0.0.0' });
     console.log(`Server readiness check passed on port ${port}`);
   } catch (err) {

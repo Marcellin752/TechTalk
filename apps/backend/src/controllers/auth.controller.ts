@@ -9,12 +9,10 @@ export async function handleRegister(request: FastifyRequest, reply: FastifyRepl
   try {
     const { email, password, name } = request.body as any;
 
-    // 1. Validate required fields
     if (!email || !password || !name) {
       return reply.status(400).send({ error: 'All fields (email, password, name) are required.' });
     }
 
-    // 2. Structural validations (Email and password safety rules)
     if (!validateEmail(email)) {
       return reply.status(400).send({ error: 'Invalid email format.' });
     }
@@ -25,18 +23,14 @@ export async function handleRegister(request: FastifyRequest, reply: FastifyRepl
       });
     }
 
-    // 3. Database check for preexisting account
     const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (existingUser.length > 0) {
       return reply.status(409).send({ error: 'A user with this email already exists.' });
     }
 
-    // 4. Secure password hashing before database storage
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // 5. Database execution using Drizzle ORM
-    // We fetch all inserted columns raw to prevent mapping errors with older Drizzle versions
     const insertedRows = await db.insert(users).values({
       name,
       email,
@@ -49,7 +43,6 @@ export async function handleRegister(request: FastifyRequest, reply: FastifyRepl
       throw new Error('Failed to retrieve created user from database.');
     }
 
-    // 6. Return the newly created user data (Safely removing the password hash from response)
     return reply.status(201).send({ 
       message: 'User registered successfully!',
       user: {
@@ -73,20 +66,26 @@ export async function handleLogin(request: FastifyRequest, reply: FastifyReply) 
       return reply.status(400).send({ error: 'Email and password are required.' });
     }
 
-    // Fetch user record by email
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
     if (!user) {
       return reply.status(401).send({ error: 'Invalid email or password.' });
     }
 
-    // Verify raw input password against hashed storage password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return reply.status(401).send({ error: 'Invalid email or password.' });
     }
 
+    // --- NEW: Generate JWT Token ---
+    // We sign the token with the user's ID and email, valid for 1 day
+    const token = (request.server as any).jwt.sign(
+      { id: user.id, email: user.email },
+      { expiresIn: '1d' }
+    );
+
     return reply.status(200).send({ 
       message: 'Login successful!',
+      token, // The client will use this token for subsequent requests
       user: {
         id: user.id,
         name: user.name,
