@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch -r dotenv/config src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
@@ -21,11 +21,14 @@
   "author": "Flavio & Gloria & Marcellin & Obafemi",
   "license": "MIT",
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.0",
     "fastify": "^5.8.5",
     "postgres": "^3.4.4"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^25.9.2",
     "@types/pg": "^8.11.0",
     "drizzle-kit": "^0.21.0",
