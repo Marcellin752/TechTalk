@@ -1,32 +1,48 @@
 import Fastify from 'fastify';
-import fastifyJwt from '@fastify/jwt';
-import { authRoutes } from './routes/auth.routes.js';
-import { articlesRoutes } from './routes/articles.routes.js';
+import jwt from '@fastify/jwt';
+import cors from '@fastify/cors';
+import { contentRoutes } from './routes/content.routes.js';
+import { initAutomationWorkers } from './services/automation.service.js';
 
-const fastify = Fastify({ logger: true });
+const fastify = Fastify({ logger: false });
 
-// 1. Register JWT Plugin with the secret key from .env
-if (!process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is missing!');
+// Declare JWT type definitions for safety
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: any;
+    requireAdmin: any;
+  }
 }
 
-fastify.register(fastifyJwt, {
-  secret: process.env.JWT_SECRET
+// Global Plugins
+fastify.register(cors, { origin: '*' });
+fastify.register(jwt, {
+  secret: process.env.JWT_SECRET || 'super-secret-key-change-me-in-production-2026'
 });
 
-// Decorator to easily protect routes later
+// Authentication Security Decorators
 fastify.decorate('authenticate', async (request: any, reply: any) => {
   try {
     await request.jwtVerify();
   } catch (err) {
-    reply.send(err);
+    reply.status(401).send({ error: 'Unauthorized', message: 'Invalid or missing token.' });
   }
 });
 
-// 2. Registering route plugins
-fastify.register(authRoutes, { prefix: '/api/auth' });
-fastify.register(articlesRoutes, { prefix: '/api/articles' });
+fastify.decorate('requireAdmin', async (request: any, reply: any) => {
+  // The role field is extracted out of the signed JWT payload
+  if (!request.user || request.user.role !== 'admin') {
+    reply.status(403).send({ 
+      error: 'Forbidden', 
+      message: 'Access denied. Only administrators can perform this action.' 
+    });
+  }
+});
 
+// Register API Routes
+fastify.register(contentRoutes, { prefix: '/api/content' });
+
+// Health Check Route
 fastify.get('/api/health', async () => {
   return { status: 'OK', message: 'TechTalk API is running smoothly' };
 });
@@ -34,10 +50,20 @@ fastify.get('/api/health', async () => {
 const start = async () => {
   try {
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
+    
+    await fastify.ready();
     await fastify.listen({ port, host: '0.0.0.0' });
-    console.log(`Server readiness check passed on port ${port}`);
+
+    console.log('\n🚀 ===============================================');
+    console.log('🔥 TechTalk Multimedia Backend is now LIVE!');
+    console.log(`📡 Server running on: http://localhost:${port}`);
+    console.log('===============================================\n');
+
+    // Start the background automation job
+    initAutomationWorkers();
+
   } catch (err) {
-    fastify.log.error(err);
+    console.error('❌ Error during startup:', err);
     process.exit(1);
   }
 };
