@@ -1,8 +1,20 @@
 {
-  "dependencies": {
-    "bcrypt": "^6.0.0"
+  "name": "teachtalk-monorepo",
+  "version": "1.0.0",
+  "description": "Monorepo for TechTalk platform",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "start:backend": "npm run start --workspace=apps/backend"
   },
-  "devDependencies": {
-    "@types/bcrypt": "^6.0.0"
-  }
+  "keywords": [
+    "monorepo",
+    "teachtalk"
+  ],
+  "author": "Flavio & Gloria & Marcellin & Obafemi",
+  "license": "MIT"
 }

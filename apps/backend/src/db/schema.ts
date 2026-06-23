@@ -1,19 +1,21 @@
-import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core';
 
-// 1. Users Table (For authentication, registration, and user profiles)
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
-  email: text('email').notNull().unique(),
-  password: text('password').notNull(), // Passwords must be hashed before saving
+  name: varchar('name', { length: 100 }).notNull(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  password: varchar('password', { length: 255 }).notNull(),
+  role: varchar('role', { length: 20 }).default('user').notNull(), // 'user' or 'admin'
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// 2. Articles / Tech Content Table (To store data fetched by your scrapers)
-export const articles = pgTable('articles', {
+export const contents = pgTable('contents', {
   id: uuid('id').defaultRandom().primaryKey(),
-  title: text('title').notNull(),
-  url: text('url').notNull().unique(), // Unique constraint prevents duplicate scrapings
-  source: text('source').notNull(), // e.g., 'Dev.to', 'Medium', 'TechCrunch'
-  summary: text('summary'), // Textual summary or preview of the tech post
+  title: varchar('title', { length: 255 }).notNull(),
+  url: varchar('url', { length: 512 }).notNull().unique(),
+  source: varchar('source', { length: 100 }).notNull(), // e.g., 'YouTube', 'Dev.to'
+  type: varchar('type', { length: 50 }).notNull(), // 'video' or 'article'
+  summary: text('summary'),
+  embedCode: text('embed_code'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
