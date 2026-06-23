@@ -8,16 +8,9 @@ import { fetchLiveYouTubeVideos } from './youtube.provider.js';
 export function initAutomationWorkers(): void {
   console.log('🤖 [Automation] Multi-source background workers initialized.');
 
-  // Temporary Test Schedule: Runs every 15 seconds for verification
-  cron.schedule('*/15 * * * * *', async () => {
-    await fetchLiveDevToArticles();
-    await fetchLiveYouTubeVideos();
-  });
-
-  /* // Production Schedule: Runs once every hour to preserve API quotas
+  // Production Schedule: Runs once every hour to preserve API quotas
   cron.schedule('0 * * * *', async () => {
     await fetchLiveDevToArticles();
     await fetchLiveYouTubeVideos();
   });
-  */
 }
