@@ -30,6 +30,7 @@
     "fastify": "^5.8.5",
     "node-cron": "^4.2.1",
     "postgres": "^3.4.4",
+    "rss-parser": "^3.13.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

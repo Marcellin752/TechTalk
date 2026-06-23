@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { fetchLiveDevToArticles } from './devto.provider.js';
 import { fetchLiveYouTubeVideos } from './youtube.provider.js';
+import { fetchLiveRSSFeeds } from './rss.provider.js'; // 1. Added RSS import
 
 /**
  * Orchestrates and executes all data fetching providers sequentially
@@ -11,8 +12,9 @@ async function runAllAutomationProviders(): Promise<void> {
   // Running sequentially prevents database connection overhead and race conditions
   await fetchLiveDevToArticles();
   await fetchLiveYouTubeVideos();
+  await fetchLiveRSSFeeds(); // 2. Added RSS execution
   
-  console.log('[Automation Engine] All sync tasks successfully finished.');
+  console.log('✅ [Automation Engine] All sync tasks successfully finished.');
 }
 
 /**
@@ -22,13 +24,11 @@ export function initAutomationWorkers(): void {
   console.log('[Automation] Multi-source background workers initialized.');
 
   // 1. Immediate Execution on Startup
-  // This ensures the database is populated as soon as the server boots up!
   runAllAutomationProviders().catch((err) => {
-    console.error(' [Automation Engine] Error during initial startup sync:', err);
+    console.error('❌ [Automation Engine] Error during initial startup sync:', err);
   });
 
   // 2. Production Schedule: Runs once every hour ('0 * * * *')
-  // This preserves your daily Google API quota perfectly.
   cron.schedule('0 * * * *', async () => {
     await runAllAutomationProviders();
   });
