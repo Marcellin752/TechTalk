@@ -1,16 +1,17 @@
 import Fastify from 'fastify';
 import jwt from '@fastify/jwt';
 import cors from '@fastify/cors';
+import { authRoutes } from './routes/auth.routes.js';
 import { contentRoutes } from './routes/content.routes.js';
-import { initAutomationWorkers } from './services/automation.service.js';
+import { initAutomationWorkers } from './services/automation/index.js'; // 🟢 Mis à jour vers le dossier modulaire
 
 const fastify = Fastify({ logger: false });
 
 // Declare JWT type definitions for safety
 declare module 'fastify' {
   interface FastifyInstance {
-    authenticate: any;
-    requireAdmin: any;
+    authenticate: (request: any, reply: any) => Promise<void>;
+    requireAdmin: (request: any, reply: any) => Promise<void>;
   }
 }
 
@@ -40,6 +41,7 @@ fastify.decorate('requireAdmin', async (request: any, reply: any) => {
 });
 
 // Register API Routes
+fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(contentRoutes, { prefix: '/api/content' });
 
 // Health Check Route
@@ -59,7 +61,7 @@ const start = async () => {
     console.log(`📡 Server running on: http://localhost:${port}`);
     console.log('===============================================\n');
 
-    // Start the background automation job
+    // Start the background automation multi-source worker
     initAutomationWorkers();
 
   } catch (err) {
