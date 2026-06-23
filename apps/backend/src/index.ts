@@ -3,7 +3,7 @@ import jwt from '@fastify/jwt';
 import cors from '@fastify/cors';
 import { authRoutes } from './routes/auth.routes.js';
 import { contentRoutes } from './routes/content.routes.js';
-import { initAutomationWorkers } from './services/automation/index.js'; // 🟢 Mis à jour vers le dossier modulaire
+import { initAutomationWorkers } from './services/automation/index.js';
 
 const fastify = Fastify({ logger: false });
 
@@ -56,16 +56,16 @@ const start = async () => {
     await fastify.ready();
     await fastify.listen({ port, host: '0.0.0.0' });
 
-    console.log('\n🚀 ===============================================');
-    console.log('🔥 TechTalk Multimedia Backend is now LIVE!');
-    console.log(`📡 Server running on: http://localhost:${port}`);
+    console.log('\n===============================================');
+    console.log(' TechTalk Multimedia Backend is now LIVE!');
+    console.log(`Server running on: http://localhost:${port}`);
     console.log('===============================================\n');
 
     // Start the background automation multi-source worker
     initAutomationWorkers();
 
   } catch (err) {
-    console.error('❌ Error during startup:', err);
+    console.error(' Error during startup:', err);
     process.exit(1);
   }
 };
