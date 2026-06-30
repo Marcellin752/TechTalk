@@ -9,7 +9,9 @@
   "scripts": {
     "dev:backend": "npm run dev --workspace=apps/backend",
     "build:backend": "npm run build --workspace=apps/backend",
-    "start:backend": "npm run start --workspace=apps/backend"
+    "start:backend": "npm run start --workspace=apps/backend",
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "build:frontend": "npm run build --workspace=apps/frontend"
   },
   "keywords": [
     "monorepo",

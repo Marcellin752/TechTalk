@@ -26,6 +26,21 @@ To get the full project up and running locally, follow the specific instructions
 * **Backend & Database Setup:** Go to `apps/backend/README.md` to see how to configure your `.env` file, run `npm install`, and synchronize your local PostgreSQL database using Drizzle migrations (`npm run db:migrate`).
 * **Frontend Setup:** Go to `apps/frontend/README.md` to install packages and launch the React development server.
 
+### PostgreSQL via Docker Compose (recommended)
+
+If you just want to bring up PostgreSQL quickly:
+
+```bash
+docker compose up -d postgres
+```
+
+Then continue with backend setup:
+
+```bash
+npm run db:push --workspace=apps/backend
+npm run dev:backend
+```
+
 ---
 
 ## Authors
