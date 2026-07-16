@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://techtalk-xg62.onrender.com/api';
 
 export interface User {
   id: string;
