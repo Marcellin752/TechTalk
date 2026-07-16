@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+// @ts-ignore
 import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/db.js';
