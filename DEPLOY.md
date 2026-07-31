@@ -68,15 +68,7 @@ Copy the deployed backend base URL (e.g. `https://teachtalk-backend.onrender.com
 
 The frontend lives in `apps/frontend/` and builds to `dist/` via `vite build`.
 
-> ⚠️ **Important:** the API base URL is currently hardcoded in `apps/frontend/src/services/api.ts`:
-> ```ts
-> const API_URL = 'http://localhost:5000/api';
-> ```
-> Before deploying, change it to your deployed backend URL:
-> ```ts
-> const API_URL = 'https://<your-service>.onrender.com/api';
-> ```
-> (Ideally make this configurable via an env var — see "Recommended improvements" below.)
+> ⚠️ **Important:** the API base URL is read from the `VITE_API_URL` environment variable, with a fallback to `http://localhost:5000/api`. For the deployed frontend you MUST set `VITE_API_URL` to your deployed backend URL (see 2.2 below); otherwise the app will call the local backend.
 
 ### 2.1 Import the project
 1. In Vercel, go to **Add New → Project** and import this GitHub repo.
@@ -91,8 +83,7 @@ The frontend lives in `apps/frontend/` and builds to `dist/` via `vite build`.
 
 Vercel will auto-detect most of these from the Vite setup; set the **Root Directory** to `apps/frontend` explicitly.
 
-### 2.2 Environment Variables (optional)
-If you make the API URL configurable, add:
+### 2.2 Environment Variables
 
 | Key | Value |
 | --- | --- |
@@ -106,10 +97,10 @@ Click **Deploy**. Once finished, Vercel gives you a URL (e.g. `https://techtalk-
 ## 3. Wiring backend ↔ frontend
 
 1. Deploy the backend first and confirm `/api/health` works.
-2. Set the frontend's `API_URL` to the Render backend URL (edit `apps/frontend/src/services/api.ts`, or use `VITE_API_URL`).
+2. Set the frontend's `VITE_API_URL` to the Render backend URL (Vercel → project → Environment Variables).
 3. Redeploy the frontend so the new API URL is bundled.
 
-CORS is currently configured as `origin: '*'` in `apps/backend/src/index.ts`, so the Vercel domain is allowed to call the API by default. For production hardening, restrict it to your Vercel URL.
+CORS is currently configured as `origin: '*'` in `apps/backend/src/index.ts`, so the Vercel domain is allowed to call the API by default. For production hardening, restrict it to your Vercel URL by setting `FRONTEND_URL` in the backend environment.
 
 ---
 
@@ -118,9 +109,9 @@ CORS is currently configured as `origin: '*'` in `apps/backend/src/index.ts`, so
 - [ ] Render PostgreSQL database created
 - [ ] Render Web Service created with `apps/backend` root, `npm install && npm run build`, `npm start`
 - [ ] Backend env vars set: `DATABASE_URL`, `JWT_SECRET`, `YOUTUBE_API_KEY`, `NODE_ENV=production`
-- [ ] `npm run db:push` / `db:migrate` executed against production DB
+- [ ] `npm run db:migrate` executed against production DB (or `db:push` for simple schema sync)
 - [ ] `/api/health` returns OK
-- [ ] Frontend `API_URL` updated to Render URL
+- [ ] Frontend `VITE_API_URL` set to Render URL
 - [ ] Vercel project uses `apps/frontend` root, builds `dist`
 - [ ] Frontend redeployed after API URL change
 
@@ -134,6 +125,5 @@ CORS is currently configured as `origin: '*'` in `apps/backend/src/index.ts`, so
 
 ## 6. Recommended improvements (not yet done)
 
-- Replace the hardcoded `API_URL` in `src/services/api.ts` with `import.meta.env.VITE_API_URL` and provide a `.env` / `.env.example` for the frontend.
 - Add a `render.yaml` (Infra-as-Code) and a `vercel.json` for reproducible deployments.
-- Lock down CORS to the specific Vercel domain.
+- Lock down CORS to the specific Vercel domain (set `FRONTEND_URL` in the backend env).

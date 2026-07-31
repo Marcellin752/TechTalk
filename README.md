@@ -34,10 +34,10 @@ If you just want to bring up PostgreSQL quickly:
 docker compose up -d postgres
 ```
 
-Then continue with backend setup:
+Then continue with backend setup (use `db:migrate` for versioned migrations, or `db:push` for quick local prototyping):
 
 ```bash
-npm run db:push --workspace=apps/backend
+npm run db:migrate --workspace=apps/backend
 npm run dev:backend
 ```
 

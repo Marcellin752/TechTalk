@@ -1,4 +1,4 @@
-const API_URL = 'https://techtalk-xg62.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export interface User {
   id: string;

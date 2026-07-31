@@ -7,7 +7,6 @@ import {
   User,
   Rss,
   X,
-  Check,
   Search,
   ChevronRight,
   Bell,
@@ -33,136 +32,12 @@ interface ContentItem {
   author: string;
   category: string;
   body: string;
-  views: string;
   date: string;
   embedCode?: string | null;
 }
 
-type AppScreen = "auth" | "onboarding" | "app";
+type AppScreen = "auth" | "app";
 type AppTab = "feed" | "saved" | "profile";
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const FEED_ITEMS: ContentItem[] = [
-  {
-    id: "1",
-    type: "article",
-    source: "Medium",
-    title: "Why Rust is Quietly Replacing C++ in Safety-Critical Systems",
-    summary: "From aerospace to automotive, teams are switching. Here's what the data says.",
-    image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=500&fit=crop&auto=format",
-    readTime: "6 min",
-    author: "Sara Okonkwo",
-    category: "Systems",
-    body: "Over the past three years, a quiet revolution has been unfolding in safety-critical software development. Rust, once dismissed as a niche systems language, has found its way into aerospace navigation systems, automotive braking controllers, and medical device firmware.\n\nThe numbers are hard to ignore. In a survey of 400 engineering teams working in regulated industries, 34% reported actively migrating from C or C++ to Rust. That's up from 9% two years ago. The driver isn't aesthetics — it's the compiler's ownership model, which eliminates entire classes of memory safety bugs at build time rather than runtime.\n\nFor teams operating under DO-178C or ISO 26262, the implications are significant. Fewer runtime failures means fewer field incidents, shorter certification cycles, and lower insurance liability. One aerospace contractor told me their defect rate dropped by 60% in modules rewritten in Rust — and that's before any additional testing.",
-    views: "24.1k",
-    date: "Jun 23",
-  },
-  {
-    id: "2",
-    type: "video",
-    source: "YouTube",
-    title: "React 19 Concurrent Features — Deep Dive",
-    summary: "useTransition, Suspense boundaries, and the new compiler explained with live demos.",
-    image: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&h=500&fit=crop&auto=format",
-    duration: "18:42",
-    author: "Theo Browne",
-    category: "Frontend",
-    body: "React 19 shipped the compiler that removes the need for useMemo and useCallback in most cases. In this video we walk through the concurrent features added since React 18.\n\nWe cover: the new React Compiler and what it actually does under the hood, the updated Suspense model with streaming SSR, useTransition for non-blocking state updates, and the new server action primitives.\n\nLive demos throughout. We also benchmark a real dashboard component before and after the compiler — the results will surprise you.",
-    views: "142k",
-    date: "Jun 24",
-  },
-  {
-    id: "3",
-    type: "article",
-    source: "Reddit",
-    title: "I Built a 10x Faster PostgreSQL Query — Here's Exactly How",
-    summary: "A query that took 8 seconds now runs in 80ms. The fix was embarrassingly simple.",
-    image: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=500&fit=crop&auto=format",
-    readTime: "4 min",
-    author: "u/dbwizard99",
-    category: "Database",
-    body: "Three weeks ago I was debugging a dashboard that was timing out. The culprit: a single JOIN doing a sequential scan on 40 million rows.\n\nHere's the query (anonymized). The problem was a function call in the WHERE clause — specifically, LOWER() applied to an indexed column. PostgreSQL can't use a B-tree index when you wrap the column in a function. The fix? A functional index on LOWER(email). Query time: 8.2s → 78ms.\n\nThe broader lesson is to always check EXPLAIN ANALYZE before optimizing. I'd been adding composite indexes for 20 minutes trying to fix the wrong thing. Running the query plan first would have saved me an hour.",
-    views: "18.7k",
-    date: "Jun 22",
-  },
-  {
-    id: "4",
-    type: "video",
-    source: "YouTube",
-    title: "How Netflix Runs 1 Million+ Kubernetes Pods",
-    summary: "Inside Netflix's container orchestration, autoscaling, and chaos engineering practices.",
-    image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=500&fit=crop&auto=format",
-    duration: "31:15",
-    author: "Netflix Engineering",
-    category: "DevOps",
-    body: "Netflix operates at a scale most engineers never encounter. At peak, we're running over a million Kubernetes pods across dozens of regions.\n\nIn this talk from KubeCon, our platform engineering team walks through the custom autoscaler we built on top of KEDA, how we handle region failover with sub-minute RPO, and the chaos engineering practices (Chaos Monkey, Latency Monkey) that keep our on-call team sane.\n\nWe also cover the organizational model — how 200+ microservice teams operate independently without stepping on each other in the same clusters.",
-    views: "87k",
-    date: "Jun 20",
-  },
-  {
-    id: "5",
-    type: "article",
-    source: "Medium",
-    title: "The Death of the Junior Developer: What AI Really Means for Entry-Level Roles",
-    summary: "Companies report a 40% drop in junior hires. But the full picture is more nuanced.",
-    image: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&h=500&fit=crop&auto=format",
-    readTime: "8 min",
-    author: "Marcus Chen",
-    category: "AI & Career",
-    body: "The numbers are hard to ignore. Three major tech employers told me their junior engineering headcount dropped by 40% year-over-year. But is AI really the cause, or is this a cyclical correction masked by a convenient narrative?\n\nThe answer, after 40 interviews with hiring managers and recent bootcamp graduates, is: both, and neither cleanly.\n\nAI tools have raised the output bar for individual contributors. A mid-level engineer with Claude or Copilot can ship code at a pace that previously required a team. That compresses the number of seats needed at junior level — not because juniors can't produce, but because the marginal productivity of a third or fourth hire has dropped.\n\nBut there's a flip side. The teams cutting junior roles are often the same teams that will struggle in 18 months to promote from within.",
-    views: "56.3k",
-    date: "Jun 21",
-  },
-  {
-    id: "6",
-    type: "article",
-    source: "Reddit",
-    title: "We Migrated 300k Lines of C++ to WebAssembly — Here's What Happened",
-    summary: "Performance went up 3x. Startup time dropped by 80%. The trade-offs were real.",
-    image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&h=500&fit=crop&auto=format",
-    readTime: "10 min",
-    author: "u/wasm_pilgrim",
-    category: "Web",
-    body: "Eighteen months ago, 40% of our product ran as a native desktop app for performance reasons. Today, that same code runs in the browser via WebAssembly — and it's faster.\n\nThe migration was not painless. Emscripten gave us a good starting point but we hit walls around threading (SharedArrayBuffer restrictions), file system access, and exception handling overhead. We spent six weeks just on the allocator.\n\nThe payoff: our p95 load time went from 4.1s to 0.8s. Memory usage dropped 30%. And we killed two native codebases, one for macOS and one for Windows.",
-    views: "31.2k",
-    date: "Jun 19",
-  },
-  {
-    id: "7",
-    type: "video",
-    source: "YouTube",
-    title: "Claude 4 vs GPT-5: A Developer's Honest Benchmark",
-    summary: "100 real-world coding tasks. Function calling, multi-step reasoning, and edge cases.",
-    image: "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800&h=500&fit=crop&auto=format",
-    duration: "24:08",
-    author: "Priya Anand",
-    category: "AI",
-    body: "I ran 100 real-world developer tasks through both models. Not cherry-picked benchmarks — actual problems from my last three months of work: debugging race conditions, writing regex for messy data, refactoring legacy PHP, generating OpenAPI specs from prose.\n\nThe results surprised me on several dimensions. Claude 4 consistently outperformed on long-context reasoning and multi-file refactors. GPT-5 had an edge on function-calling reliability and structured output adherence.\n\nNeither model is universally better. The right answer depends on your workflow.",
-    views: "201k",
-    date: "Jun 25",
-  },
-  {
-    id: "8",
-    type: "article",
-    source: "Medium",
-    title: "Stop Storing Secrets in .env Files",
-    summary: "There's a better way to handle credentials in production. Here's what we switched to.",
-    image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&h=500&fit=crop&auto=format",
-    readTime: "5 min",
-    author: "Felix Brandt",
-    category: "Security",
-    body: "Every week, another repo gets leaked with production secrets committed in a .env file. It's a solved problem. The tooling has existed for years. And yet.\n\nThe pattern that's worked best for our team: secrets manager (AWS Secrets Manager or HashiCorp Vault) injected at runtime by your orchestrator, never written to disk in the container. Local development uses a secrets proxy that authenticates via your SSO provider — no plain-text values anywhere.\n\nThe cost is real: more IAM complexity, slower local onboarding. But a single leaked database credential that takes down production for 6 hours is a much worse trade.",
-    views: "43.9k",
-    date: "Jun 18",
-  },
-];
-
-const INTERESTS = [
-  "AI & ML", "Frontend", "Backend", "DevOps", "Security",
-  "Mobile", "Open Source", "Databases", "Career", "Systems", "Web3", "Design",
-  "Performance", "Architecture",
-];
 
 const SOURCE_STYLES: Record<string, { chip: string; dot: string }> = {
   Reddit: { chip: "bg-orange-500/15 text-orange-400 border-orange-500/25", dot: "bg-orange-500" },
@@ -171,6 +46,24 @@ const SOURCE_STYLES: Record<string, { chip: string; dot: string }> = {
   "Dev.to": { chip: "bg-neutral-500/15 text-neutral-300 border-neutral-500/25", dot: "bg-neutral-400" },
   TechCrunch: { chip: "bg-lime-600/15 text-lime-400 border-lime-600/25", dot: "bg-lime-500" },
 };
+
+// ─── Sanitization ─────────────────────────────────────────────────────────────
+
+const EMBED_ALLOWED_HOSTS = new Set(["youtube.com", "www.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com"]);
+
+function sanitizeEmbedCode(html: string | null | undefined): string {
+  if (!html) return "";
+  const match = html.match(/<iframe[^>]*\bsrc=["']([^"']+)["']/i);
+  if (!match) return "";
+  try {
+    const url = new URL(match[1]);
+    if (!EMBED_ALLOWED_HOSTS.has(url.hostname)) return "";
+    if (!url.pathname.startsWith("/embed/")) return "";
+    return `<iframe title="Embedded video player" src="${url.toString()}" width="100%" height="100%" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+  } catch {
+    return "";
+  }
+}
 
 // ─── Micro Components ─────────────────────────────────────────────────────────
 
@@ -344,66 +237,6 @@ function GoogleIcon() {
   );
 }
 
-// ─── Onboarding Screen ────────────────────────────────────────────────────────
-
-function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  const toggle = (i: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
-      return next;
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col px-6 py-12">
-      <div className="max-w-sm mx-auto w-full flex-1 flex flex-col">
-        <div className="mb-1">
-          <span className="text-[11px] font-mono text-primary uppercase tracking-[0.15em]">
-            Almost there
-          </span>
-        </div>
-        <h1 className="text-[32px] font-bold text-foreground mb-2 leading-tight">
-          What are you<br />into?
-        </h1>
-        <p className="text-muted-foreground text-sm mb-10 leading-relaxed">
-          Pick topics you care about. Your feed adapts instantly.
-        </p>
-
-        <div className="flex flex-wrap gap-2 mb-auto">
-          {INTERESTS.map((interest) => {
-            const on = selected.has(interest);
-            return (
-              <button
-                key={interest}
-                onClick={() => toggle(interest)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                  on
-                    ? "bg-primary border-primary text-white shadow-md shadow-primary/20"
-                    : "bg-secondary border-border text-muted-foreground hover:text-foreground hover:border-border/80"
-                }`}
-              >
-                {on && <Check size={12} />}
-                {interest}
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          onClick={onComplete}
-          disabled={selected.size < 1}
-          className="w-full bg-primary text-white py-4 rounded-2xl font-semibold text-sm mt-8 disabled:opacity-30 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-lg shadow-primary/20"
-        >
-          Start Exploring →
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Feed Card ────────────────────────────────────────────────────────────────
 
 function FeedCard({
@@ -527,9 +360,9 @@ function ReaderScreen({
         {/* Video Player or Hero image */}
         <div className="relative bg-muted flex items-center justify-center overflow-hidden" style={{ height: "clamp(180px, 45vw, 360px)" }}>
           {item.type === "video" && item.embedCode ? (
-            <div 
-              className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full border-none"
-              dangerouslySetInnerHTML={{ __html: item.embedCode }}
+            <div
+              className="w-full h-full [&>iframe]:w-full [&>iframe]:h-full"
+              dangerouslySetInnerHTML={{ __html: sanitizeEmbedCode(item.embedCode) }}
             />
           ) : (
             <>
@@ -582,12 +415,16 @@ function FeedScreen({
   onSave,
   savedIds,
   loading,
+  error,
+  onRetry,
 }: {
   items: ContentItem[];
   onOpen: (item: ContentItem) => void;
   onSave: (item: ContentItem) => void;
   savedIds: Set<string>;
   loading: boolean;
+  error: string | null;
+  onRetry: () => void;
 }) {
   return (
     <div className="flex-1 overflow-y-auto">
@@ -611,7 +448,19 @@ function FeedScreen({
           </div>
         )}
 
-        {!loading && items.length === 0 && (
+        {!loading && error && (
+          <div className="py-12 text-center text-muted-foreground text-sm font-mono space-y-4">
+            <div>{error}</div>
+            <button
+              onClick={onRetry}
+              className="px-4 py-2 rounded-xl bg-secondary border border-border text-foreground hover:bg-muted transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && items.length === 0 && (
           <div className="py-12 text-center text-muted-foreground text-sm font-mono">
             No technical talks found. Check back later!
           </div>
@@ -806,14 +655,15 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   const [saved, setSaved] = useState<ContentItem[]>([]);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [feedError, setFeedError] = useState<string | null>(null);
 
   const savedIds = new Set(saved.map((i) => i.id));
 
-  useEffect(() => {
-    async function loadFeed() {
-      setLoading(true);
-      try {
-        const backendContents = await api.getContents();
+  const loadFeed = async () => {
+    setLoading(true);
+    setFeedError(null);
+    try {
+      const backendContents = await api.getContents();
         const mappedItems: ContentItem[] = backendContents.map((c) => {
           let image = "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=500&fit=crop&auto=format";
           let youtubeId = "";
@@ -873,7 +723,6 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
             author,
             category,
             body: c.summary || "No full text available.",
-            views: `${Math.floor(Math.random() * 50) + 5}k`,
             date: new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
             embedCode: c.embedCode
           };
@@ -881,15 +730,15 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
         setItems(mappedItems);
       } catch (err) {
         console.error("Failed to fetch feed:", err);
+        setFeedError("Unable to load the feed. Check your connection and try again.");
       } finally {
         setLoading(false);
       }
-    }
+  };
 
-    if (tab === "feed") {
-      loadFeed();
-    }
-  }, [tab]);
+  useEffect(() => {
+    loadFeed();
+  }, []);
 
   const toggleSave = (item: ContentItem) => {
     setSaved((prev) =>
@@ -935,7 +784,15 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       {/* Screen content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {tab === "feed" && (
-          <FeedScreen items={items} onOpen={setReader} onSave={toggleSave} savedIds={savedIds} loading={loading} />
+          <FeedScreen
+            items={items}
+            onOpen={setReader}
+            onSave={toggleSave}
+            savedIds={savedIds}
+            loading={loading}
+            error={feedError}
+            onRetry={loadFeed}
+          />
         )}
         {tab === "saved" && (
           <SavedScreen
@@ -1005,7 +862,6 @@ export default function App() {
   return (
     <div className="dark min-h-screen bg-background">
       {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
-      {screen === "onboarding" && <OnboardingScreen onComplete={() => setScreen("app")} />}
       {screen === "app" && <MainApp user={user} onLogout={handleLogout} />}
     </div>
   );

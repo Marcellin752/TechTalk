@@ -8,7 +8,7 @@ export function validateEmail(email: string): boolean {
     if (!email || typeof email !== 'string') {
         return false;
     }
-    if (email.length > 300) {
+    if (email.length > 255) {
         return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,6 +28,6 @@ export function validatePassword(password: string): boolean {
     if (password.length < 12 || password.length > 100) {
         return false;
     }
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,100}$/;
     return passwordRegex.test(password);
 }

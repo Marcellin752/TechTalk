@@ -15,6 +15,13 @@
       "when": 1781376092246,
       "tag": "0001_slow_quasimodo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785486251229,
+      "tag": "0002_brainy_ultimatum",
+      "breakpoints": true
     }
   ]
 }

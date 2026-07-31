@@ -8,6 +8,7 @@ This document provides the frontend team with the necessary technical specificat
 * **Backend Stack:** Fastify, TypeScript, Drizzle ORM, PostgreSQL.
 * **Authentication:** Stateful JWT via `@fastify/jwt` (Token must be passed in the `Authorization: Bearer <token>` header).
 * **Data Refresh Rate:** Automated workers (`node-cron`) sync data from **Dev.to**, **YouTube API v3**, and global **RSS feeds** once every hour.
+* **Base URL:** `http://localhost:5000/api` in local development (configurable in the frontend via the `VITE_API_URL` environment variable).
 
 ---
 
@@ -40,9 +41,10 @@ interface UserProfile {
   email: string;       // Unique user email
   name: string;        // Account display name
   role: 'user' | 'admin'; // Access privilege level
-  createdAt: string;   // Account creation date
 }
 ```
+
+Note: the `created_at` column is not returned by the API on register/login (only `id`, `name`, `email`, `role` are exposed).
 
 ## REST API Endpoints Contract
 
@@ -62,8 +64,7 @@ interface UserProfile {
 * **Success Response (`201 Created`):**
   ```json
   {
-    "success": true,
-    "message": "User registered successfully",
+    "message": "User registered successfully!",
     "user": {
       "id": "a3b89c...",
       "email": "jane@example.com",
@@ -85,7 +86,7 @@ interface UserProfile {
 * **Success Response (`200 OK`):**
   ```json
   {
-    "success": true,
+    "message": "Login successful!",
     "token": "eyJhbGciOiJIUzI1NiIsIn...",
     "user": {
       "id": "a3b89c...",
@@ -99,11 +100,12 @@ interface UserProfile {
 ###  Content & Feed Module
 
 #### 1. Fetch Aggregated Feed
-* **Endpoint:** `GET /api/contents`
+* **Endpoint:** `GET /api/content`
 * **Headers Required:** `Authorization: Bearer <your_jwt_token>`
 * **Query Parameters (Optional Filtering):**
-  * `type`: `article` or `video`
-  * `source`: `Dev.to`, `YouTube`, `TechCrunch`
+  * `limit`: max number of items to return (default `50`, max `100`)
+  * `offset`: number of items to skip (default `0`)
+* **Response:** items are ordered by `created_at` descending.
 * **Success Response (`200 OK`):**
   ```json
   [

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -18,4 +18,6 @@ export const contents = pgTable('contents', {
   summary: text('summary'),
   embedCode: text('embed_code'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  createdAtIdx: index('contents_created_at_idx').on(table.createdAt),
+}));

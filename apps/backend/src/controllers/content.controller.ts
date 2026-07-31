@@ -1,11 +1,22 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { desc } from 'drizzle-orm';
 import { db } from '../db/db.js';
 import { contents } from '../db/schema.js';
 
-// Fetch all multi-platform contents
+// Fetch all multi-platform contents, paginated and sorted by recency
 export async function handleGetContents(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const allContents = await db.select().from(contents);
+    const query = request.query as { limit?: string; offset?: string };
+    const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(query.offset || '0', 10) || 0, 0);
+
+    const allContents = await db
+      .select()
+      .from(contents)
+      .orderBy(desc(contents.createdAt))
+      .limit(limit)
+      .offset(offset);
+
     return reply.status(200).send(allContents);
   } catch (error) {
     request.log.error(error);
