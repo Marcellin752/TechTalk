@@ -105,5 +105,72 @@ export const api = {
       throw new Error(`Failed to fetch content: ${response.statusText}`);
     }
     return response.json();
+  },
+
+  async getBookmarks(): Promise<Content[]> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    const response = await fetch(`${API_URL}/content/bookmarks`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        this.logout();
+        window.location.reload();
+      }
+      throw new Error(`Failed to fetch bookmarks: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  async addBookmark(contentId: string): Promise<{ success: boolean; error?: string }> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    try {
+      const response = await fetch(`${API_URL}/content/bookmarks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ contentId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to add bookmark' };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
+  async deleteBookmark(contentId: string): Promise<{ success: boolean; error?: string }> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    try {
+      const response = await fetch(`${API_URL}/content/bookmarks/${contentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to delete bookmark' };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
   }
 };

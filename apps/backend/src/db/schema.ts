@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -20,4 +20,13 @@ export const contents = pgTable('contents', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   createdAtIdx: index('contents_created_at_idx').on(table.createdAt),
+}));
+
+export const bookmarks = pgTable('bookmarks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  contentId: uuid('content_id').references(() => contents.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userContentUniqueIdx: uniqueIndex('bookmarks_user_content_unique_idx').on(table.userId, table.contentId),
 }));
