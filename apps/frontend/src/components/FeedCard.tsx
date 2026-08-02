@@ -1,5 +1,6 @@
 import { Play, User, Bookmark, BookmarkCheck } from "lucide-react";
 import { ContentItem } from "../types/content";
+import { SourceBadge } from "./SourceBadge";
 
 interface FeedCardProps {
   item: ContentItem;
@@ -46,7 +47,7 @@ export function FeedCard({
       {/* Body */}
       <div className="p-4 cursor-pointer" onClick={onOpen}>
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[11px] text-muted-foreground font-mono">{item.category}</span>
+          <SourceBadge source={item.source} />
           <span className="text-[11px] text-muted-foreground font-mono ml-auto">{item.date}</span>
         </div>
 
