@@ -433,6 +433,8 @@ function FeedScreen({
   loading,
   error,
   onRetry,
+  hasMore,
+  onLoadMore,
 }: {
   items: ContentItem[];
   onOpen: (item: ContentItem) => void;
@@ -441,6 +443,8 @@ function FeedScreen({
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+  hasMore: boolean;
+  onLoadMore: () => void;
 }) {
   return (
     <div className="flex-1 overflow-y-auto">
@@ -454,6 +458,17 @@ function FeedScreen({
             isSaved={savedIds.has(item.id)}
           />
         ))}
+
+        {!loading && !error && hasMore && items.length > 0 && (
+          <div className="py-4 text-center">
+            <button
+              onClick={onLoadMore}
+              className="px-6 py-2.5 rounded-xl bg-secondary border border-border text-foreground text-sm font-semibold hover:bg-muted active:scale-95 transition-all shadow-sm"
+            >
+              Load More Tech Talks
+            </button>
+          </div>
+        )}
 
         {loading && (
           <div className="py-8 flex flex-col items-center gap-3">
@@ -745,6 +760,12 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
+  
+  // Search & Pagination States
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
   const savedIds = new Set(saved.map((i) => i.id));
 
@@ -752,9 +773,11 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     setLoading(true);
     setFeedError(null);
     try {
-      const backendContents = await api.getContents();
+      const backendContents = await api.getContents(50, 0);
       const mappedItems = backendContents.map(mapBackendContentToItem);
       setItems(mappedItems);
+      setOffset(0);
+      setHasMore(backendContents.length >= 50);
 
       // Fetch bookmarks
       const backendBookmarks = await api.getBookmarks();
@@ -763,6 +786,27 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     } catch (err) {
       console.error("Failed to fetch feed:", err);
       setFeedError("Unable to load the feed. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+    try {
+      const nextOffset = offset + 50;
+      const backendContents = await api.getContents(50, nextOffset);
+      if (backendContents.length === 0) {
+        setHasMore(false);
+      } else {
+        const mappedNext = backendContents.map(mapBackendContentToItem);
+        setItems((prev) => [...prev, ...mappedNext]);
+        setOffset(nextOffset);
+        setHasMore(backendContents.length >= 50);
+      }
+    } catch (err) {
+      console.error("Failed to load more feed contents:", err);
     } finally {
       setLoading(false);
     }
@@ -783,6 +827,17 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     }
   };
 
+  const filteredItems = items.filter((item) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      item.title.toLowerCase().includes(q) ||
+      item.summary.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q) ||
+      item.source.toLowerCase().includes(q)
+    );
+  });
+
   const tabs: { id: AppTab; label: string; icon: React.ReactNode }[] = [
     { id: "feed", label: "Feed", icon: <Rss size={20} /> },
     { id: "saved", label: "Saved", icon: <Bookmark size={20} /> },
@@ -798,21 +853,51 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between flex-shrink-0">
-        {tab === "feed" ? (
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
-              <Rss size={13} className="text-white" />
+      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between flex-shrink-0 h-[57px]">
+        {tab === "feed" && isSearching ? (
+          <div className="flex items-center gap-2 w-full">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search articles, videos, topics..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+                className="w-full bg-secondary border border-border rounded-xl pl-9 pr-4 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+              />
+              <Search size={14} className="absolute left-3 top-2.5 text-muted-foreground" />
             </div>
-            <span className="text-[18px] font-bold tracking-tight text-foreground">TechTalk</span>
+            <button
+              onClick={() => {
+                setIsSearching(false);
+                setSearchQuery("");
+              }}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary"
+            >
+              <X size={16} />
+            </button>
           </div>
         ) : (
-          <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
-        )}
-        {tab === "feed" && (
-          <button className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary">
-            <Search size={18} />
-          </button>
+          <>
+            {tab === "feed" ? (
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
+                  <Rss size={13} className="text-white" />
+                </div>
+                <span className="text-[18px] font-bold tracking-tight text-foreground">TechTalk</span>
+              </div>
+            ) : (
+              <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
+            )}
+            {tab === "feed" && (
+              <button
+                onClick={() => setIsSearching(true)}
+                className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
+              >
+                <Search size={18} />
+              </button>
+            )}
+          </>
         )}
       </header>
 
@@ -820,13 +905,15 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       <div className="flex-1 flex flex-col overflow-hidden">
         {tab === "feed" && (
           <FeedScreen
-            items={items}
+            items={filteredItems}
             onOpen={setReader}
             onSave={toggleSave}
             savedIds={savedIds}
             loading={loading}
             error={feedError}
             onRetry={loadFeed}
+            hasMore={hasMore && !searchQuery}
+            onLoadMore={loadMore}
           />
         )}
         {tab === "saved" && (

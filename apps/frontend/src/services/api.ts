@@ -86,12 +86,16 @@ export const api = {
     }
   },
 
-  async getContents(): Promise<Content[]> {
+  async getContents(limit?: number, offset?: number): Promise<Content[]> {
     const token = this.getToken();
     if (!token) {
       throw new Error('Not authenticated');
     }
-    const response = await fetch(`${API_URL}/content`, {
+    const url = new URL(`${API_URL}/content`);
+    if (limit !== undefined) url.searchParams.append('limit', limit.toString());
+    if (offset !== undefined) url.searchParams.append('offset', offset.toString());
+
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
