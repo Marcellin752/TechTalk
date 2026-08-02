@@ -2,9 +2,11 @@ import { FastifyInstance } from 'fastify';
 import { handleRegister, handleLogin } from '../controllers/auth.controller.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
+  const authRateLimit = { rateLimit: { max: 20, timeWindow: '1 minute' } };
+
   // POST /api/auth/register
-  fastify.post('/register', handleRegister);
+  fastify.post('/register', { config: authRateLimit }, handleRegister);
 
   // POST /api/auth/login
-  fastify.post('/login', handleLogin);
+  fastify.post('/login', { config: authRateLimit }, handleLogin);
 }

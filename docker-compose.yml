@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: teachtalk-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: teachtalk_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - teachtalk_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d teachtalk_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  teachtalk_pgdata:

@@ -30,24 +30,24 @@ npm install
 
 #### 3. Database Sync & Operations
 
-You don't need to manually write SQL to update your database structure. Use the following commands:
+Two workflows exist; pick one and stick to it:
 
-* Generate Migrations: (Run this only if you modify src/db/schema.ts)
+* **Migrations (recommended for shared/production databases):** versioned SQL files in `src/db/migrations/`. Apply them with:
 
 ```bash
-npm run db:generate
+npm run db:migrate
 ```
 
-* Push Schema Directly (Recommended for Local Dev): Instantly synchronizes your PostgreSQL database with your TypeScript schema.
+* **Push (quick local prototyping only):** syncs the schema directly to your database without versioned files:
 
 ```bash
 npm run db:push
 ```
 
-* Apply Migrations: Run this to execute the official SQL migration files into your instance.
+Do **not** mix both on the same database — `db:push` can drift from the migration history. To create a new migration after editing `src/db/schema.ts`:
 
 ```bash
-npm run db:migrate
+npm run db:generate
 ```
 
 ## Automation Service (Background Workers)

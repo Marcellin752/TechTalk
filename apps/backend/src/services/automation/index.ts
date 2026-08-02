@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { fetchLiveDevToArticles } from './devto.provider.js';
 import { fetchLiveYouTubeVideos } from './youtube.provider.js';
 import { fetchLiveRSSFeeds } from './rss.provider.js'; // 1. Added RSS import
+import { fetchLiveRedditPosts } from './reddit.provider.js';
 
 /**
  * Orchestrates and executes all data fetching providers sequentially
@@ -13,6 +14,7 @@ async function runAllAutomationProviders(): Promise<void> {
   await fetchLiveDevToArticles();
   await fetchLiveYouTubeVideos();
   await fetchLiveRSSFeeds(); // 2. Added RSS execution
+  await fetchLiveRedditPosts();
   
   console.log('✅ [Automation Engine] All sync tasks successfully finished.');
 }

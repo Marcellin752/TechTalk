@@ -26,3 +26,6 @@ jobs:
 
       - name: Check Backend Compilation
         run: npm run build:backend
+
+      - name: Check Frontend Build
+        run: npm run build:frontend
