@@ -12,7 +12,9 @@
     "start:backend": "npm run start --workspace=apps/backend",
     "dev:frontend": "npm run dev --workspace=apps/frontend",
     "build:frontend": "npm run build --workspace=apps/frontend",
-    "dev": "npm run dev:backend & npm run dev:frontend"
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "test:backend": "npm run test --workspace=apps/backend",
+    "test": "npm run test:backend"
   },
   "keywords": [
     "monorepo",
