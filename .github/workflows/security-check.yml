@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0 # Essentiel pour que Gitleaks puisse inspecter tout l'historique des commits
 
       - name: Run Gitleaks (Secret & .env Scanner)
-        uses: gitleaks/github-action@v3
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
