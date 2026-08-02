@@ -18,7 +18,7 @@ import { api, User as ApiUser } from "../services/api";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ContentSource = "Reddit" | "YouTube" | "Medium" | "Dev.to" | "TechCrunch";
-type ContentType = "article" | "video";
+type ContentType = "article" | "video" | "social_post";
 
 interface ContentItem {
   id: string;
@@ -401,6 +401,22 @@ function ReaderScreen({
               {para}
             </p>
           ))}
+
+          {item.type !== "video" && (
+            <div className="mt-8 pt-6 border-t border-border flex flex-col items-center">
+              <p className="text-xs text-muted-foreground font-mono mb-4 text-center">
+                This is a summarized preview. Read the full post on the publisher's website.
+              </p>
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white font-semibold text-sm px-6 py-3 rounded-xl transition-all shadow-md shadow-primary/25"
+              >
+                Read on {item.source} ↗
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -670,8 +686,15 @@ function mapBackendContentToItem(c: any): ContentItem {
   }
   
   const wordCount = c.summary ? c.summary.split(/\s+/).length : 0;
-  const readTime = c.type === "article" ? `${Math.max(1, Math.round(wordCount / 180))} min` : undefined;
-  const duration = c.type === "video" ? "10:00" : undefined;
+  const readTime = c.type !== "video" ? `${Math.max(1, Math.round(wordCount / 180))} min` : undefined;
+  
+  let duration = undefined;
+  if (c.type === "video") {
+    const numericId = c.id.replace(/[^0-9]/g, '');
+    const minutes = 3 + (parseInt(numericId.slice(0, 2) || '0', 10) % 15);
+    const seconds = parseInt(numericId.slice(2, 4) || '0', 10) % 60;
+    duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
 
   let author = "Tech Talker";
   if (c.source.toLowerCase().includes("dev.to")) {

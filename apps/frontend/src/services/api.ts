@@ -12,7 +12,7 @@ export interface Content {
   title: string;
   url: string;
   source: string;
-  type: 'article' | 'video';
+  type: 'article' | 'video' | 'social_post';
   summary: string | null;
   embedCode: string | null;
   createdAt: string;
