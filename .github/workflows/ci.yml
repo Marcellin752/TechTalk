@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm' # Met en cache les dépendances npm pour accélérer les futurs builds
 
       - name: Install Monorepo Dependencies
@@ -29,3 +29,6 @@ jobs:
 
       - name: Check Frontend Build
         run: npm run build:frontend
+
+      - name: Run Backend Tests
+        run: npm run test:backend
