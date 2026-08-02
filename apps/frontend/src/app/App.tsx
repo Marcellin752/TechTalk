@@ -13,6 +13,7 @@ import {
   Info,
   LogOut,
 } from "lucide-react";
+import { toast, Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -187,7 +188,10 @@ function AuthScreen({ onAuthSuccess }: { onAuthSuccess: (user: ApiUser) => void 
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          <button className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5">
+          <button
+            onClick={() => toast.info("Google Authentication is coming soon! Please use standard email Sign In / Sign Up for the MVP.")}
+            className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5"
+          >
             <GoogleIcon />
             Continue with Google
           </button>
@@ -586,16 +590,26 @@ function SavedScreen({
 function ProfileScreen({
   user,
   savedCount,
+  readCount,
+  interests,
+  onToggleInterest,
   onLogout,
 }: {
   user: ApiUser | null;
   savedCount: number;
+  readCount: number;
+  interests: string[];
+  onToggleInterest: (interest: string) => void;
   onLogout: () => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
+
   const stats = [
     { label: "Saved", value: savedCount.toString() },
-    { label: "Read", value: "15" },
-    { label: "Streak", value: "3d" },
+    { label: "Read", value: readCount.toString() },
+    { label: "Streak", value: readCount > 0 ? "3d" : "0d" },
   ];
 
   const menuItems = [
@@ -633,22 +647,52 @@ function ProfileScreen({
 
         {/* Interests */}
         <div className="mb-8">
-          <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
-            My Interests
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {["AI & ML", "Frontend", "Systems", "Security", "DevOps"].map((tag) => (
-              <span
-                key={tag}
-                className="px-3 py-1.5 bg-secondary border border-border rounded-full text-xs text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-            <button className="px-3 py-1.5 bg-secondary border border-primary/30 rounded-full text-xs text-primary">
-              + Edit
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em]">
+              My Interests
+            </h3>
+            <button
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-xs text-primary font-mono hover:underline"
+            >
+              {isEditing ? "✓ Done" : "+ Edit"}
             </button>
           </div>
+
+          {isEditing ? (
+            <div className="flex flex-wrap gap-2 p-3 rounded-2xl bg-secondary border border-border">
+              {allAvailableInterests.map((tag) => {
+                const active = interests.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => onToggleInterest(tag)}
+                    className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                      active
+                        ? "bg-primary text-white border border-primary shadow-sm shadow-primary/20"
+                        : "bg-background text-muted-foreground border border-border hover:text-foreground"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {interests.map((tag) => (
+                <span
+                  key={tag}
+                  className="px-3 py-1.5 bg-secondary border border-border rounded-full text-xs text-muted-foreground"
+                >
+                  {tag}
+                </span>
+              ))}
+              {interests.length === 0 && (
+                <span className="text-xs text-muted-foreground font-mono">No interests added yet. Click edit to choose!</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Menu */}
@@ -656,6 +700,7 @@ function ProfileScreen({
           {menuItems.map((item, idx) => (
             <button
               key={item.label}
+              onClick={() => toast.info(`${item.label} feature is coming in the next update!`)}
               className={`w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between ${
                 idx < menuItems.length - 1 ? "border-b border-border" : ""
               }`}
@@ -766,6 +811,42 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   const [searchQuery, setSearchQuery] = useState("");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+
+  // Read items & Interests tracking states
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    const raw = localStorage.getItem("teachtalk_read_ids");
+    if (!raw) return new Set();
+    try {
+      return new Set(JSON.parse(raw));
+    } catch {
+      return new Set();
+    }
+  });
+
+  const [interests, setInterests] = useState<string[]>(() => {
+    const raw = localStorage.getItem("teachtalk_interests");
+    return raw ? JSON.parse(raw) : ["AI & ML", "Frontend", "Systems", "Security", "DevOps"];
+  });
+
+  const handleOpenReader = (item: ContentItem) => {
+    setReader(item);
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      next.add(item.id);
+      localStorage.setItem("teachtalk_read_ids", JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+
+  const handleToggleInterest = (interest: string) => {
+    setInterests((prev) => {
+      const next = prev.includes(interest)
+        ? prev.filter((i) => i !== interest)
+        : [...prev, interest];
+      localStorage.setItem("teachtalk_interests", JSON.stringify(next));
+      return next;
+    });
+  };
 
   const savedIds = new Set(saved.map((i) => i.id));
 
@@ -906,7 +987,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
         {tab === "feed" && (
           <FeedScreen
             items={filteredItems}
-            onOpen={setReader}
+            onOpen={handleOpenReader}
             onSave={toggleSave}
             savedIds={savedIds}
             loading={loading}
@@ -919,14 +1000,23 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
         {tab === "saved" && (
           <SavedScreen
             saved={saved}
-            onOpen={setReader}
+            onOpen={handleOpenReader}
             onRemove={async (id) => {
               setSaved((prev) => prev.filter((i) => i.id !== id));
               await api.deleteBookmark(id);
             }}
           />
         )}
-        {tab === "profile" && <ProfileScreen user={user} savedCount={saved.length} onLogout={onLogout} />}
+        {tab === "profile" && (
+          <ProfileScreen
+            user={user}
+            savedCount={saved.length}
+            readCount={readIds.size}
+            interests={interests}
+            onToggleInterest={handleToggleInterest}
+            onLogout={onLogout}
+          />
+        )}
       </div>
 
       {/* Bottom nav */}
@@ -986,6 +1076,7 @@ export default function App() {
 
   return (
     <div className="dark min-h-screen bg-background">
+      <Toaster position="top-center" theme="dark" />
       {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
       {screen === "app" && <MainApp user={user} onLogout={handleLogout} />}
     </div>
