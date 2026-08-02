@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, master]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   scan-secrets:
     name: Check for unwanted files and secrets
@@ -17,9 +21,11 @@ jobs:
           fetch-depth: 0 # Essentiel pour que Gitleaks puisse inspecter tout l'historique des commits
 
       - name: Run Gitleaks (Secret & .env Scanner)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/github-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_COMMENTS: "false"
 
       - name: Block explicit unwanted files (.env, .DS_Store, etc.)
         run: |
