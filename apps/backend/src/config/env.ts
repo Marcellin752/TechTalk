@@ -19,5 +19,6 @@ export const config = {
   scrapers: {
     youtubeApiKey: process.env.YOUTUBE_API_KEY,
     redditClientId: process.env.REDDIT_CLIENT_ID,
+    redditClientSecret: process.env.REDDIT_CLIENT_SECRET,
   },
 };
