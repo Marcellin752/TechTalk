@@ -1,4 +1,4 @@
-import { useRef, useState, type TouchEvent } from "react";
+import { useMemo, useRef, useState, type TouchEvent } from "react";
 import { FeedCard } from "../components/FeedCard";
 import { ContentItem } from "../types/content";
 
@@ -16,6 +16,14 @@ interface FeedScreenProps {
 
 const PULL_THRESHOLD = 72;
 
+type FeedFilter = "all" | "articles" | "videos";
+
+const FILTERS: { id: FeedFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "articles", label: "Articles" },
+  { id: "videos", label: "Videos" },
+];
+
 export function FeedScreen({
   items,
   onOpen,
@@ -30,6 +38,13 @@ export function FeedScreen({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const pullStartY = useRef<number | null>(null);
+  const [filter, setFilter] = useState<FeedFilter>("all");
+
+  const filteredItems = useMemo(() => {
+    if (filter === "all") return items;
+    if (filter === "videos") return items.filter((i) => i.type === "video");
+    return items.filter((i) => i.type !== "video");
+  }, [items, filter]);
 
   const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
@@ -73,7 +88,24 @@ export function FeedScreen({
           />
         </div>
 
-        {items.map((item) => (
+        {/* Filter bar */}
+        <div className="flex items-center gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                filter === f.id
+                  ? "bg-primary text-white shadow-sm shadow-primary/20"
+                  : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {filteredItems.map((item) => (
           <FeedCard
             key={item.id}
             item={item}
@@ -83,7 +115,7 @@ export function FeedScreen({
           />
         ))}
 
-        {!loading && !error && hasMore && items.length > 0 && (
+        {!loading && !error && hasMore && items.length > 0 && filter === "all" && (
           <div className="py-4 text-center">
             <button
               onClick={onLoadMore}
@@ -115,9 +147,11 @@ export function FeedScreen({
           </div>
         )}
 
-        {!loading && !error && items.length === 0 && (
+        {!loading && !error && filteredItems.length === 0 && (
           <div className="py-12 text-center text-muted-foreground text-sm font-mono">
-            No technical talks found. Check back later!
+            {items.length === 0
+              ? "No technical talks found. Check back later!"
+              : "No items match this filter yet. Try another one!"}
           </div>
         )}
       </div>
