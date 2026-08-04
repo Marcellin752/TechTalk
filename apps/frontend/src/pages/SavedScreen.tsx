@@ -1,11 +1,10 @@
-import { ArrowLeft, Bookmark, X } from "lucide-react";
+import { Bookmark, X } from "lucide-react";
 import { ContentItem } from "../types/content";
 
 interface SavedScreenProps {
   saved: ContentItem[];
   onOpen: (item: ContentItem) => void;
   onRemove: (id: string) => void;
-  onBack: () => void;
   error?: string | null;
 }
 
@@ -13,7 +12,6 @@ export function SavedScreen({
   saved,
   onOpen,
   onRemove,
-  onBack,
   error,
 }: SavedScreenProps) {
   const articles = saved.filter((i) => i.type !== "video");
@@ -35,23 +33,14 @@ export function SavedScreen({
 
   if (saved.length === 0) {
     return (
-      <div className="flex-1 flex flex-col px-6 py-5 text-center">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-16"
-        >
-          <ArrowLeft size={18} />
-          <span className="text-sm">Back to Feed</span>
-        </button>
-        <div className="flex flex-col items-center px-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-secondary border border-border flex items-center justify-center mb-5 shadow-inner">
-            <Bookmark size={24} className="text-muted-foreground" />
-          </div>
-          <h2 className="text-lg font-semibold text-foreground mb-2">Nothing saved yet</h2>
-          <p className="text-sm text-muted-foreground max-w-[220px] leading-relaxed">
-            Tap the bookmark icon on any card to save it here.
-          </p>
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-secondary border border-border flex items-center justify-center mb-5 shadow-inner">
+          <Bookmark size={24} className="text-muted-foreground" />
         </div>
+        <h2 className="text-lg font-semibold text-foreground mb-2">Nothing saved yet</h2>
+        <p className="text-sm text-muted-foreground max-w-[220px] leading-relaxed">
+          Tap the bookmark icon on any card to save it here.
+        </p>
       </div>
     );
   }
@@ -101,13 +90,6 @@ export function SavedScreen({
   return (
     <div className="flex-1 overflow-y-auto px-4 py-5">
       <div className="max-w-lg mx-auto space-y-8 pb-8">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={18} />
-          <span className="text-sm">Back to Feed</span>
-        </button>
         {articles.length > 0 && <Section title="Articles & Posts" items={articles} />}
         {videos.length > 0 && <Section title="Videos" items={videos} />}
       </div>
