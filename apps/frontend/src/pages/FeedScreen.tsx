@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { FeedCard } from "../components/FeedCard";
 import { ContentItem } from "../types/content";
 
@@ -45,6 +45,23 @@ export function FeedScreen({
     if (filter === "videos") return items.filter((i) => i.type === "video");
     return items.filter((i) => i.type !== "video");
   }, [items, filter]);
+
+  // Infinite scroll sentinel
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const shouldObserve = !loading && !error && hasMore && filter === "all" && items.length > 0;
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !shouldObserve) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) onLoadMore();
+      },
+      { rootMargin: "400px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldObserve, onLoadMore, items.length]);
 
   const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
@@ -116,13 +133,8 @@ export function FeedScreen({
         ))}
 
         {!loading && !error && hasMore && items.length > 0 && filter === "all" && (
-          <div className="py-4 text-center">
-            <button
-              onClick={onLoadMore}
-              className="px-6 py-2.5 rounded-xl bg-secondary border border-border text-foreground text-sm font-semibold hover:bg-muted active:scale-95 transition-all shadow-sm"
-            >
-              Load More Tech Talks
-            </button>
+          <div ref={sentinelRef} className="py-4 flex justify-center">
+            <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
           </div>
         )}
 
