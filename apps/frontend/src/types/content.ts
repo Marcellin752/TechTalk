@@ -18,4 +18,4 @@ export interface ContentItem {
 }
 
 export type AppScreen = "auth" | "app";
-export type AppTab = "feed" | "saved" | "profile";
+export type AppTab = "feed" | "saved" | "profile" | "settings";

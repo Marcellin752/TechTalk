@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, Info, LogOut } from "lucide-react";
+import { User, Info, LogOut, Bookmark, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { User as ApiUser } from "../services/api";
 
@@ -10,6 +10,7 @@ interface ProfileScreenProps {
   readDates: string[];
   interests: string[];
   onToggleInterest: (interest: string) => void;
+  onNavigateToSaved: () => void;
   onLogout: () => void;
 }
 
@@ -40,6 +41,7 @@ export function ProfileScreen({
   readDates,
   interests,
   onToggleInterest,
+  onNavigateToSaved,
   onLogout,
 }: ProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -55,7 +57,8 @@ export function ProfileScreen({
   ];
 
   const menuItems = [
-    { label: "About TechTalk", icon: <Info size={14} /> },
+    { label: "My Saved Items", icon: <Bookmark size={14} />, action: onNavigateToSaved },
+    { label: "About TechTalk", icon: <Info size={14} />, action: () => toast.info("TechTalk v1.0 — TikTok for tech: discover, scroll, learn. Aggregates articles & videos from Dev.to, TechCrunch, Reddit and YouTube.") },
   ];
 
   return (
@@ -148,15 +151,16 @@ export function ProfileScreen({
           {menuItems.map((item, idx) => (
             <button
               key={item.label}
-              onClick={() =>
-                toast.info("TechTalk v1.0 — TikTok for tech: discover, scroll, learn. Aggregates articles & videos from Dev.to, TechCrunch, Reddit and YouTube.")
-              }
+              onClick={item.action}
               className={`w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between ${
                 idx < menuItems.length - 1 ? "border-b border-border" : ""
               }`}
             >
-              <span>{item.label}</span>
-              <span className="text-muted-foreground">{item.icon}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-muted-foreground">{item.icon}</span>
+                {item.label}
+              </span>
+              <ChevronRight size={14} className="text-muted-foreground" />
             </button>
           ))}
         </div>

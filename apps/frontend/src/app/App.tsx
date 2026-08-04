@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Rss, Search, Bookmark, User, X } from "lucide-react";
+import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -11,6 +11,7 @@ import { AuthScreen } from "../pages/AuthScreen";
 import { FeedScreen } from "../pages/FeedScreen";
 import { SavedScreen } from "../pages/SavedScreen";
 import { ProfileScreen } from "../pages/ProfileScreen";
+import { SettingsScreen } from "../pages/SettingsScreen";
 import { ReaderScreen } from "../pages/ReaderScreen";
 
 // ─── Content Mapping Helper ──────────────────────────────────────────────────
@@ -276,16 +277,11 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     }
   };
 
-  const tabs: { id: AppTab; label: string; icon: React.ReactNode }[] = [
-    { id: "feed", label: "Feed", icon: <Rss size={20} /> },
-    { id: "saved", label: "Saved", icon: <Bookmark size={20} /> },
-    { id: "profile", label: "Profile", icon: <User size={20} /> },
-  ];
-
   const headerTitle: Record<AppTab, string> = {
     feed: "TechTalk",
     saved: "Saved",
     profile: "Profile",
+    settings: "Settings",
   };
 
   return (
@@ -327,14 +323,56 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
             ) : (
               <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
             )}
-            {tab === "feed" && (
+            <div className="flex items-center gap-1">
+              {tab === "feed" && (
+                <button
+                  onClick={() => setIsSearching(true)}
+                  className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
+                  aria-label="Search"
+                >
+                  <Search size={18} />
+                </button>
+              )}
+              {tab !== "saved" && (
+                <button
+                  onClick={() => setTab("saved")}
+                  className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
+                    tab === "saved" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-label="Saved"
+                >
+                  <Bookmark size={18} />
+                </button>
+              )}
               <button
-                onClick={() => setIsSearching(true)}
-                className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
+                onClick={() => setTab("settings")}
+                className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
+                  tab === "settings" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+                aria-label="Settings"
               >
-                <Search size={18} />
+                <Settings size={18} />
               </button>
-            )}
+              <button
+                onClick={() => setTab("profile")}
+                className={`p-1 rounded-full hover:bg-secondary transition-colors ${
+                  tab === "profile" ? "ring-2 ring-primary/40" : ""
+                }`}
+                aria-label="Profile"
+              >
+                {user?.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user.name || "Profile"}
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
+                    <User size={14} className="text-primary" />
+                  </div>
+                )}
+              </button>
+            </div>
           </>
         )}
       </header>
@@ -373,31 +411,12 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
             readDates={readDates}
             interests={interests}
             onToggleInterest={handleToggleInterest}
+            onNavigateToSaved={() => setTab("saved")}
             onLogout={onLogout}
           />
         )}
+        {tab === "settings" && <SettingsScreen user={user} />}
       </div>
-
-      {/* Bottom nav */}
-      <nav className="bg-card border-t border-border px-2 py-2 flex flex-shrink-0 safe-area-pb">
-        {tabs.map((t) => {
-          const active = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all ${
-                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <div className={`transition-transform duration-150 ${active ? "scale-110" : ""}`}>
-                {t.icon}
-              </div>
-              <span className="text-[9px] font-mono uppercase tracking-widest">{t.label}</span>
-            </button>
-          );
-        })}
-      </nav>
 
       {/* Reader overlay */}
       {reader && (
