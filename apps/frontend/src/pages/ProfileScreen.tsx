@@ -7,15 +7,37 @@ interface ProfileScreenProps {
   user: ApiUser | null;
   savedCount: number;
   readCount: number;
+  readDates: string[];
   interests: string[];
   onToggleInterest: (interest: string) => void;
   onLogout: () => void;
+}
+
+function computeStreak(readDates: string[]): number {
+  const days = new Set(readDates);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let cursor = new Date(today);
+
+  // If nothing read today, streak can still count from yesterday.
+  if (!days.has(cursor.toISOString().slice(0, 10))) {
+    cursor.setTime(cursor.getTime() - dayMs);
+  }
+
+  let streak = 0;
+  while (days.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setTime(cursor.getTime() - dayMs);
+  }
+  return streak;
 }
 
 export function ProfileScreen({
   user,
   savedCount,
   readCount,
+  readDates,
   interests,
   onToggleInterest,
   onLogout,
@@ -24,10 +46,11 @@ export function ProfileScreen({
 
   const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
 
+  const streak = computeStreak(readDates);
   const stats = [
     { label: "Saved", value: savedCount.toString() },
     { label: "Read", value: readCount.toString() },
-    { label: "Streak", value: readCount > 0 ? "3d" : "0d" },
+    { label: "Streak", value: streak > 0 ? `${streak}d` : "—" },
   ];
 
   const menuItems = [

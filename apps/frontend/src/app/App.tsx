@@ -105,7 +105,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
-  // Read items & Interests tracking states
+  // Read items tracking (ids) + streak tracking (read dates)
   const [readIds, setReadIds] = useState<Set<string>>(() => {
     const raw = localStorage.getItem("teachtalk_read_ids");
     if (!raw) return new Set();
@@ -116,10 +116,18 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     }
   });
 
-  const [interests, setInterests] = useState<string[]>(() => {
-    const raw = localStorage.getItem("teachtalk_interests");
-    return raw ? JSON.parse(raw) : ["AI & ML", "Frontend", "Systems", "Security", "DevOps"];
+  const [readDates, setReadDates] = useState<string[]>(() => {
+    const raw = localStorage.getItem("teachtalk_read_dates");
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
+
+  const todayKey = () => new Date().toISOString().slice(0, 10);
 
   const handleOpenReader = (item: ContentItem) => {
     setReader(item);
@@ -129,7 +137,19 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       localStorage.setItem("teachtalk_read_ids", JSON.stringify(Array.from(next)));
       return next;
     });
+    setReadDates((prev) => {
+      const key = todayKey();
+      if (prev.includes(key)) return prev;
+      const next = [...prev, key];
+      localStorage.setItem("teachtalk_read_dates", JSON.stringify(next));
+      return next;
+    });
   };
+
+  const [interests, setInterests] = useState<string[]>(() => {
+    const raw = localStorage.getItem("teachtalk_interests");
+    return raw ? JSON.parse(raw) : ["AI & ML", "Frontend", "Systems", "Security", "DevOps"];
+  });
 
   const handleToggleInterest = (interest: string) => {
     setInterests((prev) => {
@@ -348,6 +368,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
             user={user}
             savedCount={saved.length}
             readCount={readIds.size}
+            readDates={readDates}
             interests={interests}
             onToggleInterest={handleToggleInterest}
             onLogout={onLogout}
