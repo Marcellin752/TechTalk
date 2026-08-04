@@ -1,10 +1,18 @@
-import { Info, Rss } from "lucide-react";
-import { toast } from "sonner";
+import { Rss, Bookmark, Search, User, Globe, Shield } from "lucide-react";
 import { User as ApiUser } from "../services/api";
 
 interface SettingsScreenProps {
   user: ApiUser | null;
 }
+
+const SOURCES = ["Dev.to", "TechCrunch", "Reddit", "YouTube"];
+
+const FEATURES = [
+  { icon: <Rss size={16} />, title: "Curated feed", desc: "Fresh tech articles & videos from across the web." },
+  { icon: <Bookmark size={16} />, title: "Save for later", desc: "Bookmark posts and revisit them anytime." },
+  { icon: <Search size={16} />, title: "Full-text search", desc: "Find exactly what you're looking for instantly." },
+  { icon: <User size={16} />, title: "Your profile", desc: "Track reading streaks and personalize interests." },
+];
 
 export function SettingsScreen({ user }: SettingsScreenProps) {
   return (
@@ -22,24 +30,60 @@ export function SettingsScreen({ user }: SettingsScreenProps) {
         {/* Account summary */}
         <div className="rounded-2xl border border-border overflow-hidden bg-card mb-8">
           <button
-            onClick={() => toast.info("You are signed in as " + (user?.email || "guest"))}
             className="w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between"
           >
-            <span>{user?.name || "Tech Enthusiast"}</span>
+            <span className="font-semibold">{user?.name || "Tech Enthusiast"}</span>
             <span className="text-muted-foreground text-xs font-mono">{user?.email || "guest"}</span>
           </button>
         </div>
 
         {/* About */}
+        <section className="mb-8">
+          <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
+            About TechTalk
+          </h3>
+          <div className="rounded-2xl border border-border overflow-hidden bg-card p-5">
+            <p className="text-sm text-foreground/85 leading-relaxed mb-4">
+              TechTalk is a <span className="font-semibold text-foreground">TikTok-style tech feed</span> — discover,
+              scroll and learn. Instead of a noisy timeline, it curates high-quality technical articles and videos
+              from across the internet into one clean, mobile-first stream.
+            </p>
+
+            <div className="flex flex-wrap gap-2 mb-5">
+              {SOURCES.map((s) => (
+                <span
+                  key={s}
+                  className="px-2.5 py-1 rounded-full bg-secondary border border-border text-xs font-mono text-muted-foreground"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              {FEATURES.map((f) => (
+                <div key={f.title} className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-primary">{f.icon}</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">{f.title}</div>
+                    <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">{f.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Privacy note */}
         <div className="rounded-2xl border border-border overflow-hidden bg-card">
-          <button
-            onClick={() =>
-              toast.info("TechTalk — TikTok for tech: discover, scroll, learn. Aggregates articles & videos from Dev.to, TechCrunch, Reddit and YouTube.")
-            }
-            className="w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between"
-          >
-            <span>About TechTalk</span>
-            <Info size={14} className="text-muted-foreground" />
+          <button className="w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Shield size={14} className="text-muted-foreground" />
+              Privacy & data
+            </span>
+            <Globe size={14} className="text-muted-foreground" />
           </button>
         </div>
       </div>

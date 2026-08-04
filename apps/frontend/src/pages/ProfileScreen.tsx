@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { User, Info, LogOut, Bookmark, ChevronRight } from "lucide-react";
-import { toast } from "sonner";
 import { User as ApiUser } from "../services/api";
 
 interface ProfileScreenProps {
@@ -11,6 +10,7 @@ interface ProfileScreenProps {
   interests: string[];
   onToggleInterest: (interest: string) => void;
   onNavigateToSaved: () => void;
+  onNavigateToSettings: () => void;
   onLogout: () => void;
 }
 
@@ -42,6 +42,7 @@ export function ProfileScreen({
   interests,
   onToggleInterest,
   onNavigateToSaved,
+  onNavigateToSettings,
   onLogout,
 }: ProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -58,7 +59,7 @@ export function ProfileScreen({
 
   const menuItems = [
     { label: "My Saved Items", icon: <Bookmark size={14} />, action: onNavigateToSaved },
-    { label: "About TechTalk", icon: <Info size={14} />, action: () => toast.info("TechTalk v1.0 — TikTok for tech: discover, scroll, learn. Aggregates articles & videos from Dev.to, TechCrunch, Reddit and YouTube.") },
+    { label: "About TechTalk", icon: <Info size={14} />, action: onNavigateToSettings },
   ];
 
   return (

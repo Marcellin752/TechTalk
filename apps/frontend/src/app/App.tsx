@@ -413,6 +413,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
             interests={interests}
             onToggleInterest={handleToggleInterest}
             onNavigateToSaved={() => setTab("saved")}
+            onNavigateToSettings={() => setTab("settings")}
             onLogout={onLogout}
           />
         )}
