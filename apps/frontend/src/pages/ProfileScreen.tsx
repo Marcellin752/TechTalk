@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, ChevronRight, Bell, Info, LogOut } from "lucide-react";
+import { User, Info, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { User as ApiUser } from "../services/api";
 
@@ -7,15 +7,37 @@ interface ProfileScreenProps {
   user: ApiUser | null;
   savedCount: number;
   readCount: number;
+  readDates: string[];
   interests: string[];
   onToggleInterest: (interest: string) => void;
   onLogout: () => void;
+}
+
+function computeStreak(readDates: string[]): number {
+  const days = new Set(readDates);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let cursor = new Date(today);
+
+  // If nothing read today, streak can still count from yesterday.
+  if (!days.has(cursor.toISOString().slice(0, 10))) {
+    cursor.setTime(cursor.getTime() - dayMs);
+  }
+
+  let streak = 0;
+  while (days.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setTime(cursor.getTime() - dayMs);
+  }
+  return streak;
 }
 
 export function ProfileScreen({
   user,
   savedCount,
   readCount,
+  readDates,
   interests,
   onToggleInterest,
   onLogout,
@@ -24,15 +46,14 @@ export function ProfileScreen({
 
   const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
 
+  const streak = computeStreak(readDates);
   const stats = [
     { label: "Saved", value: savedCount.toString() },
     { label: "Read", value: readCount.toString() },
-    { label: "Streak", value: readCount > 0 ? "3d" : "0d" },
+    { label: "Streak", value: streak > 0 ? `${streak}d` : "—" },
   ];
 
   const menuItems = [
-    { label: "Settings", icon: <ChevronRight size={14} /> },
-    { label: "Notifications", icon: <Bell size={14} /> },
     { label: "About TechTalk", icon: <Info size={14} /> },
   ];
 
@@ -41,9 +62,17 @@ export function ProfileScreen({
       <div className="max-w-lg mx-auto px-4 py-8 pb-10">
         {/* Avatar */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center mb-4 shadow-lg shadow-primary/10">
-            <User size={32} className="text-primary" />
-          </div>
+          {user?.picture ? (
+            <img
+              src={user.picture}
+              alt={user.name || "Profile"}
+              className="w-20 h-20 rounded-full object-cover border-2 border-primary/30 mb-4 shadow-lg shadow-primary/10"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center mb-4 shadow-lg shadow-primary/10">
+              <User size={32} className="text-primary" />
+            </div>
+          )}
           <h2 className="text-xl font-bold text-foreground">{user?.name || "Tech Enthusiast"}</h2>
           <p className="text-sm text-muted-foreground font-mono mt-1">{user?.email || "developer@teachtalk.com"}</p>
         </div>
@@ -118,7 +147,9 @@ export function ProfileScreen({
           {menuItems.map((item, idx) => (
             <button
               key={item.label}
-              onClick={() => toast.info(`${item.label} feature is coming in the next update!`)}
+              onClick={() =>
+                toast.info("TechTalk v1.0 — TikTok for tech: discover, scroll, learn. Aggregates articles & videos from Dev.to, TechCrunch, Reddit and YouTube.")
+              }
               className={`w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between ${
                 idx < menuItems.length - 1 ? "border-b border-border" : ""
               }`}

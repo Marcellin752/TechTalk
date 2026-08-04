@@ -6,6 +6,7 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   password: varchar('password', { length: 255 }), // nullable: Google-only accounts have no password
   googleId: varchar('google_id', { length: 255 }).unique(),
+  picture: varchar('picture', { length: 500 }), // avatar URL (Google profile picture)
   role: varchar('role', { length: 20 }).default('user').notNull(), // 'user' or 'admin'
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
@@ -17,6 +18,7 @@ export const contents = pgTable('contents', {
   source: varchar('source', { length: 100 }).notNull(), // e.g., 'YouTube', 'Dev.to'
   type: varchar('type', { length: 50 }).notNull(), // 'video' or 'article'
   summary: text('summary'),
+  image: varchar('image', { length: 1000 }), // thumbnail / cover image URL
   embedCode: text('embed_code'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({

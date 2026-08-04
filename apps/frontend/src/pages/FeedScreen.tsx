@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { FeedCard } from "../components/FeedCard";
 import { ContentItem } from "../types/content";
 
@@ -13,6 +14,16 @@ interface FeedScreenProps {
   onLoadMore: () => void;
 }
 
+const PULL_THRESHOLD = 72;
+
+type FeedFilter = "all" | "articles" | "videos";
+
+const FILTERS: { id: FeedFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "articles", label: "Articles" },
+  { id: "videos", label: "Videos" },
+];
+
 export function FeedScreen({
   items,
   onOpen,
@@ -24,10 +35,94 @@ export function FeedScreen({
   hasMore,
   onLoadMore,
 }: FeedScreenProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const pullStartY = useRef<number | null>(null);
+  const [filter, setFilter] = useState<FeedFilter>("all");
+
+  const filteredItems = useMemo(() => {
+    if (filter === "all") return items;
+    if (filter === "videos") return items.filter((i) => i.type === "video");
+    return items.filter((i) => i.type !== "video");
+  }, [items, filter]);
+
+  // Infinite scroll sentinel
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const shouldObserve = !loading && !error && hasMore && filter === "all" && items.length > 0;
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !shouldObserve) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) onLoadMore();
+      },
+      { rootMargin: "400px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldObserve, onLoadMore, items.length]);
+
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    pullStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    if (pullStartY.current === null) return;
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    const delta = e.touches[0].clientY - pullStartY.current;
+    if (delta > 0 && !loading && !error) {
+      setPullDistance(Math.min(delta * 0.5, PULL_THRESHOLD + 40));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pullStartY.current = null;
+    if (pullDistance >= PULL_THRESHOLD && !loading && !error) {
+      onRetry();
+    }
+    setPullDistance(0);
+  };
+
+  const refreshing = pullDistance >= PULL_THRESHOLD;
+
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} ref={scrollRef}>
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
-        {items.map((item) => (
+        {/* Pull-to-refresh indicator */}
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-200"
+          style={{ height: pullDistance }}
+        >
+          <div
+            className={`w-6 h-6 border-2 border-primary/20 rounded-full ${
+              refreshing ? "border-t-primary animate-spin" : "border-t-primary"
+            }`}
+            style={{ transform: `rotate(${pullDistance * 3}deg)` }}
+          />
+        </div>
+
+        {/* Filter bar */}
+        <div className="flex items-center gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                filter === f.id
+                  ? "bg-primary text-white shadow-sm shadow-primary/20"
+                  : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {filteredItems.map((item) => (
           <FeedCard
             key={item.id}
             item={item}
@@ -37,14 +132,9 @@ export function FeedScreen({
           />
         ))}
 
-        {!loading && !error && hasMore && items.length > 0 && (
-          <div className="py-4 text-center">
-            <button
-              onClick={onLoadMore}
-              className="px-6 py-2.5 rounded-xl bg-secondary border border-border text-foreground text-sm font-semibold hover:bg-muted active:scale-95 transition-all shadow-sm"
-            >
-              Load More Tech Talks
-            </button>
+        {!loading && !error && hasMore && items.length > 0 && filter === "all" && (
+          <div ref={sentinelRef} className="py-4 flex justify-center">
+            <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
           </div>
         )}
 
@@ -69,9 +159,11 @@ export function FeedScreen({
           </div>
         )}
 
-        {!loading && !error && items.length === 0 && (
+        {!loading && !error && filteredItems.length === 0 && (
           <div className="py-12 text-center text-muted-foreground text-sm font-mono">
-            No technical talks found. Check back later!
+            {items.length === 0
+              ? "No technical talks found. Check back later!"
+              : "No items match this filter yet. Try another one!"}
           </div>
         )}
       </div>

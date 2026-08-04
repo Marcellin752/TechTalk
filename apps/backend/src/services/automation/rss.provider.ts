@@ -10,6 +10,14 @@ const TECH_FEEDS = [
   { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' }
 ];
 
+// Pulls a thumbnail from an RSS item: enclosure, then first <img> in content
+function extractImage(item: any): string | null {
+  if (item.enclosure?.url) return item.enclosure.url;
+  const content = item['content:encoded'] || item.content || '';
+  const match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return match ? match[1] : null;
+}
+
 /**
  * Fetches data from configured RSS feeds and puts them into the 'contents' table
  */
@@ -24,6 +32,8 @@ export async function fetchLiveRSSFeeds(): Promise<void> {
       for (const item of feedData.items) {
         if (!item.title || !item.link) continue;
 
+        const image = extractImage(item);
+
         // Inserting into 'contents' database table. Prevents duplicates using url conflict check.
         await db.insert(contents).values({
           title: item.title,
@@ -31,6 +41,7 @@ export async function fetchLiveRSSFeeds(): Promise<void> {
           source: feed.name,
           type: 'article',
           summary: item.contentSnippet || item.content || '',
+          image,
         }).onConflictDoNothing({ target: contents.url });
       }
 

@@ -16,22 +16,24 @@ import { ReaderScreen } from "../pages/ReaderScreen";
 // ─── Content Mapping Helper ──────────────────────────────────────────────────
 
 function mapBackendContentToItem(c: any): ContentItem {
-  let image = "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=500&fit=crop&auto=format";
+  let image = c.image || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=500&fit=crop&auto=format";
   let youtubeId = "";
   
   if (c.type === "video") {
     const match = c.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
     if (match && match[1]) {
       youtubeId = match[1];
-      image = `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`;
-    } else {
+      image = c.image || `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`;
+    } else if (!c.image) {
       image = "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&h=500&fit=crop&auto=format";
     }
   } else {
-    if (c.source.toLowerCase().includes("techcrunch")) {
-      image = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=500&fit=crop&auto=format";
-    } else if (c.source.toLowerCase().includes("reddit")) {
-      image = "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=500&fit=crop&auto=format";
+    if (!c.image) {
+      if (c.source.toLowerCase().includes("techcrunch")) {
+        image = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=500&fit=crop&auto=format";
+      } else if (c.source.toLowerCase().includes("reddit")) {
+        image = "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=500&fit=crop&auto=format";
+      }
     }
   }
   
@@ -97,6 +99,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [savedError, setSavedError] = useState<string | null>(null);
   
   // Search & Pagination States
   const [isSearching, setIsSearching] = useState(false);
@@ -104,7 +107,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
-  // Read items & Interests tracking states
+  // Read items tracking (ids) + streak tracking (read dates)
   const [readIds, setReadIds] = useState<Set<string>>(() => {
     const raw = localStorage.getItem("teachtalk_read_ids");
     if (!raw) return new Set();
@@ -115,10 +118,18 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     }
   });
 
-  const [interests, setInterests] = useState<string[]>(() => {
-    const raw = localStorage.getItem("teachtalk_interests");
-    return raw ? JSON.parse(raw) : ["AI & ML", "Frontend", "Systems", "Security", "DevOps"];
+  const [readDates, setReadDates] = useState<string[]>(() => {
+    const raw = localStorage.getItem("teachtalk_read_dates");
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
+
+  const todayKey = () => new Date().toISOString().slice(0, 10);
 
   const handleOpenReader = (item: ContentItem) => {
     setReader(item);
@@ -128,7 +139,19 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       localStorage.setItem("teachtalk_read_ids", JSON.stringify(Array.from(next)));
       return next;
     });
+    setReadDates((prev) => {
+      const key = todayKey();
+      if (prev.includes(key)) return prev;
+      const next = [...prev, key];
+      localStorage.setItem("teachtalk_read_dates", JSON.stringify(next));
+      return next;
+    });
   };
+
+  const [interests, setInterests] = useState<string[]>(() => {
+    const raw = localStorage.getItem("teachtalk_interests");
+    return raw ? JSON.parse(raw) : ["AI & ML", "Frontend", "Systems", "Security", "DevOps"];
+  });
 
   const handleToggleInterest = (interest: string) => {
     setInterests((prev) => {
@@ -151,16 +174,23 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       setItems(mappedItems);
       setOffset(0);
       setHasMore(backendContents.length >= 50);
-
-      // Fetch bookmarks
-      const backendBookmarks = await api.getBookmarks();
-      const mappedBookmarks = backendBookmarks.map(mapBackendContentToItem);
-      setSaved(mappedBookmarks);
     } catch (err) {
       console.error("Failed to fetch feed:", err);
       setFeedError("Unable to load the feed. Check your connection and try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBookmarks = async () => {
+    setSavedError(null);
+    try {
+      const backendBookmarks = await api.getBookmarks();
+      const mappedBookmarks = backendBookmarks.map(mapBackendContentToItem);
+      setSaved(mappedBookmarks);
+    } catch (err) {
+      console.error("Failed to fetch bookmarks:", err);
+      setSavedError("Unable to load your bookmarks");
     }
   };
 
@@ -232,6 +262,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
 
   useEffect(() => {
     loadFeed();
+    loadBookmarks();
   }, []);
 
   const toggleSave = async (item: ContentItem) => {
@@ -331,6 +362,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
               setSaved((prev) => prev.filter((i) => i.id !== id));
               await api.deleteBookmark(id);
             }}
+            error={savedError}
           />
         )}
         {tab === "profile" && (
@@ -338,6 +370,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
             user={user}
             savedCount={saved.length}
             readCount={readIds.size}
+            readDates={readDates}
             interests={interests}
             onToggleInterest={handleToggleInterest}
             onLogout={onLogout}
