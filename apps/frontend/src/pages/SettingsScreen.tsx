@@ -1,4 +1,4 @@
-import { Rss, Bookmark, Search, User, Globe, Shield } from "lucide-react";
+import { Rss, Bookmark, Search, User } from "lucide-react";
 import { User as ApiUser } from "../services/api";
 
 interface SettingsScreenProps {
@@ -75,17 +75,6 @@ export function SettingsScreen({ user }: SettingsScreenProps) {
             </div>
           </div>
         </section>
-
-        {/* Privacy note */}
-        <div className="rounded-2xl border border-border overflow-hidden bg-card">
-          <button className="w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Shield size={14} className="text-muted-foreground" />
-              Privacy & data
-            </span>
-            <Globe size={14} className="text-muted-foreground" />
-          </button>
-        </div>
       </div>
     </div>
   );
