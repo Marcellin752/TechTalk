@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Play, User, Bookmark, BookmarkCheck } from "lucide-react";
 import { ContentItem } from "../types/content";
 import { SourceBadge } from "./SourceBadge";
@@ -15,6 +16,8 @@ export function FeedCard({
   onSave,
   isSaved,
 }: FeedCardProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+
   return (
     <article className="bg-card border border-border rounded-2xl overflow-hidden group hover:border-border/60 transition-all">
       {/* Thumbnail */}
@@ -22,11 +25,18 @@ export function FeedCard({
         className="relative aspect-[16/9] bg-muted overflow-hidden cursor-pointer"
         onClick={onOpen}
       >
-        <img
-          src={item.image}
-          alt={item.title}
-          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
-        />
+        {imgFailed ? (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary to-muted">
+            <Play size={28} className="text-muted-foreground/40" />
+          </div>
+        ) : (
+          <img
+            src={item.image}
+            alt={item.title}
+            onError={() => setImgFailed(true)}
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
         {item.type === "video" && (

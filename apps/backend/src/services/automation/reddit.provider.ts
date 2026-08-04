@@ -80,12 +80,16 @@ export async function fetchLiveRedditPosts(): Promise<void> {
 
         const canonicalUrl = `https://www.reddit.com${itemData.permalink}`;
 
+        const thumbnail = itemData.thumbnail;
+        const image = thumbnail && /^https?:\/\//.test(thumbnail) ? thumbnail : null;
+
         const item = {
           title: itemData.title,
           url: canonicalUrl,
           source: 'Reddit',
           type: 'article',
           summary: itemData.selftext || `Discussion link: ${itemData.url}`,
+          image,
           embedCode: null,
         };
 

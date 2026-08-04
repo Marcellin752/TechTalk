@@ -43,6 +43,13 @@
       "when": 1785848647041,
       "tag": "0005_yielding_masked_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785848759976,
+      "tag": "0006_solid_the_order",
+      "breakpoints": true
     }
   ]
 }

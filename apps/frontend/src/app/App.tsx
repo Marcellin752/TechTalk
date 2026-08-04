@@ -16,22 +16,24 @@ import { ReaderScreen } from "../pages/ReaderScreen";
 // ─── Content Mapping Helper ──────────────────────────────────────────────────
 
 function mapBackendContentToItem(c: any): ContentItem {
-  let image = "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=500&fit=crop&auto=format";
+  let image = c.image || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=500&fit=crop&auto=format";
   let youtubeId = "";
   
   if (c.type === "video") {
     const match = c.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
     if (match && match[1]) {
       youtubeId = match[1];
-      image = `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`;
-    } else {
+      image = c.image || `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`;
+    } else if (!c.image) {
       image = "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&h=500&fit=crop&auto=format";
     }
   } else {
-    if (c.source.toLowerCase().includes("techcrunch")) {
-      image = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=500&fit=crop&auto=format";
-    } else if (c.source.toLowerCase().includes("reddit")) {
-      image = "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=500&fit=crop&auto=format";
+    if (!c.image) {
+      if (c.source.toLowerCase().includes("techcrunch")) {
+        image = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=500&fit=crop&auto=format";
+      } else if (c.source.toLowerCase().includes("reddit")) {
+        image = "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=500&fit=crop&auto=format";
+      }
     }
   }
   

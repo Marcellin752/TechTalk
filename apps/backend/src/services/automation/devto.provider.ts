@@ -23,6 +23,7 @@ export async function fetchLiveDevToArticles(): Promise<void> {
         source: 'Dev.to',
         type: 'article',
         summary: article.description || 'No description available.',
+        image: article.social_image || article.cover_image || null,
         embedCode: null
       };
 

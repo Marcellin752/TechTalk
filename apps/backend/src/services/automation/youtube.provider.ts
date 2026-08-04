@@ -40,6 +40,7 @@ export async function fetchLiveYouTubeVideos(): Promise<void> {
         source: 'YouTube',
         type: 'video',
         summary: snippet.description || 'No description available.',
+        image: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || null,
         embedCode: `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`
       };
 
