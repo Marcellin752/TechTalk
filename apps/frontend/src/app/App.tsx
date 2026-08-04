@@ -322,13 +322,53 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
               </div>
               <span className="text-[18px] font-bold tracking-tight text-foreground">TechTalk</span>
             </div>
-            <button
-              onClick={() => setIsSearching(true)}
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
-              aria-label="Search"
-            >
-              <Search size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsSearching(true)}
+                className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
+                aria-label="Search"
+              >
+                <Search size={18} />
+              </button>
+              <button
+                onClick={() => setTab("saved")}
+                className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                aria-label="Saved"
+              >
+                <Bookmark size={18} />
+              </button>
+              <button
+                onClick={() => setTab("settings")}
+                className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                aria-label="Settings"
+              >
+                <Settings size={18} />
+              </button>
+              <button
+                onClick={() => setTab("about")}
+                className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                aria-label="About"
+              >
+                <Info size={18} />
+              </button>
+              <button
+                onClick={() => setTab("profile")}
+                className="p-1 rounded-full hover:bg-secondary transition-colors"
+                aria-label="Profile"
+              >
+                {user?.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user.name || "Profile"}
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
+                    <User size={14} className="text-primary" />
+                  </div>
+                )}
+              </button>
+            </div>
           </>
         ) : (
           <>
