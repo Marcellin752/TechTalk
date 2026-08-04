@@ -86,7 +86,28 @@ export const api = {
     }
   },
 
-  async getContents(limit?: number, offset?: number): Promise<Content[]> {
+  async googleLogin(credential: string): Promise<{ success: boolean; token?: string; user?: User; error?: string }> {
+    try {
+      const response = await fetch(`${API_URL}/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Google Sign-In failed' };
+      }
+      this.setToken(data.token);
+      this.setUser(data.user);
+      return { success: true, token: data.token, user: data.user };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
+  async getContents(limit?: number, offset?: number, search?: string): Promise<Content[]> {
     const token = this.getToken();
     if (!token) {
       throw new Error('Not authenticated');
@@ -94,6 +115,7 @@ export const api = {
     const url = new URL(`${API_URL}/content`);
     if (limit !== undefined) url.searchParams.append('limit', limit.toString());
     if (offset !== undefined) url.searchParams.append('offset', offset.toString());
+    if (search) url.searchParams.append('search', search);
 
     const response = await fetch(url.toString(), {
       method: 'GET',

@@ -15,6 +15,7 @@ export const config = {
   databaseUrl: requireEnv('DATABASE_URL'),
   jwtSecret: requireEnv('JWT_SECRET'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
   corsOrigin: process.env.FRONTEND_URL || 'http://localhost:5173',
   scrapers: {
     youtubeApiKey: process.env.YOUTUBE_API_KEY,

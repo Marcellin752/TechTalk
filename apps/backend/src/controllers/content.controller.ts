@@ -1,21 +1,32 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq, and, ilike, or } from 'drizzle-orm';
 import { db } from '../db/db.js';
 import { contents, bookmarks } from '../db/schema.js';
 
-// Fetch all multi-platform contents, paginated and sorted by recency
+// Fetch all multi-platform contents, paginated, sorted by recency and optionally filtered by search
 export async function handleGetContents(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = request.query as { limit?: string; offset?: string };
+    const query = request.query as { limit?: string; offset?: string; search?: string };
     const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(query.offset || '0', 10) || 0, 0);
 
-    const allContents = await db
+    const search = (query.search || '').trim();
+
+    const baseQuery = db
       .select()
       .from(contents)
-      .orderBy(desc(contents.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .orderBy(desc(contents.createdAt));
+
+    // Apply a LIKE filter when a search keyword is provided
+    const filtered = search
+      ? baseQuery.where(or(
+          ilike(contents.title, `%${search}%`),
+          ilike(contents.summary, `%${search}%`),
+          ilike(contents.source, `%${search}%`)
+        ))
+      : baseQuery;
+
+    const allContents = await filtered.limit(limit).offset(offset);
 
     return reply.status(200).send(allContents);
   } catch (error) {
