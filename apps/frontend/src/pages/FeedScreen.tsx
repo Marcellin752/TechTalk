@@ -1,3 +1,4 @@
+import { useRef, useState, type TouchEvent } from "react";
 import { FeedCard } from "../components/FeedCard";
 import { ContentItem } from "../types/content";
 
@@ -13,6 +14,8 @@ interface FeedScreenProps {
   onLoadMore: () => void;
 }
 
+const PULL_THRESHOLD = 72;
+
 export function FeedScreen({
   items,
   onOpen,
@@ -24,9 +27,52 @@ export function FeedScreen({
   hasMore,
   onLoadMore,
 }: FeedScreenProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const pullStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    pullStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    if (pullStartY.current === null) return;
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    const delta = e.touches[0].clientY - pullStartY.current;
+    if (delta > 0 && !loading && !error) {
+      setPullDistance(Math.min(delta * 0.5, PULL_THRESHOLD + 40));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pullStartY.current = null;
+    if (pullDistance >= PULL_THRESHOLD && !loading && !error) {
+      onRetry();
+    }
+    setPullDistance(0);
+  };
+
+  const refreshing = pullDistance >= PULL_THRESHOLD;
+
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} ref={scrollRef}>
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
+        {/* Pull-to-refresh indicator */}
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-200"
+          style={{ height: pullDistance }}
+        >
+          <div
+            className={`w-6 h-6 border-2 border-primary/20 rounded-full ${
+              refreshing ? "border-t-primary animate-spin" : "border-t-primary"
+            }`}
+            style={{ transform: `rotate(${pullDistance * 3}deg)` }}
+          />
+        </div>
+
         {items.map((item) => (
           <FeedCard
             key={item.id}
