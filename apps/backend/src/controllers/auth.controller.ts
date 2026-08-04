@@ -59,7 +59,8 @@ export async function handleRegister(request: FastifyRequest, reply: FastifyRepl
         id: createdUser.id,
         name: createdUser.name,
         email: createdUser.email,
-        role: createdUser.role
+        role: createdUser.role,
+        picture: createdUser.picture ?? null
       } 
     });
 
@@ -115,7 +116,8 @@ export async function handleLogin(request: FastifyRequest, reply: FastifyReply) 
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        picture: user.picture ?? null
       }
     });
 
@@ -164,6 +166,7 @@ export async function handleGoogleAuth(request: FastifyRequest, reply: FastifyRe
     const googleId = payload.sub as string;
     const email = payload.email;
     const name = payload.name || email.split('@')[0];
+    const picture = payload.picture || null;
 
     // 2. Find an existing user by googleId OR by email
     const existingByGoogle = await db.select().from(users).where(eq(users.googleId, googleId)).limit(1);
@@ -173,12 +176,20 @@ export async function handleGoogleAuth(request: FastifyRequest, reply: FastifyRe
 
     let user;
     if (existingByGoogle[0]) {
-      // Already linked: regular Google sign-in
-      user = existingByGoogle[0];
+      // Already linked: regular Google sign-in. Refresh the avatar if Google re-sends one.
+      if (picture && existingByGoogle[0].picture !== picture) {
+        const [updated] = await db.update(users)
+          .set({ picture })
+          .where(eq(users.id, existingByGoogle[0].id))
+          .returning();
+        user = updated;
+      } else {
+        user = existingByGoogle[0];
+      }
     } else if (existingByEmail[0]) {
       // 3a. Link googleId to an existing email/password account
       const [updated] = await db.update(users)
-        .set({ googleId })
+        .set({ googleId, ...(picture ? { picture } : {}) })
         .where(eq(users.id, existingByEmail[0].id))
         .returning();
       user = updated;
@@ -189,6 +200,7 @@ export async function handleGoogleAuth(request: FastifyRequest, reply: FastifyRe
         email,
         password: null,
         googleId,
+        picture,
         role: 'user',
       }).returning();
       user = created;
@@ -212,6 +224,7 @@ export async function handleGoogleAuth(request: FastifyRequest, reply: FastifyRe
         name: user.name,
         email: user.email,
         role: user.role,
+        picture: user.picture ?? null,
       },
     });
   } catch (error) {
