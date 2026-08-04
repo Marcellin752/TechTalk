@@ -43,6 +43,7 @@ export function ProfileScreen({
   onLogout,
 }: ProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
 
   const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
 
@@ -161,12 +162,47 @@ export function ProfileScreen({
         </div>
 
         <button
-          onClick={onLogout}
-          className="w-full mt-3 text-left px-4 py-3.5 rounded-2xl text-sm text-red-400 hover:bg-secondary border border-border transition-colors flex items-center gap-2"
+          onClick={() => setConfirmingLogout(true)}
+          className="w-full mt-3 px-4 py-3.5 rounded-2xl text-sm text-red-400 hover:bg-secondary border border-border transition-colors flex items-center gap-2"
         >
           <LogOut size={14} />
           Sign Out
         </button>
+
+        {/* Sign out confirmation dialog */}
+        {confirmingLogout && (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-6"
+            onClick={() => setConfirmingLogout(false)}
+          >
+            <div
+              className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+                <LogOut size={20} className="text-red-400" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground mb-1">Sign out?</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                You'll need to sign in again to access your feed and saved items.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmingLogout(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-secondary border border-border text-foreground text-sm font-medium hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onLogout}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
