@@ -1,6 +1,7 @@
 import Parser from 'rss-parser';
 import { db } from '../../db/db.js';
 import { contents } from '../../db/schema.js';
+import { sanitizeHtmlContent } from '../../utils/html.js';
 
 const parser = new Parser();
 
@@ -33,6 +34,8 @@ export async function fetchLiveRSSFeeds(): Promise<void> {
         if (!item.title || !item.link) continue;
 
         const image = extractImage(item);
+        const contentHtml = item['content:encoded'] || item.content || '';
+        const body = contentHtml ? sanitizeHtmlContent(contentHtml) : null;
 
         // Inserting into 'contents' database table. Prevents duplicates using url conflict check.
         await db.insert(contents).values({
@@ -41,6 +44,7 @@ export async function fetchLiveRSSFeeds(): Promise<void> {
           source: feed.name,
           type: 'article',
           summary: item.contentSnippet || item.content || '',
+          body,
           image,
         }).onConflictDoNothing({ target: contents.url });
       }

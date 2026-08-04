@@ -84,6 +84,7 @@ export async function handleGetBookmarks(request: FastifyRequest, reply: Fastify
         source: contents.source,
         type: contents.type,
         summary: contents.summary,
+        body: contents.body,
         image: contents.image,
         embedCode: contents.embedCode,
         createdAt: contents.createdAt,

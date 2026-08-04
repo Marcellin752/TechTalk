@@ -13,9 +13,10 @@ export interface ContentItem {
   author: string;
   category: string;
   body: string;
+  bodyHtml?: string;
   date: string;
   embedCode?: string | null;
 }
 
 export type AppScreen = "auth" | "app";
-export type AppTab = "feed" | "saved" | "profile";
+export type AppTab = "feed" | "saved" | "profile" | "settings";

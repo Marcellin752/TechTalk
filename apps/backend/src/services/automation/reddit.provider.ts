@@ -1,6 +1,7 @@
 import { db } from '../../db/db.js';
 import { contents } from '../../db/schema.js';
 import { config } from '../../config/env.js';
+import { markdownToHtml } from '../../utils/html.js';
 
 const REDDIT_SUBREDDITS = ['programming', 'technology', 'webdev'];
 
@@ -89,6 +90,7 @@ export async function fetchLiveRedditPosts(): Promise<void> {
           source: 'Reddit',
           type: 'article',
           summary: itemData.selftext || `Discussion link: ${itemData.url}`,
+          body: itemData.selftext ? markdownToHtml(itemData.selftext) : null,
           image,
           embedCode: null,
         };
