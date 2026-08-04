@@ -97,6 +97,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
+  const [savedError, setSavedError] = useState<string | null>(null);
   
   // Search & Pagination States
   const [isSearching, setIsSearching] = useState(false);
@@ -151,16 +152,23 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       setItems(mappedItems);
       setOffset(0);
       setHasMore(backendContents.length >= 50);
-
-      // Fetch bookmarks
-      const backendBookmarks = await api.getBookmarks();
-      const mappedBookmarks = backendBookmarks.map(mapBackendContentToItem);
-      setSaved(mappedBookmarks);
     } catch (err) {
       console.error("Failed to fetch feed:", err);
       setFeedError("Unable to load the feed. Check your connection and try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBookmarks = async () => {
+    setSavedError(null);
+    try {
+      const backendBookmarks = await api.getBookmarks();
+      const mappedBookmarks = backendBookmarks.map(mapBackendContentToItem);
+      setSaved(mappedBookmarks);
+    } catch (err) {
+      console.error("Failed to fetch bookmarks:", err);
+      setSavedError("Unable to load your bookmarks");
     }
   };
 
@@ -232,6 +240,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
 
   useEffect(() => {
     loadFeed();
+    loadBookmarks();
   }, []);
 
   const toggleSave = async (item: ContentItem) => {
@@ -331,6 +340,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
               setSaved((prev) => prev.filter((i) => i.id !== id));
               await api.deleteBookmark(id);
             }}
+            error={savedError}
           />
         )}
         {tab === "profile" && (

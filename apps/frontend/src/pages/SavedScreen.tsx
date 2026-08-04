@@ -5,15 +5,31 @@ interface SavedScreenProps {
   saved: ContentItem[];
   onOpen: (item: ContentItem) => void;
   onRemove: (id: string) => void;
+  error?: string | null;
 }
 
 export function SavedScreen({
   saved,
   onOpen,
   onRemove,
+  error,
 }: SavedScreenProps) {
   const articles = saved.filter((i) => i.type !== "video");
   const videos = saved.filter((i) => i.type === "video");
+
+  if (error && saved.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-secondary border border-border flex items-center justify-center mb-5 shadow-inner">
+          <Bookmark size={24} className="text-muted-foreground" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-2">Couldn't load your saves</h2>
+        <p className="text-sm text-muted-foreground max-w-[260px] leading-relaxed">
+          {error}. Check your connection and try again.
+        </p>
+      </div>
+    );
+  }
 
   if (saved.length === 0) {
     return (
