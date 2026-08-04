@@ -10,7 +10,7 @@ interface ProfileScreenProps {
   interests: string[];
   onToggleInterest: (interest: string) => void;
   onNavigateToSaved: () => void;
-  onNavigateToSettings: () => void;
+  onNavigateToAbout: () => void;
   onLogout: () => void;
 }
 
@@ -42,7 +42,7 @@ export function ProfileScreen({
   interests,
   onToggleInterest,
   onNavigateToSaved,
-  onNavigateToSettings,
+  onNavigateToAbout,
   onLogout,
 }: ProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -59,7 +59,7 @@ export function ProfileScreen({
 
   const menuItems = [
     { label: "My Saved Items", icon: <Bookmark size={14} />, action: onNavigateToSaved },
-    { label: "About TechTalk", icon: <Info size={14} />, action: onNavigateToSettings },
+    { label: "About TechTalk", icon: <Info size={14} />, action: onNavigateToAbout },
   ];
 
   return (

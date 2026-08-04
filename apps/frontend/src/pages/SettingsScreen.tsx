@@ -1,78 +1,141 @@
-import { Rss, Bookmark, Search, User } from "lucide-react";
-import { User as ApiUser } from "../services/api";
+import { useState } from "react";
+import { Check } from "lucide-react";
+import { toast } from "sonner";
+import { api, User as ApiUser } from "../services/api";
 
 interface SettingsScreenProps {
   user: ApiUser | null;
+  interests: string[];
+  onToggleInterest: (interest: string) => void;
+  onUserUpdate: (user: ApiUser) => void;
 }
 
-const SOURCES = ["Dev.to", "TechCrunch", "Reddit", "YouTube"];
+const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
 
-const FEATURES = [
-  { icon: <Rss size={16} />, title: "Curated feed", desc: "Fresh tech articles & videos from across the web." },
-  { icon: <Bookmark size={16} />, title: "Save for later", desc: "Bookmark posts and revisit them anytime." },
-  { icon: <Search size={16} />, title: "Full-text search", desc: "Find exactly what you're looking for instantly." },
-  { icon: <User size={16} />, title: "Your profile", desc: "Track reading streaks and personalize interests." },
+const LANGUAGES = [
+  { code: "en", label: "English", badge: null },
+  { code: "fr", label: "Français", badge: "Coming soon" },
 ];
 
-export function SettingsScreen({ user }: SettingsScreenProps) {
+export function SettingsScreen({
+  user,
+  interests,
+  onToggleInterest,
+  onUserUpdate,
+}: SettingsScreenProps) {
+  const [name, setName] = useState(user?.name || "");
+  const [savingName, setSavingName] = useState(false);
+  const [selectedLang, setSelectedLang] = useState("en");
+
+  const handleSaveName = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error("Name cannot be empty.");
+      return;
+    }
+    setSavingName(true);
+    try {
+      const res = await api.updateProfile(trimmed);
+      if (res.success && res.user) {
+        onUserUpdate(res.user);
+        toast.success("Profile updated!");
+      } else {
+        toast.error(res.error || "Failed to update profile.");
+      }
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-lg mx-auto px-4 py-8 pb-10">
-        {/* App info */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
-            <Rss size={24} className="text-white" />
-          </div>
-          <h2 className="text-xl font-bold text-foreground">TechTalk</h2>
-          <p className="text-sm text-muted-foreground font-mono mt-1">v1.0.0</p>
-        </div>
-
-        {/* Account summary */}
-        <div className="rounded-2xl border border-border overflow-hidden bg-card mb-8">
-          <button
-            className="w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between"
-          >
-            <span className="font-semibold">{user?.name || "Tech Enthusiast"}</span>
-            <span className="text-muted-foreground text-xs font-mono">{user?.email || "guest"}</span>
-          </button>
-        </div>
-
-        {/* About */}
-        <section className="mb-8">
+      <div className="max-w-lg mx-auto px-4 py-6 pb-10 space-y-8">
+        {/* Edit profile */}
+        <section>
           <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
-            About TechTalk
+            Edit Profile
           </h3>
-          <div className="rounded-2xl border border-border overflow-hidden bg-card p-5">
-            <p className="text-sm text-foreground/85 leading-relaxed mb-4">
-              TechTalk is a <span className="font-semibold text-foreground">TikTok-style tech feed</span> — discover,
-              scroll and learn. Instead of a noisy timeline, it curates high-quality technical articles and videos
-              from across the internet into one clean, mobile-first stream.
+          <div className="rounded-2xl border border-border overflow-hidden bg-card p-4">
+            <label className="text-xs font-mono text-muted-foreground mb-1.5 block">Name</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                className="flex-1 bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={savingName}
+                className="px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {savingName ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Preferences */}
+        <section>
+          <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
+            Preferences
+          </h3>
+          <div className="rounded-2xl border border-border overflow-hidden bg-card p-4">
+            <p className="text-xs text-muted-foreground mb-3">
+              Select the topics you're interested in.
             </p>
+            <div className="flex flex-wrap gap-2">
+              {allAvailableInterests.map((tag) => {
+                const active = interests.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => onToggleInterest(tag)}
+                    className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                      active
+                        ? "bg-primary text-white border border-primary shadow-sm shadow-primary/20"
+                        : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-            <div className="flex flex-wrap gap-2 mb-5">
-              {SOURCES.map((s) => (
-                <span
-                  key={s}
-                  className="px-2.5 py-1 rounded-full bg-secondary border border-border text-xs font-mono text-muted-foreground"
+        {/* Language */}
+        <section>
+          <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
+            Language
+          </h3>
+          <div className="rounded-2xl border border-border overflow-hidden bg-card">
+            {LANGUAGES.map((lang, idx) => {
+              const selected = selectedLang === lang.code;
+              const disabled = lang.badge !== null;
+              return (
+                <button
+                  key={lang.code}
+                  onClick={() => !disabled && setSelectedLang(lang.code)}
+                  disabled={disabled}
+                  className={`w-full text-left px-4 py-3.5 text-sm transition-colors flex items-center justify-between ${
+                    idx < LANGUAGES.length - 1 ? "border-b border-border" : ""
+                  } ${disabled ? "cursor-not-allowed opacity-60" : "hover:bg-secondary"}`}
                 >
-                  {s}
-                </span>
-              ))}
-            </div>
-
-            <div className="space-y-4">
-              {FEATURES.map((f) => (
-                <div key={f.title} className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-primary">{f.icon}</span>
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">{f.title}</div>
-                    <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">{f.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  <span className="flex items-center gap-2">
+                    <span className="text-foreground">{lang.label}</span>
+                    {lang.badge && (
+                      <span className="px-2 py-0.5 rounded-full bg-secondary border border-border text-[10px] font-mono text-muted-foreground">
+                        {lang.badge}
+                      </span>
+                    )}
+                  </span>
+                  {selected && <Check size={16} className="text-primary" />}
+                </button>
+              );
+            })}
           </div>
         </section>
       </div>

@@ -232,3 +232,43 @@ export async function handleGoogleAuth(request: FastifyRequest, reply: FastifyRe
     return reply.status(500).send({ error: 'Internal server error.' });
   }
 }
+
+/**
+ * Updates the authenticated user's profile (currently the display name).
+ */
+export async function handleUpdateProfile(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (request.user as any).id;
+    const { name } = request.body as { name?: string };
+
+    if (!name || !name.trim()) {
+      return reply.status(400).send({ error: 'Name is required.' });
+    }
+    if (name.trim().length > 100) {
+      return reply.status(400).send({ error: 'Name must be 100 characters or fewer.' });
+    }
+
+    const [updated] = await db.update(users)
+      .set({ name: name.trim() })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!updated) {
+      return reply.status(404).send({ error: 'User not found.' });
+    }
+
+    return reply.status(200).send({
+      message: 'Profile updated successfully!',
+      user: {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        role: updated.role,
+        picture: updated.picture ?? null,
+      },
+    });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}

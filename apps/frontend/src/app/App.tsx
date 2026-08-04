@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
+import { Rss, Search, Bookmark, User, Settings, Info, ArrowLeft, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -12,6 +12,7 @@ import { FeedScreen } from "../pages/FeedScreen";
 import { SavedScreen } from "../pages/SavedScreen";
 import { ProfileScreen } from "../pages/ProfileScreen";
 import { SettingsScreen } from "../pages/SettingsScreen";
+import { AboutScreen } from "../pages/AboutScreen";
 import { ReaderScreen } from "../pages/ReaderScreen";
 
 // ─── Content Mapping Helper ──────────────────────────────────────────────────
@@ -94,7 +95,7 @@ function mapBackendContentToItem(c: any): ContentItem {
 
 // ─── Main App Shell ───────────────────────────────────────────────────────────
 
-function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => void }) {
+function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUserUpdate: (u: ApiUser) => void; onLogout: () => void }) {
   const [tab, setTab] = useState<AppTab>("feed");
   const [reader, setReader] = useState<ContentItem | null>(null);
   const [saved, setSaved] = useState<ContentItem[]>([]);
@@ -283,13 +284,24 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     saved: "Saved",
     profile: "Profile",
     settings: "Settings",
+    about: "About",
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between flex-shrink-0 h-[57px]">
-        {tab === "feed" && isSearching ? (
+        {tab === "about" ? (
+          <div className="flex items-center">
+            <button
+              onClick={() => setTab("feed")}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft size={18} />
+              <span className="text-sm">Back</span>
+            </button>
+          </div>
+        ) : tab === "feed" && isSearching ? (
           <div className="flex items-center gap-2 w-full">
             <div className="relative flex-1">
               <input
@@ -355,6 +367,15 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
                 <Settings size={18} />
               </button>
               <button
+                onClick={() => setTab("about")}
+                className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
+                  tab === "about" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+                aria-label="About"
+              >
+                <Info size={18} />
+              </button>
+              <button
                 onClick={() => setTab("profile")}
                 className={`p-1 rounded-full hover:bg-secondary transition-colors ${
                   tab === "profile" ? "ring-2 ring-primary/40" : ""
@@ -401,6 +422,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
               setSaved((prev) => prev.filter((i) => i.id !== id));
               await api.deleteBookmark(id);
             }}
+            onBack={() => setTab("feed")}
             error={savedError}
           />
         )}
@@ -413,11 +435,19 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
             interests={interests}
             onToggleInterest={handleToggleInterest}
             onNavigateToSaved={() => setTab("saved")}
-            onNavigateToSettings={() => setTab("settings")}
+            onNavigateToAbout={() => setTab("about")}
             onLogout={onLogout}
           />
         )}
-        {tab === "settings" && <SettingsScreen user={user} />}
+        {tab === "settings" && (
+          <SettingsScreen
+            user={user}
+            interests={interests}
+            onToggleInterest={handleToggleInterest}
+            onUserUpdate={onUserUpdate}
+          />
+        )}
+        {tab === "about" && <AboutScreen />}
       </div>
 
       {/* Reader overlay */}
@@ -448,6 +478,10 @@ export default function App() {
     setScreen("app");
   };
 
+  const handleUserUpdate = (updatedUser: ApiUser) => {
+    setUser(updatedUser);
+  };
+
   const handleLogout = () => {
     api.logout();
     setUser(null);
@@ -458,7 +492,7 @@ export default function App() {
     <div className="dark min-h-screen bg-background">
       <Toaster position="top-center" theme="dark" />
       {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
-      {screen === "app" && <MainApp user={user} onLogout={handleLogout} />}
+      {screen === "app" && <MainApp user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} />}
     </div>
   );
 }

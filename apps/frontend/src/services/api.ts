@@ -108,6 +108,31 @@ export const api = {
     }
   },
 
+  async updateProfile(name: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    const token = this.getToken();
+    if (!token) {
+      return { success: false, error: 'Not authenticated' };
+    }
+    try {
+      const response = await fetch(`${API_URL}/auth/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to update profile' };
+      }
+      this.setUser(data.user);
+      return { success: true, user: data.user };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
   async getContents(limit?: number, offset?: number, search?: string): Promise<Content[]> {
     const token = this.getToken();
     if (!token) {
