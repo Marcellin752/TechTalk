@@ -4,7 +4,8 @@ export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
-  password: varchar('password', { length: 255 }).notNull(),
+  password: varchar('password', { length: 255 }), // nullable: Google-only accounts have no password
+  googleId: varchar('google_id', { length: 255 }).unique(),
   role: varchar('role', { length: 20 }).default('user').notNull(), // 'user' or 'admin'
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

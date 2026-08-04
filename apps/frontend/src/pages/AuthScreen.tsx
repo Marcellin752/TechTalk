@@ -1,9 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Rss } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 import { Field } from "../components/Field";
 import { GoogleIcon } from "../components/GoogleIcon";
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            auto_select?: boolean;
+          }) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
 
 interface AuthScreenProps {
   onAuthSuccess: (user: ApiUser) => void;
@@ -16,6 +35,56 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || window.google?.accounts) return;
+
+    // Lazily load the Google Identity Services script
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      window.google?.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        auto_select: false,
+        callback: handleGoogleCredential,
+      });
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleGoogleCredential = async (response: { credential: string }) => {
+    setGoogleLoading(true);
+    try {
+      const res = await api.googleLogin(response.credential);
+      if (res.success && res.user) {
+        onAuthSuccess(res.user);
+      } else {
+        setError(res.error || "Google Sign-In failed");
+      }
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleClick = () => {
+    if (!GOOGLE_CLIENT_ID || !window.google?.accounts) {
+      toast.info(
+        "Google Sign-In is coming soon! Please use standard email Sign In / Sign Up for now."
+      );
+      return;
+    }
+    window.google.accounts.id.prompt();
+  };
 
   const handleSubmit = async () => {
     if (!email || !password || (mode === "signup" && !name)) {
@@ -118,11 +187,12 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           </div>
 
           <button
-            onClick={() => toast.info("Google Authentication is coming soon! Please use standard email Sign In / Sign Up for the MVP.")}
-            className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5"
+            onClick={handleGoogleClick}
+            disabled={googleLoading}
+            className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
           >
             <GoogleIcon />
-            Continue with Google
+            {googleLoading ? "Signing in..." : "Continue with Google"}
           </button>
         </div>
       </div>

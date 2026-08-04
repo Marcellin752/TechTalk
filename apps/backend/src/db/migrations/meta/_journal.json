@@ -29,6 +29,13 @@
       "when": 1785674532478,
       "tag": "0003_spooky_firestar",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1785840267209,
+      "tag": "0004_outstanding_klaw",
+      "breakpoints": true
     }
   ]
 }

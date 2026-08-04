@@ -1,8 +1,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
+import { OAuth2Client } from 'google-auth-library';
 import { db } from '../db/db.js';
 import { users } from '../db/schema.js';
+import { config } from '../config/env.js';
 import { validateEmail, validatePassword } from '../utils/validators.js';
 
 /**
@@ -85,7 +87,12 @@ export async function handleLogin(request: FastifyRequest, reply: FastifyReply) 
       return reply.status(401).send({ error: 'Invalid email or password.' });
     }
 
-    // 2. Compare passwords
+    // 2a. Google-only accounts have no password set; reject password login for them
+    if (!user.password) {
+      return reply.status(401).send({ error: 'This account uses Google Sign-In. Please use Continue with Google.' });
+    }
+
+    // 2b. Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return reply.status(401).send({ error: 'Invalid email or password.' });
@@ -112,6 +119,101 @@ export async function handleLogin(request: FastifyRequest, reply: FastifyReply) 
       }
     });
 
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/**
+ * Handles Google One-Tap authentication via an ID token (credential).
+ * Verifies the token with Google, then upserts the user (create or attach
+ * googleId to an existing email account) and signs the standard TechTalk JWT.
+ */
+export async function handleGoogleAuth(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { credential } = request.body as { credential?: string };
+
+    if (!credential) {
+      return reply.status(400).send({ error: 'Missing Google credential token.' });
+    }
+
+    const clientId = config.googleClientId;
+    if (!clientId) {
+      return reply.status(503).send({ error: 'Google Sign-In is not configured on the server.' });
+    }
+
+    // 1. Verify the ID token with Google
+    const client = new OAuth2Client(clientId);
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      request.log.error(err);
+      return reply.status(401).send({ error: 'Invalid Google credential.' });
+    }
+
+    if (!payload || !payload.email || !payload.email_verified) {
+      return reply.status(401).send({ error: 'Google account email is not verified.' });
+    }
+
+    const googleId = payload.sub as string;
+    const email = payload.email;
+    const name = payload.name || email.split('@')[0];
+
+    // 2. Find an existing user by googleId OR by email
+    const existingByGoogle = await db.select().from(users).where(eq(users.googleId, googleId)).limit(1);
+    const existingByEmail = existingByGoogle.length === 0
+      ? await db.select().from(users).where(eq(users.email, email)).limit(1)
+      : [];
+
+    let user;
+    if (existingByGoogle[0]) {
+      // Already linked: regular Google sign-in
+      user = existingByGoogle[0];
+    } else if (existingByEmail[0]) {
+      // 3a. Link googleId to an existing email/password account
+      const [updated] = await db.update(users)
+        .set({ googleId })
+        .where(eq(users.id, existingByEmail[0].id))
+        .returning();
+      user = updated;
+    } else {
+      // 3b. Create a brand new Google-only account
+      const [created] = await db.insert(users).values({
+        name,
+        email,
+        password: null,
+        googleId,
+        role: 'user',
+      }).returning();
+      user = created;
+    }
+
+    if (!user) {
+      throw new Error('Failed to resolve Google user.');
+    }
+
+    // 4. Sign the standard TechTalk JWT
+    const token = (request.server as any).jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      { expiresIn: '1d' }
+    );
+
+    return reply.status(200).send({
+      message: 'Google Sign-In successful!',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error.' });
