@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Rss, Search, Bookmark, User, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
@@ -164,12 +164,57 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
     }
   };
 
+  // Server-side search with debounce. Clears results & reloads feed when empty.
+  const searchDebounceRef = useRef<number | null>(null);
+
+  const runSearch = async (term: string) => {
+    const trimmed = term.trim();
+    setLoading(true);
+    setFeedError(null);
+    try {
+      if (!trimmed) {
+        // No keyword: load the normal initial feed
+        const backendContents = await api.getContents(50, 0);
+        setItems(backendContents.map(mapBackendContentToItem));
+        setOffset(0);
+        setHasMore(backendContents.length >= 50);
+        return;
+      }
+      const results = await api.getContents(50, 0, trimmed);
+      setItems(results.map(mapBackendContentToItem));
+      setOffset(0);
+      setHasMore(results.length >= 50);
+    } catch (err) {
+      console.error("Failed to search feed:", err);
+      setFeedError("Search failed. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+    }
+    const q = searchQuery.trim();
+    if (!q) {
+      // Immediate reload of the normal feed when the search is emptied
+      runSearch("");
+      return;
+    }
+    searchDebounceRef.current = window.setTimeout(() => runSearch(q), 350);
+    return () => {
+      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchQuery]);
+
   const loadMore = async () => {
     if (loading || !hasMore) return;
     setLoading(true);
     try {
       const nextOffset = offset + 50;
-      const backendContents = await api.getContents(50, nextOffset);
+      const q = searchQuery.trim();
+      const backendContents = await api.getContents(50, nextOffset, q || undefined);
       if (backendContents.length === 0) {
         setHasMore(false);
       } else {
@@ -199,17 +244,6 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       await api.addBookmark(item.id);
     }
   };
-
-  const filteredItems = items.filter((item) => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      item.title.toLowerCase().includes(q) ||
-      item.summary.toLowerCase().includes(q) ||
-      item.category.toLowerCase().includes(q) ||
-      item.source.toLowerCase().includes(q)
-    );
-  });
 
   const tabs: { id: AppTab; label: string; icon: React.ReactNode }[] = [
     { id: "feed", label: "Feed", icon: <Rss size={20} /> },
@@ -278,7 +312,7 @@ function MainApp({ user, onLogout }: { user: ApiUser | null; onLogout: () => voi
       <div className="flex-1 flex flex-col overflow-hidden">
         {tab === "feed" && (
           <FeedScreen
-            items={filteredItems}
+            items={items}
             onOpen={handleOpenReader}
             onSave={toggleSave}
             savedIds={savedIds}
