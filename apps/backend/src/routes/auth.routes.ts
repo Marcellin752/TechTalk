@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { handleRegister, handleLogin, handleGoogleAuth } from '../controllers/auth.controller.js';
+import { handleRegister, handleLogin, handleGoogleAuth, handleUpdateProfile } from '../controllers/auth.controller.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
   const authRateLimit = { rateLimit: { max: 20, timeWindow: '1 minute' } };
@@ -12,4 +12,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // POST /api/auth/google
   fastify.post('/google', { config: authRateLimit }, handleGoogleAuth);
+
+  // PATCH /api/auth/profile
+  fastify.patch('/profile', { preHandler: [fastify.authenticate] }, handleUpdateProfile);
 }
