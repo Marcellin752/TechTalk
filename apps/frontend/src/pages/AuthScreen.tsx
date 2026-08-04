@@ -37,29 +37,26 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const hiddenGoogleBtnRef = useRef<HTMLDivElement>(null);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
 
     const setupGis = () => {
       const gis = window.google?.accounts?.id;
-      if (!gis || !hiddenGoogleBtnRef.current) return;
+      if (!gis || !googleBtnRef.current) return;
       gis.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: handleGoogleCredential,
-        // Reset the loading state when the user dismisses the Google popup
-        moment_listener: (notification) => {
-          if (notification.isSkippedMoment()) {
-            setGoogleLoading(false);
-          }
-        },
       });
-      // Render the real Google button off-screen so we can trigger its click
-      gis.renderButton(hiddenGoogleBtnRef.current, {
-        type: "icon",
+      // Render the official Google Sign-In button, which manages its own click
+      gis.renderButton(googleBtnRef.current, {
+        type: "standard",
+        theme: "outline",
         size: "large",
-        shape: "circle",
+        shape: "rectangular",
+        width: 384,
+        text: "continue_with",
       });
     };
 
@@ -102,14 +99,9 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       );
       return;
     }
+    // If the official button hasn't rendered yet, fall back to the One Tap prompt
     setGoogleLoading(true);
-    const iframe = hiddenGoogleBtnRef.current?.querySelector("iframe");
-    if (iframe) {
-      iframe.click();
-    } else {
-      // Fallback: trigger the one-tap prompt
-      window.google.accounts.id.prompt();
-    }
+    window.google.accounts.id.prompt();
   };
 
   const handleSubmit = async () => {
@@ -212,21 +204,18 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          <button
-            onClick={handleGoogleClick}
-            disabled={googleLoading}
-            className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
-          >
-            <GoogleIcon />
-            {googleLoading ? "Signing in..." : "Continue with Google"}
-          </button>
-
-          {/* Off-screen container holding the real Google button we click */}
-          <div
-            ref={hiddenGoogleBtnRef}
-            aria-hidden="true"
-            className="fixed left-[-9999px] top-0 opacity-0 pointer-events-none"
-          />
+          {GOOGLE_CLIENT_ID && !googleLoading ? (
+            <div ref={googleBtnRef} className="w-full flex justify-center" />
+          ) : (
+            <button
+              onClick={handleGoogleClick}
+              disabled={googleLoading}
+              className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
+            >
+              <GoogleIcon />
+              {googleLoading ? "Signing in..." : "Continue with Google"}
+            </button>
+          )}
         </div>
       </div>
     </div>
