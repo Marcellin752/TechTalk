@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Rss, Search, Bookmark, User, Settings, Info, ArrowLeft, X } from "lucide-react";
+import { Rss, Search, Bookmark, User, Settings, Info, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -291,17 +291,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     <div className="min-h-screen bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between flex-shrink-0 h-[57px]">
-        {tab === "about" ? (
-          <div className="flex items-center">
-            <button
-              onClick={() => setTab("feed")}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft size={18} />
-              <span className="text-sm">Back</span>
-            </button>
-          </div>
-        ) : tab === "feed" && isSearching ? (
+        {tab === "feed" && isSearching ? (
           <div className="flex items-center gap-2 w-full">
             <div className="relative flex-1">
               <input
@@ -324,28 +314,26 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
               <X size={16} />
             </button>
           </div>
+        ) : tab === "feed" ? (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
+                <Rss size={13} className="text-white" />
+              </div>
+              <span className="text-[18px] font-bold tracking-tight text-foreground">TechTalk</span>
+            </div>
+            <button
+              onClick={() => setIsSearching(true)}
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
+              aria-label="Search"
+            >
+              <Search size={18} />
+            </button>
+          </>
         ) : (
           <>
-            {tab === "feed" ? (
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
-                  <Rss size={13} className="text-white" />
-                </div>
-                <span className="text-[18px] font-bold tracking-tight text-foreground">TechTalk</span>
-              </div>
-            ) : (
-              <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
-            )}
+            <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
             <div className="flex items-center gap-1">
-              {tab === "feed" && (
-                <button
-                  onClick={() => setIsSearching(true)}
-                  className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
-                  aria-label="Search"
-                >
-                  <Search size={18} />
-                </button>
-              )}
               {tab !== "saved" && (
                 <button
                   onClick={() => setTab("saved")}
@@ -437,6 +425,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             onNavigateToSaved={() => setTab("saved")}
             onNavigateToAbout={() => setTab("about")}
             onLogout={onLogout}
+            onBack={() => setTab("feed")}
           />
         )}
         {tab === "settings" && (
@@ -445,9 +434,10 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             interests={interests}
             onToggleInterest={handleToggleInterest}
             onUserUpdate={onUserUpdate}
+            onBack={() => setTab("feed")}
           />
         )}
-        {tab === "about" && <AboutScreen />}
+        {tab === "about" && <AboutScreen onBack={() => setTab("feed")} />}
       </div>
 
       {/* Reader overlay */}

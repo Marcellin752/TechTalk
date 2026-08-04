@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -8,6 +8,7 @@ interface SettingsScreenProps {
   interests: string[];
   onToggleInterest: (interest: string) => void;
   onUserUpdate: (user: ApiUser) => void;
+  onBack: () => void;
 }
 
 const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
@@ -22,6 +23,7 @@ export function SettingsScreen({
   interests,
   onToggleInterest,
   onUserUpdate,
+  onBack,
 }: SettingsScreenProps) {
   const [name, setName] = useState(user?.name || "");
   const [savingName, setSavingName] = useState(false);
@@ -50,6 +52,14 @@ export function SettingsScreen({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-lg mx-auto px-4 py-6 pb-10 space-y-8">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back to Feed</span>
+        </button>
+
         {/* Edit profile */}
         <section>
           <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
