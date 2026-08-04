@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Rss, Search, Bookmark, User, Settings, Info, ArrowLeft, X } from "lucide-react";
+import { Rss, Search, Bookmark, User, Settings, Info, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -332,6 +332,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
           </>
         ) : (
           <>
+            <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setTab("feed")}
@@ -433,6 +434,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             onNavigateToSaved={() => setTab("saved")}
             onNavigateToAbout={() => setTab("about")}
             onLogout={onLogout}
+            onBack={() => setTab("feed")}
           />
         )}
         {tab === "settings" && (
@@ -441,9 +443,10 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             interests={interests}
             onToggleInterest={handleToggleInterest}
             onUserUpdate={onUserUpdate}
+            onBack={() => setTab("feed")}
           />
         )}
-        {tab === "about" && <AboutScreen />}
+        {tab === "about" && <AboutScreen onBack={() => setTab("feed")} />}
       </div>
 
       {/* Reader overlay */}

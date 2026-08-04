@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, Info, LogOut, Bookmark, ChevronRight } from "lucide-react";
+import { ArrowLeft, User, Info, LogOut, Bookmark, ChevronRight } from "lucide-react";
 import { User as ApiUser } from "../services/api";
 
 interface ProfileScreenProps {
@@ -12,6 +12,7 @@ interface ProfileScreenProps {
   onNavigateToSaved: () => void;
   onNavigateToAbout: () => void;
   onLogout: () => void;
+  onBack: () => void;
 }
 
 function computeStreak(readDates: string[]): number {
@@ -44,6 +45,7 @@ export function ProfileScreen({
   onNavigateToSaved,
   onNavigateToAbout,
   onLogout,
+  onBack,
 }: ProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
@@ -65,6 +67,14 @@ export function ProfileScreen({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-lg mx-auto px-4 py-8 pb-10">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back to Feed</span>
+        </button>
+
         {/* Avatar */}
         <div className="flex flex-col items-center mb-8">
           {user?.picture ? (

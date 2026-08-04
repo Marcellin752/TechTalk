@@ -1,4 +1,8 @@
-import { Rss, Bookmark, Search, User } from "lucide-react";
+import { ArrowLeft, Rss, Bookmark, Search, User } from "lucide-react";
+
+interface AboutScreenProps {
+  onBack: () => void;
+}
 
 const SOURCES = ["Dev.to", "TechCrunch", "Reddit", "YouTube"];
 
@@ -9,10 +13,18 @@ const FEATURES = [
   { icon: <User size={16} />, title: "Your profile", desc: "Track reading streaks and personalize interests." },
 ];
 
-export function AboutScreen() {
+export function AboutScreen({ onBack }: AboutScreenProps) {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-lg mx-auto px-4 py-8 pb-10">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back to Feed</span>
+        </button>
+
         {/* App info */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
