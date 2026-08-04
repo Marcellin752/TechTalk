@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Rss } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
@@ -15,8 +15,9 @@ declare global {
           initialize: (config: {
             client_id: string;
             callback: (response: { credential: string }) => void;
-            auto_select?: boolean;
+            moment_listener?: (notification: { isSkippedMoment: () => boolean }) => void;
           }) => void;
+          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
           prompt: () => void;
         };
       };
@@ -36,27 +37,45 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const hiddenGoogleBtnRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || window.google?.accounts) return;
+    if (!GOOGLE_CLIENT_ID) return;
 
-    // Lazily load the Google Identity Services script
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      window.google?.accounts.id.initialize({
+    const setupGis = () => {
+      const gis = window.google?.accounts?.id;
+      if (!gis || !hiddenGoogleBtnRef.current) return;
+      gis.initialize({
         client_id: GOOGLE_CLIENT_ID,
-        auto_select: false,
         callback: handleGoogleCredential,
+        // Reset the loading state when the user dismisses the Google popup
+        moment_listener: (notification) => {
+          if (notification.isSkippedMoment()) {
+            setGoogleLoading(false);
+          }
+        },
+      });
+      // Render the real Google button off-screen so we can trigger its click
+      gis.renderButton(hiddenGoogleBtnRef.current, {
+        type: "icon",
+        size: "large",
+        shape: "circle",
       });
     };
-    document.body.appendChild(script);
 
-    return () => {
-      document.body.removeChild(script);
-    };
+    if (window.google?.accounts?.id) {
+      setupGis();
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = setupGis;
+      document.body.appendChild(script);
+      return () => {
+        document.body.removeChild(script);
+      };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -77,13 +96,20 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   };
 
   const handleGoogleClick = () => {
-    if (!GOOGLE_CLIENT_ID || !window.google?.accounts) {
+    if (!GOOGLE_CLIENT_ID || !window.google?.accounts?.id) {
       toast.info(
         "Google Sign-In is coming soon! Please use standard email Sign In / Sign Up for now."
       );
       return;
     }
-    window.google.accounts.id.prompt();
+    setGoogleLoading(true);
+    const iframe = hiddenGoogleBtnRef.current?.querySelector("iframe");
+    if (iframe) {
+      iframe.click();
+    } else {
+      // Fallback: trigger the one-tap prompt
+      window.google.accounts.id.prompt();
+    }
   };
 
   const handleSubmit = async () => {
@@ -194,6 +220,13 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             <GoogleIcon />
             {googleLoading ? "Signing in..." : "Continue with Google"}
           </button>
+
+          {/* Off-screen container holding the real Google button we click */}
+          <div
+            ref={hiddenGoogleBtnRef}
+            aria-hidden="true"
+            className="fixed left-[-9999px] top-0 opacity-0 pointer-events-none"
+          />
         </div>
       </div>
     </div>
