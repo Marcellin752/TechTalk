@@ -333,16 +333,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
         ) : (
           <>
             <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setTab("feed")}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Back to feed"
-              >
-                <ArrowLeft size={18} />
-              </button>
-              <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
-            </div>
             <div className="flex items-center gap-1">
               {tab !== "saved" && (
                 <button
@@ -420,6 +410,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
               setSaved((prev) => prev.filter((i) => i.id !== id));
               await api.deleteBookmark(id);
             }}
+            onBack={() => setTab("feed")}
             error={savedError}
           />
         )}
