@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, ChevronRight, Bell, Info, LogOut } from "lucide-react";
+import { User, Info, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { User as ApiUser } from "../services/api";
 
@@ -54,8 +54,6 @@ export function ProfileScreen({
   ];
 
   const menuItems = [
-    { label: "Settings", icon: <ChevronRight size={14} /> },
-    { label: "Notifications", icon: <Bell size={14} /> },
     { label: "About TechTalk", icon: <Info size={14} /> },
   ];
 
@@ -149,7 +147,9 @@ export function ProfileScreen({
           {menuItems.map((item, idx) => (
             <button
               key={item.label}
-              onClick={() => toast.info(`${item.label} feature is coming in the next update!`)}
+              onClick={() =>
+                toast.info("TechTalk v1.0 — TikTok for tech: discover, scroll, learn. Aggregates articles & videos from Dev.to, TechCrunch, Reddit and YouTube.")
+              }
               className={`w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between ${
                 idx < menuItems.length - 1 ? "border-b border-border" : ""
               }`}
