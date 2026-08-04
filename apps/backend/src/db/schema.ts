@@ -18,6 +18,7 @@ export const contents = pgTable('contents', {
   source: varchar('source', { length: 100 }).notNull(), // e.g., 'YouTube', 'Dev.to'
   type: varchar('type', { length: 50 }).notNull(), // 'video' or 'article'
   summary: text('summary'),
+  body: text('body'), // full article content as sanitized HTML
   image: varchar('image', { length: 1000 }), // thumbnail / cover image URL
   embedCode: text('embed_code'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

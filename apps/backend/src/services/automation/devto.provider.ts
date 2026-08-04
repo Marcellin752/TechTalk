@@ -1,5 +1,6 @@
 import { db } from '../../db/db.js';
 import { contents } from '../../db/schema.js';
+import { sanitizeHtmlContent } from '../../utils/html.js';
 
 /**
  * Fetches latest technical articles from Dev.to public API and inserts them into the database.
@@ -23,6 +24,7 @@ export async function fetchLiveDevToArticles(): Promise<void> {
         source: 'Dev.to',
         type: 'article',
         summary: article.description || 'No description available.',
+        body: article.body_html ? sanitizeHtmlContent(article.body_html) : null,
         image: article.social_image || article.cover_image || null,
         embedCode: null
       };

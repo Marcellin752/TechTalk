@@ -93,11 +93,18 @@ export function ReaderScreen({
             </div>
           </div>
 
-          {item.body.split("\n\n").map((para, i) => (
-            <p key={i} className="text-[15px] text-foreground/85 leading-[1.8] mb-5">
-              {para}
-            </p>
-          ))}
+          {item.bodyHtml ? (
+            <div
+              className="article-body text-[15px] text-foreground/85 leading-[1.8]"
+              dangerouslySetInnerHTML={{ __html: item.bodyHtml }}
+            />
+          ) : (
+            item.body.split("\n\n").map((para, i) => (
+              <p key={i} className="text-[15px] text-foreground/85 leading-[1.8] mb-5">
+                {para}
+              </p>
+            ))
+          )}
 
           {item.type !== "video" && (
             <div className="mt-8 pt-6 border-t border-border flex flex-col items-center">

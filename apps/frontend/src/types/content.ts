@@ -13,6 +13,7 @@ export interface ContentItem {
   author: string;
   category: string;
   body: string;
+  bodyHtml?: string;
   date: string;
   embedCode?: string | null;
 }

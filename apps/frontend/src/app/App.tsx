@@ -86,6 +86,7 @@ function mapBackendContentToItem(c: any): ContentItem {
     author,
     category,
     body: c.summary || "No full text available.",
+    bodyHtml: c.body || null,
     date: new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     embedCode: c.embedCode
   };
