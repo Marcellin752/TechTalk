@@ -6,6 +6,7 @@ export interface ContentItem {
   type: ContentType;
   source: ContentSource;
   title: string;
+  url: string;
   summary: string;
   image: string;
   duration?: string;

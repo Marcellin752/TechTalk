@@ -80,6 +80,7 @@ function mapBackendContentToItem(c: any): ContentItem {
     type: c.type,
     source: c.source as any,
     title: c.title,
+    url: c.url,
     summary: c.summary || "No description available.",
     image,
     duration,
