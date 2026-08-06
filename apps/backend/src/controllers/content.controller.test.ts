@@ -86,6 +86,18 @@ describe('handleGetContents', () => {
     expect(mocks.offsetFn).toHaveBeenCalled();
   });
 
+  it('should apply a categories filter when categories are provided', async () => {
+    const reply = makeReply();
+    const request: any = { query: { categories: 'AI & ML,DevOps' }, log: { error: vi.fn() } };
+
+    await handleGetContents(request, reply);
+
+    expect(reply.statusCode).toBe(200);
+    expect(mocks.whereFn).toHaveBeenCalledTimes(1);
+    expect(mocks.limitFn).toHaveBeenCalled();
+    expect(mocks.offsetFn).toHaveBeenCalled();
+  });
+
   it('should clamp limit and offset to safe values', async () => {
     const reply = makeReply();
     const request: any = { query: { limit: '9999', offset: '-5' }, log: { error: vi.fn() } };

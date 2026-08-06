@@ -64,6 +64,23 @@ export function FeedCard({
         <h2 className="text-[15px] font-semibold text-foreground leading-snug mb-2 line-clamp-2">
           {item.title}
         </h2>
+        {item.categories && item.categories.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {item.categories.slice(0, 3).map((cat) => (
+              <span
+                key={cat}
+                className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary"
+              >
+                {cat}
+              </span>
+            ))}
+            {item.categories.length > 3 && (
+              <span className="px-2 py-0.5 rounded-full bg-secondary border border-border text-[10px] font-mono text-muted-foreground">
+                +{item.categories.length - 3}
+              </span>
+            )}
+          </div>
+        )}
         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
           {item.summary}
         </p>

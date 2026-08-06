@@ -13,6 +13,7 @@ export interface ContentItem {
   readTime?: string;
   author: string;
   category: string;
+  categories?: string[];
   body: string;
   bodyHtml?: string;
   date: string;

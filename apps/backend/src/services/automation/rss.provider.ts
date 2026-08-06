@@ -2,6 +2,7 @@ import Parser from 'rss-parser';
 import { db } from '../../db/db.js';
 import { contents } from '../../db/schema.js';
 import { sanitizeHtmlContent } from '../../utils/html.js';
+import { classifyContent } from '../../utils/classify.js';
 
 const parser = new Parser();
 
@@ -45,6 +46,7 @@ export async function fetchLiveRSSFeeds(): Promise<void> {
           type: 'article',
           summary: item.contentSnippet || item.content || '',
           body,
+          categories: classifyContent(item.title, item.contentSnippet || item.content),
           image,
         }).onConflictDoNothing({ target: contents.url });
       }

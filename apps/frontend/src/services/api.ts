@@ -17,6 +17,8 @@ export interface Content {
   source: string;
   type: 'article' | 'video' | 'social_post';
   summary: string | null;
+  body?: string | null;
+  categories?: string[] | null;
   embedCode: string | null;
   createdAt: string;
 }
@@ -164,7 +166,7 @@ export const api = {
     }
   },
 
-  async getContents(limit?: number, offset?: number, search?: string, type?: string): Promise<Content[]> {
+  async getContents(limit?: number, offset?: number, search?: string, type?: string, categories?: string[]): Promise<Content[]> {
     const token = this.getToken();
     if (!token) {
       throw new Error('Not authenticated');
@@ -174,6 +176,7 @@ export const api = {
     if (offset !== undefined) url.searchParams.append('offset', offset.toString());
     if (search) url.searchParams.append('search', search);
     if (type) url.searchParams.append('type', type);
+    if (categories && categories.length > 0) url.searchParams.append('categories', categories.join(','));
 
     const response = await fetch(url.toString(), {
       method: 'GET',
