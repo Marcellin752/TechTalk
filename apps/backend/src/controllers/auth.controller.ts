@@ -272,3 +272,31 @@ export async function handleUpdateProfile(request: FastifyRequest, reply: Fastif
     return reply.status(500).send({ error: 'Internal server error.' });
   }
 }
+
+/**
+ * Returns the currently authenticated user from the DB.
+ * The JWT only carries id/email/role, so we fetch fresh data (name/picture).
+ */
+export async function handleGetMe(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (request.user as any).id;
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) {
+      return reply.status(404).send({ error: 'User not found.' });
+    }
+
+    return reply.status(200).send({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        picture: user.picture ?? null,
+      },
+    });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}

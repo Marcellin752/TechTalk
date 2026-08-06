@@ -38,7 +38,7 @@ vi.mock('../db/db.js', () => ({
   },
 }));
 
-import { handleGoogleAuth } from './auth.controller.js';
+import { handleGoogleAuth, handleGetMe } from './auth.controller.js';
 
 function makeReply() {
   const reply: any = {
@@ -199,5 +199,38 @@ describe('handleGoogleAuth', () => {
     expect(reply.statusCode).toBe(200);
     expect(mocks.insertFn).not.toHaveBeenCalled();
     expect(mocks.updateFn).not.toHaveBeenCalled();
+  });
+
+  it('should return the authenticated user from /me', async () => {
+    mocks.limitFn.mockResolvedValueOnce([
+      { id: 'u-1', name: 'Alex Kim', email: 'alex@example.com', role: 'user', picture: null },
+    ]);
+    mocks.whereFn.mockReturnValue({ limit: mocks.limitFn });
+    mocks.fromFn.mockReturnValue({ where: mocks.whereFn });
+    mocks.selectFn.mockReturnValue({ from: mocks.fromFn });
+
+    const reply = makeReply();
+    const request: any = { user: { id: 'u-1' }, log: { error: vi.fn() } };
+
+    await handleGetMe(request, reply);
+
+    expect(reply.statusCode).toBe(200);
+    expect(reply.body.user.email).toBe('alex@example.com');
+    expect(reply.body.user.picture).toBeNull();
+  });
+
+  it('should return 404 from /me when the user no longer exists', async () => {
+    mocks.limitFn.mockResolvedValueOnce([]);
+    mocks.whereFn.mockReturnValue({ limit: mocks.limitFn });
+    mocks.fromFn.mockReturnValue({ where: mocks.whereFn });
+    mocks.selectFn.mockReturnValue({ from: mocks.fromFn });
+
+    const reply = makeReply();
+    const request: any = { user: { id: 'missing' }, log: { error: vi.fn() } };
+
+    await handleGetMe(request, reply);
+
+    expect(reply.statusCode).toBe(404);
+    expect(reply.body.error).toBe('User not found.');
   });
 });

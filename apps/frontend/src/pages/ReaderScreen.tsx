@@ -109,7 +109,9 @@ export function ReaderScreen({
           {item.type !== "video" && (
             <div className="mt-8 pt-6 border-t border-border flex flex-col items-center">
               <p className="text-xs text-muted-foreground font-mono mb-4 text-center">
-                This is a summarized preview. Read the full post on the publisher's website.
+                {item.bodyHtml
+                  ? "Want to read it on the publisher's site?"
+                  : "This is a summarized preview. Read the full post on the publisher's website."}
               </p>
               <a
                 href={item.url}

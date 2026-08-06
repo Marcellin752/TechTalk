@@ -80,6 +80,7 @@ function mapBackendContentToItem(c: any): ContentItem {
     type: c.type,
     source: c.source as any,
     title: c.title,
+    url: c.url,
     summary: c.summary || "No description available.",
     image,
     duration,
@@ -107,6 +108,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   // Search & Pagination States
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [contentType, setContentType] = useState<"all" | "article" | "video">("all");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
@@ -168,11 +170,13 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
   const savedIds = new Set(saved.map((i) => i.id));
 
+  const typeParam = contentType === "all" ? undefined : contentType;
+
   const loadFeed = async () => {
     setLoading(true);
     setFeedError(null);
     try {
-      const backendContents = await api.getContents(50, 0);
+      const backendContents = await api.getContents(50, 0, undefined, typeParam);
       const mappedItems = backendContents.map(mapBackendContentToItem);
       setItems(mappedItems);
       setOffset(0);
@@ -206,14 +210,14 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     setFeedError(null);
     try {
       if (!trimmed) {
-        // No keyword: load the normal initial feed
-        const backendContents = await api.getContents(50, 0);
+        // No keyword: load the normal feed (with the active type filter)
+        const backendContents = await api.getContents(50, 0, undefined, typeParam);
         setItems(backendContents.map(mapBackendContentToItem));
         setOffset(0);
         setHasMore(backendContents.length >= 50);
         return;
       }
-      const results = await api.getContents(50, 0, trimmed);
+      const results = await api.getContents(50, 0, trimmed, typeParam);
       setItems(results.map(mapBackendContentToItem));
       setOffset(0);
       setHasMore(results.length >= 50);
@@ -247,7 +251,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     try {
       const nextOffset = offset + 50;
       const q = searchQuery.trim();
-      const backendContents = await api.getContents(50, nextOffset, q || undefined);
+      const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam);
       if (backendContents.length === 0) {
         setHasMore(false);
       } else {
@@ -262,6 +266,13 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
       setLoading(false);
     }
   };
+
+  // Reload the feed when the type filter changes (clears results)
+  useEffect(() => {
+    if (searchQuery.trim()) return;
+    loadFeed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentType]);
 
   useEffect(() => {
     loadFeed();
@@ -440,6 +451,8 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             onRetry={loadFeed}
             hasMore={hasMore && !searchQuery}
             onLoadMore={loadMore}
+            contentType={contentType}
+            onFilterChange={setContentType}
           />
         )}
         {tab === "saved" && (
@@ -502,6 +515,25 @@ export default function App() {
   const [user, setUser] = useState<ApiUser | null>(() => {
     return api.getUser();
   });
+  const [bootstrapping, setBootstrapping] = useState(() => !!api.getToken());
+
+  useEffect(() => {
+    if (!api.getToken()) {
+      setBootstrapping(false);
+      return;
+    }
+    api.getMe().then((res) => {
+      if (res.success && res.user) {
+        setUser(res.user);
+      } else {
+        // Expired or invalid token: go back to the auth screen
+        api.logout();
+        setUser(null);
+        setScreen("auth");
+      }
+      setBootstrapping(false);
+    });
+  }, []);
 
   const handleAuthSuccess = (authUser: ApiUser) => {
     setUser(authUser);
@@ -521,8 +553,16 @@ export default function App() {
   return (
     <div className="dark min-h-screen bg-background">
       <Toaster position="top-center" theme="dark" />
-      {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
-      {screen === "app" && <MainApp user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} />}
+      {bootstrapping ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
+          {screen === "app" && <MainApp user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} />}
+        </>
+      )}
     </div>
   );
 }
