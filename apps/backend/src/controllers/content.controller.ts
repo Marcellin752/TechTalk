@@ -1,17 +1,22 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { desc, eq, and, ilike, or } from 'drizzle-orm';
+import { desc, eq, and, ilike, or, arrayOverlaps } from 'drizzle-orm';
 import { db } from '../db/db.js';
 import { contents, bookmarks } from '../db/schema.js';
+import { classifyContent } from '../utils/classify.js';
 
 // Fetch all multi-platform contents, paginated, sorted by recency and optionally filtered by search
 export async function handleGetContents(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string };
+    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string };
     const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(query.offset || '0', 10) || 0, 0);
 
     const search = (query.search || '').trim();
     const type = (query.type || '').trim().toLowerCase();
+    const categories = (query.categories || '')
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
 
     const conditions = [];
     if (search) {
@@ -24,8 +29,11 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
     if (type) {
       conditions.push(eq(contents.type, type));
     }
+    if (categories.length > 0) {
+      conditions.push(arrayOverlaps(contents.categories, categories));
+    }
 
-    // Apply search and/or type filters when provided
+    // Apply search, type and/or categories filters when provided
     const filtered = conditions.length > 0
       ? db.select().from(contents).where(and(...conditions))
       : db.select().from(contents);
@@ -60,6 +68,7 @@ export async function handleCreateContent(request: FastifyRequest, reply: Fastif
       source,
       type,
       summary,
+      categories: classifyContent(title, summary),
       embedCode, // Storing the dynamic player data for YouTube/TikTok
     }).returning();
 
@@ -89,6 +98,7 @@ export async function handleGetBookmarks(request: FastifyRequest, reply: Fastify
         type: contents.type,
         summary: contents.summary,
         body: contents.body,
+        categories: contents.categories,
         image: contents.image,
         embedCode: contents.embedCode,
         createdAt: contents.createdAt,

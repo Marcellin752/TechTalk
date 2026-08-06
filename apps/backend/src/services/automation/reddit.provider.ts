@@ -2,6 +2,7 @@ import { db } from '../../db/db.js';
 import { contents } from '../../db/schema.js';
 import { config } from '../../config/env.js';
 import { markdownToHtml } from '../../utils/html.js';
+import { classifyContent } from '../../utils/classify.js';
 
 const REDDIT_SUBREDDITS = ['programming', 'technology', 'webdev'];
 
@@ -91,6 +92,7 @@ export async function fetchLiveRedditPosts(): Promise<void> {
           type: 'article',
           summary: itemData.selftext || `Discussion link: ${itemData.url}`,
           body: itemData.selftext ? markdownToHtml(itemData.selftext) : null,
+          categories: classifyContent(itemData.title, itemData.selftext),
           image,
           embedCode: null,
         };

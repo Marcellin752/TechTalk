@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Rss, Search, Bookmark, User, Settings, Info, X } from "lucide-react";
+import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -62,17 +62,21 @@ function mapBackendContentToItem(c: any): ContentItem {
   }
 
   let category = "Technology";
-  const titleLower = c.title.toLowerCase();
-  if (titleLower.includes("typescript") || titleLower.includes("js") || titleLower.includes("react") || titleLower.includes("frontend")) {
-    category = "Web Development";
-  } else if (titleLower.includes("rust") || titleLower.includes("c++") || titleLower.includes("systems")) {
-    category = "Systems";
-  } else if (titleLower.includes("ai") || titleLower.includes("gpt") || titleLower.includes("claude") || titleLower.includes("intelligence")) {
-    category = "AI";
-  } else if (titleLower.includes("database") || titleLower.includes("postgres") || titleLower.includes("sql")) {
-    category = "Databases";
-  } else if (titleLower.includes("kubernetes") || titleLower.includes("docker") || titleLower.includes("aws") || titleLower.includes("devops")) {
-    category = "DevOps";
+  if (c.categories && c.categories.length > 0) {
+    category = c.categories[0];
+  } else {
+    const titleLower = c.title.toLowerCase();
+    if (titleLower.includes("typescript") || titleLower.includes("js") || titleLower.includes("react") || titleLower.includes("frontend")) {
+      category = "Web Development";
+    } else if (titleLower.includes("rust") || titleLower.includes("c++") || titleLower.includes("systems")) {
+      category = "Systems";
+    } else if (titleLower.includes("ai") || titleLower.includes("gpt") || titleLower.includes("claude") || titleLower.includes("intelligence")) {
+      category = "AI";
+    } else if (titleLower.includes("database") || titleLower.includes("postgres") || titleLower.includes("sql")) {
+      category = "Databases";
+    } else if (titleLower.includes("kubernetes") || titleLower.includes("docker") || titleLower.includes("aws") || titleLower.includes("devops")) {
+      category = "DevOps";
+    }
   }
 
   return {
@@ -87,6 +91,7 @@ function mapBackendContentToItem(c: any): ContentItem {
     readTime,
     author,
     category,
+    categories: c.categories || undefined,
     body: c.summary || "No full text available.",
     bodyHtml: c.body || null,
     date: new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
@@ -170,13 +175,15 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
   const savedIds = new Set(saved.map((i) => i.id));
 
+  // Interests act as an OR category filter for the feed. Empty selection = no filter.
   const typeParam = contentType === "all" ? undefined : contentType;
+  const interestParam = interests.length > 0 ? interests : undefined;
 
   const loadFeed = async () => {
     setLoading(true);
     setFeedError(null);
     try {
-      const backendContents = await api.getContents(50, 0, undefined, typeParam);
+      const backendContents = await api.getContents(50, 0, undefined, typeParam, interestParam);
       const mappedItems = backendContents.map(mapBackendContentToItem);
       setItems(mappedItems);
       setOffset(0);
@@ -210,14 +217,14 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     setFeedError(null);
     try {
       if (!trimmed) {
-        // No keyword: load the normal feed (with the active type filter)
-        const backendContents = await api.getContents(50, 0, undefined, typeParam);
+        // No keyword: load the normal feed (with the active type/category filters)
+        const backendContents = await api.getContents(50, 0, undefined, typeParam, interestParam);
         setItems(backendContents.map(mapBackendContentToItem));
         setOffset(0);
         setHasMore(backendContents.length >= 50);
         return;
       }
-      const results = await api.getContents(50, 0, trimmed, typeParam);
+      const results = await api.getContents(50, 0, trimmed, typeParam, interestParam);
       setItems(results.map(mapBackendContentToItem));
       setOffset(0);
       setHasMore(results.length >= 50);
@@ -251,7 +258,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     try {
       const nextOffset = offset + 50;
       const q = searchQuery.trim();
-      const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam);
+      const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam, interestParam);
       if (backendContents.length === 0) {
         setHasMore(false);
       } else {
@@ -267,12 +274,12 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     }
   };
 
-  // Reload the feed when the type filter changes (clears results)
+  // Reload the feed when the type or interests filters change (clears results)
   useEffect(() => {
     if (searchQuery.trim()) return;
     loadFeed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentType]);
+  }, [contentType, interests.join(",")]);
 
   useEffect(() => {
     loadFeed();
@@ -356,13 +363,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 <Settings size={18} />
               </button>
               <button
-                onClick={() => setTab("about")}
-                className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-                aria-label="About"
-              >
-                <Info size={18} />
-              </button>
-              <button
                 onClick={() => setTab("profile")}
                 className="p-1 rounded-full hover:bg-secondary transition-colors"
                 aria-label="Profile"
@@ -404,15 +404,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 aria-label="Settings"
               >
                 <Settings size={18} />
-              </button>
-              <button
-                onClick={() => setTab("about")}
-                className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
-                  tab === "about" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                aria-label="About"
-              >
-                <Info size={18} />
               </button>
               <button
                 onClick={() => setTab("profile")}
@@ -488,6 +479,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             onToggleInterest={handleToggleInterest}
             onUserUpdate={onUserUpdate}
             onBack={() => setTab("feed")}
+            onNavigateToAbout={() => setTab("about")}
           />
         )}
         {tab === "about" && <AboutScreen onBack={() => setTab("feed")} />}

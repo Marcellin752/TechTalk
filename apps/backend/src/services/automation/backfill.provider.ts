@@ -3,6 +3,7 @@ import Parser from 'rss-parser';
 import { db } from '../../db/db.js';
 import { contents } from '../../db/schema.js';
 import { sanitizeHtmlContent } from '../../utils/html.js';
+import { classifyContent } from '../../utils/classify.js';
 
 const parser = new Parser();
 
@@ -59,7 +60,16 @@ export async function backfillMissingBodies(): Promise<void> {
   }
 
   const missing = await db.select().from(contents).where(isNull(contents.body));
-  console.log(`🎯 [Backfill] Found ${missing.length} contents without a body.`);
+  const uncategorized = await db.select().from(contents).where(isNull(contents.categories));
+  console.log(`🎯 [Backfill] Found ${missing.length} contents without a body, ${uncategorized.length} without categories.`);
+
+  // Fill in categories for every content that has none (new column on old rows)
+  for (const content of uncategorized) {
+    await db.update(contents)
+      .set({ categories: classifyContent(content.title, content.summary) })
+      .where(eq(contents.id, content.id));
+  }
+  console.log(`✅ [Backfill] Assigned categories to ${uncategorized.length} contents.`);
 
   let updated = 0;
   let failed = 0;
@@ -89,5 +99,5 @@ export async function backfillMissingBodies(): Promise<void> {
     await new Promise((r) => setTimeout(r, 150));
   }
 
-  console.log(`✅ [Backfill] Done. Updated ${updated} contents, skipped ${failed}.`);
+  console.log(`✅ [Backfill] Done. Updated ${updated} bodies, skipped ${failed}.`);
 }
