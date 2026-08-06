@@ -515,6 +515,25 @@ export default function App() {
   const [user, setUser] = useState<ApiUser | null>(() => {
     return api.getUser();
   });
+  const [bootstrapping, setBootstrapping] = useState(() => !!api.getToken());
+
+  useEffect(() => {
+    if (!api.getToken()) {
+      setBootstrapping(false);
+      return;
+    }
+    api.getMe().then((res) => {
+      if (res.success && res.user) {
+        setUser(res.user);
+      } else {
+        // Expired or invalid token: go back to the auth screen
+        api.logout();
+        setUser(null);
+        setScreen("auth");
+      }
+      setBootstrapping(false);
+    });
+  }, []);
 
   const handleAuthSuccess = (authUser: ApiUser) => {
     setUser(authUser);
@@ -534,8 +553,16 @@ export default function App() {
   return (
     <div className="dark min-h-screen bg-background">
       <Toaster position="top-center" theme="dark" />
-      {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
-      {screen === "app" && <MainApp user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} />}
+      {bootstrapping ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
+          {screen === "app" && <MainApp user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} />}
+        </>
+      )}
     </div>
   );
 }

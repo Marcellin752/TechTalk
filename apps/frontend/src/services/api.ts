@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export interface User {
@@ -45,6 +47,13 @@ export const api = {
   logout(): void {
     localStorage.removeItem('teachtalk_token');
     localStorage.removeItem('teachtalk_user');
+  },
+
+  // Handles a forced sign-out (expired/invalid token) with a clear message
+  handleSessionExpired(): void {
+    this.logout();
+    toast.error("Your session has expired. Please sign in again.");
+    setTimeout(() => window.location.reload(), 1500);
   },
 
   async register(name: string, email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
@@ -133,6 +142,28 @@ export const api = {
     }
   },
 
+  async getMe(): Promise<{ success: boolean; user?: User; error?: string }> {
+    const token = this.getToken();
+    if (!token) {
+      return { success: false, error: 'Not authenticated' };
+    }
+    try {
+      const response = await fetch(`${API_URL}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to fetch profile' };
+      }
+      this.setUser(data.user);
+      return { success: true, user: data.user };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
   async getContents(limit?: number, offset?: number, search?: string, type?: string): Promise<Content[]> {
     const token = this.getToken();
     if (!token) {
@@ -152,8 +183,7 @@ export const api = {
     });
     if (!response.ok) {
       if (response.status === 401) {
-        this.logout();
-        window.location.reload();
+        this.handleSessionExpired();
       }
       throw new Error(`Failed to fetch content: ${response.statusText}`);
     }
@@ -173,8 +203,7 @@ export const api = {
     });
     if (!response.ok) {
       if (response.status === 401) {
-        this.logout();
-        window.location.reload();
+        this.handleSessionExpired();
       }
       throw new Error(`Failed to fetch bookmarks: ${response.statusText}`);
     }
