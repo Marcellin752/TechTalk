@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, Info } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -9,6 +9,7 @@ interface SettingsScreenProps {
   onToggleInterest: (interest: string) => void;
   onUserUpdate: (user: ApiUser) => void;
   onBack: () => void;
+  onNavigateToAbout: () => void;
 }
 
 const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
@@ -24,6 +25,7 @@ export function SettingsScreen({
   onToggleInterest,
   onUserUpdate,
   onBack,
+  onNavigateToAbout,
 }: SettingsScreenProps) {
   const [name, setName] = useState(user?.name || "");
   const [savingName, setSavingName] = useState(false);
@@ -146,6 +148,25 @@ export function SettingsScreen({
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        {/* About */}
+        <section>
+          <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
+            About
+          </h3>
+          <div className="rounded-2xl border border-border overflow-hidden bg-card">
+            <button
+              onClick={onNavigateToAbout}
+              className="w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <Info size={14} className="text-muted-foreground" />
+                About TechTalk
+              </span>
+              <ArrowLeft size={14} className="text-muted-foreground rotate-180" />
+            </button>
           </div>
         </section>
       </div>

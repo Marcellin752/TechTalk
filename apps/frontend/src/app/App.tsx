@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Rss, Search, Bookmark, User, Settings, Info, X } from "lucide-react";
+import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -363,13 +363,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 <Settings size={18} />
               </button>
               <button
-                onClick={() => setTab("about")}
-                className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-                aria-label="About"
-              >
-                <Info size={18} />
-              </button>
-              <button
                 onClick={() => setTab("profile")}
                 className="p-1 rounded-full hover:bg-secondary transition-colors"
                 aria-label="Profile"
@@ -411,15 +404,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 aria-label="Settings"
               >
                 <Settings size={18} />
-              </button>
-              <button
-                onClick={() => setTab("about")}
-                className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
-                  tab === "about" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                }`}
-                aria-label="About"
-              >
-                <Info size={18} />
               </button>
               <button
                 onClick={() => setTab("profile")}
@@ -495,6 +479,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             onToggleInterest={handleToggleInterest}
             onUserUpdate={onUserUpdate}
             onBack={() => setTab("feed")}
+            onNavigateToAbout={() => setTab("about")}
           />
         )}
         {tab === "about" && <AboutScreen onBack={() => setTab("feed")} />}
