@@ -21,9 +21,9 @@ import { handleGetContents } from './content.controller.js';
 function buildChain() {
   mocks.offsetFn.mockResolvedValue([{ id: '1', title: 'TypeScript Guide' }]);
   mocks.limitFn.mockReturnValue({ offset: mocks.offsetFn });
-  mocks.whereFn.mockReturnValue({ limit: mocks.limitFn });
-  mocks.orderByFn.mockReturnValue({ where: mocks.whereFn, limit: mocks.limitFn });
-  mocks.fromFn.mockReturnValue({ orderBy: mocks.orderByFn });
+  mocks.orderByFn.mockReturnValue({ limit: mocks.limitFn });
+  mocks.whereFn.mockReturnValue({ orderBy: mocks.orderByFn });
+  mocks.fromFn.mockReturnValue({ orderBy: mocks.orderByFn, where: mocks.whereFn });
   mocks.selectFn.mockReturnValue({ from: mocks.fromFn });
 }
 
@@ -65,6 +65,18 @@ describe('handleGetContents', () => {
   it('should apply a search filter when the search query is provided', async () => {
     const reply = makeReply();
     const request: any = { query: { search: 'typescript' }, log: { error: vi.fn() } };
+
+    await handleGetContents(request, reply);
+
+    expect(reply.statusCode).toBe(200);
+    expect(mocks.whereFn).toHaveBeenCalledTimes(1);
+    expect(mocks.limitFn).toHaveBeenCalled();
+    expect(mocks.offsetFn).toHaveBeenCalled();
+  });
+
+  it('should apply a type filter when the type query is provided', async () => {
+    const reply = makeReply();
+    const request: any = { query: { type: 'video' }, log: { error: vi.fn() } };
 
     await handleGetContents(request, reply);
 

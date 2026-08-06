@@ -133,7 +133,7 @@ export const api = {
     }
   },
 
-  async getContents(limit?: number, offset?: number, search?: string): Promise<Content[]> {
+  async getContents(limit?: number, offset?: number, search?: string, type?: string): Promise<Content[]> {
     const token = this.getToken();
     if (!token) {
       throw new Error('Not authenticated');
@@ -142,6 +142,7 @@ export const api = {
     if (limit !== undefined) url.searchParams.append('limit', limit.toString());
     if (offset !== undefined) url.searchParams.append('offset', offset.toString());
     if (search) url.searchParams.append('search', search);
+    if (type) url.searchParams.append('type', type);
 
     const response = await fetch(url.toString(), {
       method: 'GET',

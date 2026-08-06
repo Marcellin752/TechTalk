@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { FeedCard } from "../components/FeedCard";
 import { ContentItem } from "../types/content";
 
@@ -12,16 +12,16 @@ interface FeedScreenProps {
   onRetry: () => void;
   hasMore: boolean;
   onLoadMore: () => void;
+  contentType: "all" | "article" | "video";
+  onFilterChange: (t: "all" | "article" | "video") => void;
 }
 
 const PULL_THRESHOLD = 72;
 
-type FeedFilter = "all" | "articles" | "videos";
-
-const FILTERS: { id: FeedFilter; label: string }[] = [
+const FILTERS: { id: "all" | "article" | "video"; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "articles", label: "Articles" },
-  { id: "videos", label: "Videos" },
+  { id: "article", label: "Articles" },
+  { id: "video", label: "Videos" },
 ];
 
 export function FeedScreen({
@@ -34,21 +34,16 @@ export function FeedScreen({
   onRetry,
   hasMore,
   onLoadMore,
+  contentType,
+  onFilterChange,
 }: FeedScreenProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const pullStartY = useRef<number | null>(null);
-  const [filter, setFilter] = useState<FeedFilter>("all");
 
-  const filteredItems = useMemo(() => {
-    if (filter === "all") return items;
-    if (filter === "videos") return items.filter((i) => i.type === "video");
-    return items.filter((i) => i.type !== "video");
-  }, [items, filter]);
-
-  // Infinite scroll sentinel
+  // Infinite scroll sentinel (works for every view now that filtering is server-side)
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const shouldObserve = !loading && !error && hasMore && filter === "all" && items.length > 0;
+  const shouldObserve = !loading && !error && hasMore && items.length > 0;
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -61,7 +56,7 @@ export function FeedScreen({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [shouldObserve, onLoadMore, items.length]);
+  }, [shouldObserve, onLoadMore, items.length, contentType]);
 
   const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
@@ -110,9 +105,9 @@ export function FeedScreen({
           {FILTERS.map((f) => (
             <button
               key={f.id}
-              onClick={() => setFilter(f.id)}
+              onClick={() => onFilterChange(f.id)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                filter === f.id
+                contentType === f.id
                   ? "bg-primary text-white shadow-sm shadow-primary/20"
                   : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
               }`}
@@ -122,7 +117,7 @@ export function FeedScreen({
           ))}
         </div>
 
-        {filteredItems.map((item) => (
+        {items.map((item) => (
           <FeedCard
             key={item.id}
             item={item}
@@ -132,7 +127,7 @@ export function FeedScreen({
           />
         ))}
 
-        {!loading && !error && hasMore && items.length > 0 && filter === "all" && (
+        {!loading && !error && hasMore && items.length > 0 && (
           <div ref={sentinelRef} className="py-4 flex justify-center">
             <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
           </div>
@@ -159,11 +154,9 @@ export function FeedScreen({
           </div>
         )}
 
-        {!loading && !error && filteredItems.length === 0 && (
+        {!loading && !error && items.length === 0 && (
           <div className="py-12 text-center text-muted-foreground text-sm font-mono">
-            {items.length === 0
-              ? "No technical talks found. Check back later!"
-              : "No items match this filter yet. Try another one!"}
+            No technical talks found. Check back later!
           </div>
         )}
       </div>
