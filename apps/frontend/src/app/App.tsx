@@ -156,6 +156,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
       localStorage.setItem("teachtalk_read_dates", JSON.stringify(next));
       return next;
     });
+    api.markContentRead(item.id);
   };
 
   const [interests, setInterests] = useState<string[]>(() => {
@@ -284,6 +285,34 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   useEffect(() => {
     loadFeed();
     loadBookmarks();
+  }, []);
+
+  // Hydrate reading stats from the server and push any local-only history to it,
+  // so streaks/read counts survive a browser cleanup and follow the account.
+  useEffect(() => {
+    let cancelled = false;
+    api.getServerReading().then((server) => {
+      if (cancelled || !server) return;
+      const localIdsRaw = localStorage.getItem("teachtalk_read_ids");
+      const localIds = localIdsRaw ? JSON.parse(localIdsRaw) : [];
+      const localDatesRaw = localStorage.getItem("teachtalk_read_dates");
+      const localDates = localDatesRaw && Array.isArray(JSON.parse(localDatesRaw)) ? JSON.parse(localDatesRaw) : [];
+
+      const serverIds = new Set(server.readIds);
+      const mergedIds = Array.from(new Set([...localIds, ...server.readIds]));
+      const mergedDates = Array.from(new Set([...localDates, ...server.readDates]));
+
+      localStorage.setItem("teachtalk_read_ids", JSON.stringify(mergedIds));
+      localStorage.setItem("teachtalk_read_dates", JSON.stringify(mergedDates));
+      setReadIds(new Set(mergedIds));
+      setReadDates(mergedDates);
+
+      const localOnlyIds = localIds.filter((id: string) => !serverIds.has(id));
+      if (localOnlyIds.length > 0) {
+        api.syncReadingBatch(localOnlyIds);
+      }
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const toggleSave = async (item: ContentItem) => {
@@ -517,6 +546,7 @@ export default function App() {
     api.getMe().then((res) => {
       if (res.success && res.user) {
         setUser(res.user);
+        api.scheduleTokenRefresh();
       } else {
         // Expired or invalid token: go back to the auth screen
         api.logout();
@@ -529,6 +559,7 @@ export default function App() {
 
   const handleAuthSuccess = (authUser: ApiUser) => {
     setUser(authUser);
+    api.scheduleTokenRefresh();
     setScreen("app");
   };
 

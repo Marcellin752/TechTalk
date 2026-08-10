@@ -4,7 +4,7 @@ interface AboutScreenProps {
   onBack: () => void;
 }
 
-const SOURCES = ["Dev.to", "TechCrunch", "Reddit", "YouTube"];
+const SOURCES = ["Dev.to", "TechCrunch", "YouTube"];
 
 const FEATURES = [
   { icon: <Rss size={16} />, title: "Curated feed", desc: "Fresh tech articles & videos from across the web." },

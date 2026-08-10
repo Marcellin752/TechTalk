@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Check, Info } from "lucide-react";
+import { ArrowLeft, Info } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 
@@ -14,11 +14,6 @@ interface SettingsScreenProps {
 
 const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
 
-const LANGUAGES = [
-  { code: "en", label: "English", badge: null },
-  { code: "fr", label: "Français", badge: "Coming soon" },
-];
-
 export function SettingsScreen({
   user,
   interests,
@@ -29,7 +24,6 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const [name, setName] = useState(user?.name || "");
   const [savingName, setSavingName] = useState(false);
-  const [selectedLang, setSelectedLang] = useState("en");
 
   const handleSaveName = async () => {
     const trimmed = name.trim();
@@ -115,39 +109,6 @@ export function SettingsScreen({
                 );
               })}
             </div>
-          </div>
-        </section>
-
-        {/* Language */}
-        <section>
-          <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
-            Language
-          </h3>
-          <div className="rounded-2xl border border-border overflow-hidden bg-card">
-            {LANGUAGES.map((lang, idx) => {
-              const selected = selectedLang === lang.code;
-              const disabled = lang.badge !== null;
-              return (
-                <button
-                  key={lang.code}
-                  onClick={() => !disabled && setSelectedLang(lang.code)}
-                  disabled={disabled}
-                  className={`w-full text-left px-4 py-3.5 text-sm transition-colors flex items-center justify-between ${
-                    idx < LANGUAGES.length - 1 ? "border-b border-border" : ""
-                  } ${disabled ? "cursor-not-allowed opacity-60" : "hover:bg-secondary"}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="text-foreground">{lang.label}</span>
-                    {lang.badge && (
-                      <span className="px-2 py-0.5 rounded-full bg-secondary border border-border text-[10px] font-mono text-muted-foreground">
-                        {lang.badge}
-                      </span>
-                    )}
-                  </span>
-                  {selected && <Check size={16} className="text-primary" />}
-                </button>
-              );
-            })}
           </div>
         </section>
 
