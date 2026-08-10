@@ -40,7 +40,7 @@ async function getRedditAccessToken(): Promise<string | null> {
     const data = await response.json() as any;
     return data.access_token || null;
   } catch (error) {
-    console.error('❌ [Reddit Provider] Error obtaining Reddit OAuth token:', error);
+    console.error('[Reddit Provider] Error obtaining Reddit OAuth token:', error);
     return null;
   }
 }
@@ -49,7 +49,7 @@ async function getRedditAccessToken(): Promise<string | null> {
  * Fetches top tech posts from configured Reddit subreddits and inserts them into the database.
  */
 export async function fetchLiveRedditPosts(): Promise<void> {
-  console.log('🔄 [Reddit Provider] Starting Reddit scraping...');
+  console.log('[Reddit Provider] Starting Reddit scraping...');
 
   const accessToken = await getRedditAccessToken();
   if (!accessToken) {
@@ -64,7 +64,7 @@ export async function fetchLiveRedditPosts(): Promise<void> {
 
   for (const subreddit of REDDIT_SUBREDDITS) {
     try {
-      console.log(`📡 [Reddit Provider] Fetching top posts from: r/${subreddit}`);
+      console.log(`[Reddit Provider] Fetching top posts from: r/${subreddit}`);
 
       const response = await fetch(`https://oauth.reddit.com/r/${subreddit}/top.json?limit=5`, { headers });
 
@@ -107,9 +107,9 @@ export async function fetchLiveRedditPosts(): Promise<void> {
         }
       }
 
-      console.log(`✅ [Reddit Provider] Successfully processed r/${subreddit}. Added ${insertedCount} new posts.`);
+      console.log(`[Reddit Provider] Successfully processed r/${subreddit}. Added ${insertedCount} new posts.`);
     } catch (error) {
-      console.error(`❌ [Reddit Provider] Error scraping r/${subreddit}:`, error);
+      console.error(`[Reddit Provider] Error scraping r/${subreddit}:`, error);
     }
   }
 }

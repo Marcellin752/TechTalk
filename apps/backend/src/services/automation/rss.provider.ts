@@ -22,11 +22,11 @@ function extractImage(item: any): string | null {
  * Fetches data from configured RSS feeds and puts them into the 'contents' table
  */
 export async function fetchLiveRSSFeeds(): Promise<void> {
-  console.log('🔄 [RSS Provider] Starting RSS scraping...');
+  console.log('[RSS Provider] Starting RSS scraping...');
 
   for (const feed of TECH_FEEDS) {
     try {
-      console.log(`📡 [RSS Provider] Fetching feed from: ${feed.name}`);
+      console.log(`[RSS Provider] Fetching feed from: ${feed.name}`);
       const feedData = await parser.parseURL(feed.url);
 
       for (const item of feedData.items) {
@@ -48,9 +48,9 @@ export async function fetchLiveRSSFeeds(): Promise<void> {
         }).onConflictDoNothing({ target: contents.url });
       }
 
-      console.log(`✅ [RSS Provider] Successfully processed feed: ${feed.name}`);
+      console.log(`[RSS Provider] Successfully processed feed: ${feed.name}`);
     } catch (error) {
-      console.error(`❌ [RSS Provider] Error scraping feed ${feed.name}:`, error);
+      console.error(`[RSS Provider] Error scraping feed ${feed.name}:`, error);
     }
   }
 }

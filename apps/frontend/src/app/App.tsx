@@ -280,7 +280,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Server-side reading: stats survive a browser cleanup and follow the account
   useEffect(() => {
     let cancelled = false;
     api.getServerReading().then((server) => {
@@ -329,7 +328,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   return (
     <div className="h-dvh bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border flex-shrink-0">
+      <header className="z-40 bg-background/90 backdrop-blur-md border-b border-border flex-shrink-0">
         <div className="max-w-5xl mx-auto px-4 h-[57px] flex items-center justify-between">
         {tab === "feed" && isSearching ? (
           <div className="flex items-center gap-2 w-full">
