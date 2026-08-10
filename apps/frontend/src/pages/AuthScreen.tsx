@@ -68,6 +68,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           shape: "rectangular",
           width,
           text: "continue_with",
+          locale: "en",
         });
       };
 
