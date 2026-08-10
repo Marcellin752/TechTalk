@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { desc, eq, and, ilike, or, arrayOverlaps } from 'drizzle-orm';
+import { desc, eq, and, ilike, or, arrayOverlaps, inArray } from 'drizzle-orm';
 import { db } from '../db/db.js';
-import { contents, bookmarks } from '../db/schema.js';
+import { contents, bookmarks, readingHistory } from '../db/schema.js';
 import { classifyContent } from '../utils/classify.js';
 
 // Fetch all multi-platform contents, paginated, sorted by recency and optionally filtered by search
@@ -165,5 +165,82 @@ export async function handleDeleteBookmark(request: FastifyRequest, reply: Fasti
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error while removing bookmark.' });
+  }
+}
+
+// Record that the user opened a content item (used for Read count and streaks)
+export async function handleMarkRead(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (request.user as any).id;
+    const { contentId } = request.body as { contentId?: string };
+
+    if (!contentId) {
+      return reply.status(400).send({ error: 'Field (contentId) is required.' });
+    }
+
+    const [content] = await db.select().from(contents).where(eq(contents.id, contentId)).limit(1);
+    if (!content) {
+      return reply.status(404).send({ error: 'Content not found.' });
+    }
+
+    await db.insert(readingHistory).values({ userId, contentId });
+    return reply.status(201).send({ message: 'Reading recorded successfully!' });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error while recording read.' });
+  }
+}
+
+// Bulk upload of locally-tracked read ids (history hydration for existing users)
+export async function handleMarkReadBatch(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (request.user as any).id;
+    const { contentIds } = request.body as { contentIds?: string[] };
+
+    const ids = (contentIds || []).filter((id) => typeof id === 'string' && id.length > 0);
+    if (ids.length === 0) {
+      return reply.status(400).send({ error: 'Field (contentIds) is required.' });
+    }
+
+    // Only insert valid contents that were not already recorded for this user
+    const alreadyRead = await db
+      .select({ contentId: readingHistory.contentId })
+      .from(readingHistory)
+      .where(and(eq(readingHistory.userId, userId), inArray(readingHistory.contentId, ids)));
+    const alreadyReadSet = new Set(alreadyRead.map((r) => r.contentId));
+
+    const validContents = await db.select({ id: contents.id }).from(contents).where(inArray(contents.id, ids));
+    const validSet = new Set(validContents.map((c) => c.id));
+
+    const toInsert = ids.filter((id) => validSet.has(id) && !alreadyReadSet.has(id));
+    if (toInsert.length > 0) {
+      await db.insert(readingHistory).values(toInsert.map((contentId) => ({ userId, contentId })));
+    }
+
+    return reply.status(200).send({ message: 'Reading history synced successfully!' });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error while syncing reads.' });
+  }
+}
+
+// Returns the user's read ids and the distinct UTC days they read something
+export async function handleGetReading(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const userId = (request.user as any).id;
+
+    const history = await db
+      .select()
+      .from(readingHistory)
+      .where(eq(readingHistory.userId, userId))
+      .orderBy(desc(readingHistory.readAt));
+
+    const readIds = Array.from(new Set(history.map((h) => h.contentId)));
+    const readDates = Array.from(new Set(history.map((h) => new Date(h.readAt).toISOString().slice(0, 10))));
+
+    return reply.status(200).send({ readIds, readDates });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error while fetching reading history.' });
   }
 }
