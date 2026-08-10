@@ -2,11 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { api, User as ApiUser } from "../services/api";
-
-// Types
 import { ContentItem, AppScreen, AppTab } from "../types/content";
-
-// Pages
 import { AuthScreen } from "../pages/AuthScreen";
 import { FeedScreen } from "../pages/FeedScreen";
 import { SavedScreen } from "../pages/SavedScreen";
@@ -14,8 +10,6 @@ import { ProfileScreen } from "../pages/ProfileScreen";
 import { SettingsScreen } from "../pages/SettingsScreen";
 import { AboutScreen } from "../pages/AboutScreen";
 import { ReaderScreen } from "../pages/ReaderScreen";
-
-// ─── Content Mapping Helper ──────────────────────────────────────────────────
 
 function mapBackendContentToItem(c: any): ContentItem {
   let image = c.image || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=500&fit=crop&auto=format";
@@ -99,7 +93,6 @@ function mapBackendContentToItem(c: any): ContentItem {
   };
 }
 
-// ─── Main App Shell ───────────────────────────────────────────────────────────
 
 function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUserUpdate: (u: ApiUser) => void; onLogout: () => void }) {
   const [tab, setTab] = useState<AppTab>("feed");
@@ -110,14 +103,12 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   const [feedError, setFeedError] = useState<string | null>(null);
   const [savedError, setSavedError] = useState<string | null>(null);
   
-  // Search & Pagination States
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [contentType, setContentType] = useState<"all" | "article" | "video">("all");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
-  // Read items tracking (ids) + streak tracking (read dates)
   const [readIds, setReadIds] = useState<Set<string>>(() => {
     const raw = localStorage.getItem("teachtalk_read_ids");
     if (!raw) return new Set();
@@ -176,7 +167,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
   const savedIds = new Set(saved.map((i) => i.id));
 
-  // Interests act as an OR category filter for the feed. Empty selection = no filter.
   const typeParam = contentType === "all" ? undefined : contentType;
   const interestParam = interests.length > 0 ? interests : undefined;
 
@@ -209,7 +199,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     }
   };
 
-  // Server-side search with debounce. Clears results & reloads feed when empty.
   const searchDebounceRef = useRef<number | null>(null);
 
   const runSearch = async (term: string) => {
@@ -218,7 +207,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     setFeedError(null);
     try {
       if (!trimmed) {
-        // No keyword: load the normal feed (with the active type/category filters)
         const backendContents = await api.getContents(50, 0, undefined, typeParam, interestParam);
         setItems(backendContents.map(mapBackendContentToItem));
         setOffset(0);
@@ -237,13 +225,19 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     }
   };
 
+  const prevSearchRef = useRef("");
+
   useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q && !prevSearchRef.current) {
+      prevSearchRef.current = "";
+      return;
+    }
+    prevSearchRef.current = q;
     if (searchDebounceRef.current) {
       window.clearTimeout(searchDebounceRef.current);
     }
-    const q = searchQuery.trim();
     if (!q) {
-      // Immediate reload of the normal feed when the search is emptied
       runSearch("");
       return;
     }
@@ -275,7 +269,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     }
   };
 
-  // Reload the feed when the type or interests filters change (clears results)
   useEffect(() => {
     if (searchQuery.trim()) return;
     loadFeed();
@@ -283,12 +276,11 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   }, [contentType, interests.join(",")]);
 
   useEffect(() => {
-    loadFeed();
     loadBookmarks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Hydrate reading stats from the server and push any local-only history to it,
-  // so streaks/read counts survive a browser cleanup and follow the account.
+  // Server-side reading: stats survive a browser cleanup and follow the account
   useEffect(() => {
     let cancelled = false;
     api.getServerReading().then((server) => {
@@ -529,7 +521,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   );
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>(() => {
@@ -550,7 +541,6 @@ export default function App() {
         setUser(res.user);
         api.scheduleTokenRefresh();
       } else {
-        // Expired or invalid token: go back to the auth screen
         api.logout();
         setUser(null);
         setScreen("auth");

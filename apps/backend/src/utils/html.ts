@@ -1,7 +1,6 @@
 import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 
-// Allowed tags/attributes so article bodies render cleanly without scripts or styling
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
     'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'del', 'code', 'pre', 'blockquote',

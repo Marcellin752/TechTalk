@@ -9,7 +9,6 @@ import { initAutomationWorkers } from './services/automation/index.js';
 
 const fastify = Fastify({ logger: config.nodeEnv !== 'test' });
 
-// Declare JWT type definitions for safety
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: any, reply: any) => Promise<void>;
@@ -17,13 +16,10 @@ declare module 'fastify' {
   }
 }
 
-// Global Plugins
 fastify.register(cors, { origin: config.corsOrigin });
 fastify.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 fastify.register(jwt, { secret: config.jwtSecret });
 
-// Authentication Security Decorators
-// Note: sending the reply inside a preHandler stops the request chain in Fastify.
 fastify.decorate('authenticate', async (request: any, reply: any) => {
   try {
     await request.jwtVerify();
@@ -33,7 +29,6 @@ fastify.decorate('authenticate', async (request: any, reply: any) => {
 });
 
 fastify.decorate('requireAdmin', async (request: any, reply: any) => {
-  // The role field is extracted out of the signed JWT payload
   if (!request.user || request.user.role !== 'admin') {
     return reply.status(403).send({
       error: 'Forbidden',
@@ -42,11 +37,9 @@ fastify.decorate('requireAdmin', async (request: any, reply: any) => {
   }
 });
 
-// Register API Routes
 fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(contentRoutes, { prefix: '/api/content' });
 
-// Health Check Route
 fastify.get('/api/health', async () => {
   return { status: 'OK', message: 'TechTalk API is running smoothly' };
 });
@@ -61,7 +54,6 @@ const start = async () => {
     console.log(`Server running on: http://localhost:${config.port}`);
     console.log('===============================================\n');
 
-    // Start the background automation multi-source worker
     initAutomationWorkers();
 
   } catch (err) {

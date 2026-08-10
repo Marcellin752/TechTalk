@@ -41,7 +41,6 @@ export function FeedScreen({
   const [pullDistance, setPullDistance] = useState(0);
   const pullStartY = useRef<number | null>(null);
 
-  // Infinite scroll sentinel (works for every view now that filtering is server-side)
   const sentinelRef = useRef<HTMLDivElement>(null);
   const shouldObserve = !loading && !error && hasMore && items.length > 0;
 

@@ -14,7 +14,6 @@ export async function fetchLiveYouTubeVideos(): Promise<void> {
     return;
   }
 
-  // Example: Google Developers Channel ID. Replace with any tech channel ID you love.
   const channelId = 'UC_x5XG1OV2P6uZZ5FSM9Ttw'; 
   const maxResults = 5;
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${maxResults}&order=date&type=video&key=${apiKey}`;

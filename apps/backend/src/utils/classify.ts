@@ -1,5 +1,3 @@
-// Categories are assigned generously: if ANY keyword matches the title or
-// summary, the category is added. A single content can belong to many.
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'AI & ML': [

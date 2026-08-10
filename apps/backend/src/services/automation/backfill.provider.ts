@@ -7,7 +7,6 @@ import { classifyContent } from '../../utils/classify.js';
 
 const parser = new Parser();
 
-// RSS feeds that carry full article bodies in content:encoded
 const TECH_FEEDS = [
   { name: 'Dev.to', url: 'https://dev.to/feed' },
   { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
@@ -63,7 +62,6 @@ export async function backfillMissingBodies(): Promise<void> {
   const uncategorized = await db.select().from(contents).where(isNull(contents.categories));
   console.log(`🎯 [Backfill] Found ${missing.length} contents without a body, ${uncategorized.length} without categories.`);
 
-  // Fill in categories for every content that has none (new column on old rows)
   for (const content of uncategorized) {
     await db.update(contents)
       .set({ categories: classifyContent(content.title, content.summary) })
@@ -77,11 +75,9 @@ export async function backfillMissingBodies(): Promise<void> {
   for (const content of missing) {
     let body: string | null = null;
 
-    // 1. RSS lookup by URL (fast, no extra requests)
     if (rssBodies.has(content.url)) {
       body = rssBodies.get(content.url)!;
     }
-    // 2. Dev.to API fallback
     if (!body && content.source.toLowerCase().includes('dev.to')) {
       body = await fetchDevToBody(content.url);
     }
