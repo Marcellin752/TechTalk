@@ -335,9 +335,10 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col max-w-screen overflow-hidden">
+    <div className="h-dvh bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between flex-shrink-0 h-[57px]">
+      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border flex-shrink-0">
+        <div className="max-w-5xl mx-auto px-4 h-[57px] flex items-center justify-between">
         {tab === "feed" && isSearching ? (
           <div className="flex items-center gap-2 w-full">
             <div className="relative flex-1">
@@ -456,6 +457,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             </div>
           </>
         )}
+        </div>
       </header>
 
       {/* Screen content */}
