@@ -39,7 +39,7 @@ async function fetchDevToBody(url: string): Promise<string | null> {
  * existed. Runs as part of the hourly automation cron.
  */
 export async function backfillMissingBodies(): Promise<void> {
-  console.log('🔁 [Backfill] Fetching RSS bodies for lookup...');
+  console.log('[Backfill] Fetching RSS bodies for lookup...');
 
   const rssBodies = new Map<string, string>();
   for (const feed of TECH_FEEDS) {
@@ -52,22 +52,22 @@ export async function backfillMissingBodies(): Promise<void> {
           rssBodies.set(item.link, sanitizeHtmlContent(contentHtml));
         }
       }
-      console.log(`📡 [Backfill] Parsed ${feed.name} feed`);
+      console.log(`[Backfill] Parsed ${feed.name} feed`);
     } catch (error) {
-      console.error(`❌ [Backfill] Error parsing feed ${feed.name}:`, error);
+      console.error(`[Backfill] Error parsing feed ${feed.name}:`, error);
     }
   }
 
   const missing = await db.select().from(contents).where(isNull(contents.body));
   const uncategorized = await db.select().from(contents).where(isNull(contents.categories));
-  console.log(`🎯 [Backfill] Found ${missing.length} contents without a body, ${uncategorized.length} without categories.`);
+  console.log(`[Backfill] Found ${missing.length} contents without a body, ${uncategorized.length} without categories.`);
 
   for (const content of uncategorized) {
     await db.update(contents)
       .set({ categories: classifyContent(content.title, content.summary) })
       .where(eq(contents.id, content.id));
   }
-  console.log(`✅ [Backfill] Assigned categories to ${uncategorized.length} contents.`);
+  console.log(`[Backfill] Assigned categories to ${uncategorized.length} contents.`);
 
   let updated = 0;
   let failed = 0;
@@ -95,5 +95,5 @@ export async function backfillMissingBodies(): Promise<void> {
     await new Promise((r) => setTimeout(r, 150));
   }
 
-  console.log(`✅ [Backfill] Done. Updated ${updated} bodies, skipped ${failed}.`);
+  console.log(`[Backfill] Done. Updated ${updated} bodies, skipped ${failed}.`);
 }

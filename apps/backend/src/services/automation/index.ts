@@ -15,7 +15,7 @@ async function runAllAutomationProviders(): Promise<void> {
   await fetchLiveRedditPosts();
   await backfillMissingBodies();
   
-  console.log('✅ [Automation Engine] All sync tasks successfully finished.');
+  console.log('[Automation Engine] All sync tasks successfully finished.');
 }
 
 /**
@@ -25,7 +25,7 @@ export function initAutomationWorkers(): void {
   console.log('[Automation] Multi-source background workers initialized.');
 
   runAllAutomationProviders().catch((err) => {
-    console.error('❌ [Automation Engine] Error during initial startup sync:', err);
+    console.error('[Automation Engine] Error during initial startup sync:', err);
   });
 
   cron.schedule('0 * * * *', async () => {
