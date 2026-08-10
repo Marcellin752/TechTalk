@@ -81,7 +81,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       setupGis();
     } else {
       const script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
+      script.src = "https://accounts.google.com/gsi/client?hl=en";
       script.async = true;
       script.defer = true;
       script.onload = setupGis;
