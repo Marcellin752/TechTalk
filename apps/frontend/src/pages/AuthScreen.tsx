@@ -39,6 +39,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
   const gisInitialized = useRef(false);
+  const lastWidth = useRef(0);
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
@@ -59,7 +60,8 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         const container = googleBtnRef.current;
         if (!container || !gis) return;
         const width = Math.max(container.clientWidth || 320, 200);
-        container.innerHTML = "";
+        if (lastWidth.current === width) return;
+        lastWidth.current = width;
         gis.renderButton(container, {
           type: "standard",
           theme: "outline",
@@ -220,7 +222,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           </div>
 
           {GOOGLE_CLIENT_ID && !googleLoading ? (
-            <div ref={googleBtnRef} className="w-full" />
+            <div ref={googleBtnRef} className="w-full h-12" />
           ) : (
             <button
               onClick={handleGoogleClick}

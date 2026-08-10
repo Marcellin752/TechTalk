@@ -280,7 +280,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Server-side reading: stats survive a browser cleanup and follow the account
   useEffect(() => {
     let cancelled = false;
     api.getServerReading().then((server) => {

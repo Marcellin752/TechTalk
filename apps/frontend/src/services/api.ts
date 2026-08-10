@@ -2,7 +2,6 @@ import { toast } from "sonner";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Refresh 10 minutes before the token expires
 const REFRESH_BEFORE_EXPIRY_MS = 10 * 60 * 1000;
 
 export interface User {
