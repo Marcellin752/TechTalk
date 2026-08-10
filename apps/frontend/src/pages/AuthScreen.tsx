@@ -38,26 +38,42 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
+  const gisInitialized = useRef(false);
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
 
+    let observer: ResizeObserver | null = null;
+
     const setupGis = () => {
       const gis = window.google?.accounts?.id;
-      if (!gis || !googleBtnRef.current) return;
+      if (!gis || !googleBtnRef.current || gisInitialized.current) return;
+      gisInitialized.current = true;
+
       gis.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: handleGoogleCredential,
       });
-      // Render the official Google Sign-In button, which manages its own click
-      gis.renderButton(googleBtnRef.current, {
-        type: "standard",
-        theme: "outline",
-        size: "large",
-        shape: "rectangular",
-        width: 384,
-        text: "continue_with",
-      });
+
+      const renderButton = () => {
+        const container = googleBtnRef.current;
+        if (!container || !gis) return;
+        const width = Math.max(container.clientWidth || 320, 200);
+        // Re-render with the container's current width (responsive on resize)
+        container.innerHTML = "";
+        gis.renderButton(container, {
+          type: "standard",
+          theme: "outline",
+          size: "large",
+          shape: "rectangular",
+          width,
+          text: "continue_with",
+        });
+      };
+
+      renderButton();
+      observer = new ResizeObserver(renderButton);
+      observer.observe(googleBtnRef.current);
     };
 
     if (window.google?.accounts?.id) {
@@ -69,10 +85,11 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       script.defer = true;
       script.onload = setupGis;
       document.body.appendChild(script);
-      return () => {
-        document.body.removeChild(script);
-      };
     }
+
+    return () => {
+      observer?.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -205,7 +222,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           </div>
 
           {GOOGLE_CLIENT_ID && !googleLoading ? (
-            <div ref={googleBtnRef} className="w-full flex justify-center" />
+            <div ref={googleBtnRef} className="w-full" />
           ) : (
             <button
               onClick={handleGoogleClick}

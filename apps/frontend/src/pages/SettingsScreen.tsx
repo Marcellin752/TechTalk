@@ -53,7 +53,7 @@ export function SettingsScreen({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-lg mx-auto px-4 py-6 pb-10 space-y-8">
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-10 space-y-8">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"

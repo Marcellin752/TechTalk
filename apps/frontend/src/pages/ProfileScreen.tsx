@@ -66,7 +66,7 @@ export function ProfileScreen({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-lg mx-auto px-4 py-8 pb-10">
+      <div className="max-w-2xl mx-auto px-4 py-8 pb-10">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"

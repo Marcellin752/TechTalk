@@ -62,7 +62,7 @@ export function SavedScreen({
         <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
           {title} · {items.length}
         </h3>
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {items.map((item) => (
             <div
               key={item.id}
@@ -100,7 +100,7 @@ export function SavedScreen({
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-5">
-      <div className="max-w-lg mx-auto space-y-8 pb-8">
+      <div className="max-w-2xl mx-auto space-y-8 pb-8">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
