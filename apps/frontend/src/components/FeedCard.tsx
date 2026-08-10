@@ -87,14 +87,14 @@ export function FeedCard({
       </div>
 
       {/* Footer */}
-      <div className="px-4 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center">
+      <div className="px-4 pb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
             <User size={10} className="text-primary" />
           </div>
-          <span className="text-xs text-muted-foreground">{item.author}</span>
+          <span className="text-xs text-muted-foreground truncate">{item.author}</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-shrink-0">
           <button
             onClick={(e) => {
               e.stopPropagation();

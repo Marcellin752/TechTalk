@@ -87,7 +87,8 @@ export function SavedScreen({
               </div>
               <button
                 onClick={() => onRemove(item.id)}
-                className="self-start p-1.5 text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                className="self-start p-2 rounded-lg bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors md:p-1.5 md:bg-transparent md:opacity-0 md:group-hover:opacity-100 flex-shrink-0"
+                aria-label="Remove from saved"
               >
                 <X size={13} />
               </button>
