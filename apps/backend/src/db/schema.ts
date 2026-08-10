@@ -15,12 +15,12 @@ export const contents = pgTable('contents', {
   id: uuid('id').defaultRandom().primaryKey(),
   title: varchar('title', { length: 255 }).notNull(),
   url: varchar('url', { length: 512 }).notNull().unique(),
-  source: varchar('source', { length: 100 }).notNull(), // e.g., 'YouTube', 'Dev.to'
-  type: varchar('type', { length: 50 }).notNull(), // 'video' or 'article'
+  source: varchar('source', { length: 100 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(),
   summary: text('summary'),
   body: text('body'), // full article content as sanitized HTML
-  categories: text('categories').array(), // multiple categories a content belongs to
-  image: varchar('image', { length: 1000 }), // thumbnail / cover image URL
+  categories: text('categories').array(),
+  image: varchar('image', { length: 1000 }),
   embedCode: text('embed_code'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({

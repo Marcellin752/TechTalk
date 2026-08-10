@@ -54,7 +54,6 @@ export const api = {
     localStorage.removeItem('teachtalk_user');
   },
 
-  // Handles a forced sign-out (expired/invalid token) with a clear message
   handleSessionExpired(): void {
     this.logout();
     toast.error("Your session has expired. Please sign in again.");
@@ -73,8 +72,6 @@ export const api = {
     }
   },
 
-  // Exchanges the current (possibly recently expired) token for a fresh one.
-  // The backend always verifies the signature before re-issuing.
   async tryRefresh(): Promise<boolean> {
     if (this._refreshing) return this._refreshing;
     const token = this.getToken();
@@ -99,7 +96,6 @@ export const api = {
     return this._refreshing;
   },
 
-  // Proactively renews the token before it expires so sessions never silently die.
   scheduleTokenRefresh(): void {
     const token = this.getToken();
     if (!token) return;
@@ -118,8 +114,6 @@ export const api = {
     }, delay);
   },
 
-  // Authenticated fetch that transparently tries a token refresh once on a 401
-  // before escalating to the session-expired flow.
   async fetchWithAuth(path: string, options: RequestInit = {}, retry = true): Promise<Response> {
     const token = this.getToken();
     if (!token) {

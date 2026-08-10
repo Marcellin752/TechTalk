@@ -4,7 +4,6 @@ import { db } from '../db/db.js';
 import { contents, bookmarks, readingHistory } from '../db/schema.js';
 import { classifyContent } from '../utils/classify.js';
 
-// Fetch all multi-platform contents, paginated, sorted by recency and optionally filtered by search
 export async function handleGetContents(request: FastifyRequest, reply: FastifyReply) {
   try {
     const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string };
@@ -33,7 +32,6 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
       conditions.push(arrayOverlaps(contents.categories, categories));
     }
 
-    // Apply search, type and/or categories filters when provided
     const filtered = conditions.length > 0
       ? db.select().from(contents).where(and(...conditions))
       : db.select().from(contents);
@@ -47,7 +45,6 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
   }
 }
 
-// Manually insert or scrape new content (Protected Route)
 export async function handleCreateContent(request: FastifyRequest, reply: FastifyReply) {
   try {
     const { title, url, source, type, summary, embedCode } = request.body as any;
@@ -56,7 +53,6 @@ export async function handleCreateContent(request: FastifyRequest, reply: Fastif
       return reply.status(400).send({ error: 'Fields (title, url, source, type) are required.' });
     }
 
-    // Validate that the content type is known
     const validTypes = ['article', 'video', 'social_post'];
     if (!validTypes.includes(type)) {
       return reply.status(400).send({ error: 'Invalid content type. Must be article, video, or social_post.' });
@@ -69,7 +65,6 @@ export async function handleCreateContent(request: FastifyRequest, reply: Fastif
       type,
       summary,
       categories: classifyContent(title, summary),
-      embedCode, // Storing the dynamic player data for YouTube/TikTok
     }).returning();
 
     return reply.status(201).send({
@@ -85,7 +80,6 @@ export async function handleCreateContent(request: FastifyRequest, reply: Fastif
   }
 }
 
-// Fetch all bookmarks for authenticated user
 export async function handleGetBookmarks(request: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = (request.user as any).id;
@@ -115,7 +109,6 @@ export async function handleGetBookmarks(request: FastifyRequest, reply: Fastify
   }
 }
 
-// Bookmark a content item for authenticated user
 export async function handleCreateBookmark(request: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = (request.user as any).id;
@@ -125,13 +118,11 @@ export async function handleCreateBookmark(request: FastifyRequest, reply: Fasti
       return reply.status(400).send({ error: 'Field (contentId) is required.' });
     }
 
-    // Check if the content exists
     const [content] = await db.select().from(contents).where(eq(contents.id, contentId)).limit(1);
     if (!content) {
       return reply.status(404).send({ error: 'Content not found.' });
     }
 
-    // Insert bookmark
     await db.insert(bookmarks).values({
       userId,
       contentId,
@@ -144,7 +135,6 @@ export async function handleCreateBookmark(request: FastifyRequest, reply: Fasti
   }
 }
 
-// Delete a bookmark for authenticated user
 export async function handleDeleteBookmark(request: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = (request.user as any).id;
@@ -168,7 +158,6 @@ export async function handleDeleteBookmark(request: FastifyRequest, reply: Fasti
   }
 }
 
-// Record that the user opened a content item (used for Read count and streaks)
 export async function handleMarkRead(request: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = (request.user as any).id;
@@ -191,7 +180,6 @@ export async function handleMarkRead(request: FastifyRequest, reply: FastifyRepl
   }
 }
 
-// Bulk upload of locally-tracked read ids (history hydration for existing users)
 export async function handleMarkReadBatch(request: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = (request.user as any).id;
@@ -202,7 +190,6 @@ export async function handleMarkReadBatch(request: FastifyRequest, reply: Fastif
       return reply.status(400).send({ error: 'Field (contentIds) is required.' });
     }
 
-    // Only insert valid contents that were not already recorded for this user
     const alreadyRead = await db
       .select({ contentId: readingHistory.contentId })
       .from(readingHistory)
@@ -224,7 +211,6 @@ export async function handleMarkReadBatch(request: FastifyRequest, reply: Fastif
   }
 }
 
-// Returns the user's read ids and the distinct UTC days they read something
 export async function handleGetReading(request: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = (request.user as any).id;

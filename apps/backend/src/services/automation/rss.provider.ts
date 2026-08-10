@@ -6,13 +6,11 @@ import { classifyContent } from '../../utils/classify.js';
 
 const parser = new Parser();
 
-// Tech RSS feeds list to feed TechTalk
 const TECH_FEEDS = [
   { name: 'Dev.to', url: 'https://dev.to/feed' },
   { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' }
 ];
 
-// Pulls a thumbnail from an RSS item: enclosure, then first <img> in content
 function extractImage(item: any): string | null {
   if (item.enclosure?.url) return item.enclosure.url;
   const content = item['content:encoded'] || item.content || '';
@@ -38,7 +36,6 @@ export async function fetchLiveRSSFeeds(): Promise<void> {
         const contentHtml = item['content:encoded'] || item.content || '';
         const body = contentHtml ? sanitizeHtmlContent(contentHtml) : null;
 
-        // Inserting into 'contents' database table. Prevents duplicates using url conflict check.
         await db.insert(contents).values({
           title: item.title,
           url: item.link,

@@ -59,7 +59,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         const container = googleBtnRef.current;
         if (!container || !gis) return;
         const width = Math.max(container.clientWidth || 320, 200);
-        // Re-render with the container's current width (responsive on resize)
         container.innerHTML = "";
         gis.renderButton(container, {
           type: "standard",
@@ -117,7 +116,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       );
       return;
     }
-    // If the official button hasn't rendered yet, fall back to the One Tap prompt
     setGoogleLoading(true);
     window.google.accounts.id.prompt();
   };
@@ -140,7 +138,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       } else {
         const res = await api.register(name, email, password);
         if (res.success) {
-          // Auto sign in on registration success
           const loginRes = await api.login(email, password);
           if (loginRes.success && loginRes.user) {
             onAuthSuccess(loginRes.user);
