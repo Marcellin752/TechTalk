@@ -35,3 +35,12 @@ export const bookmarks = pgTable('bookmarks', {
 }, (table) => ({
   userContentUniqueIdx: uniqueIndex('bookmarks_user_content_unique_idx').on(table.userId, table.contentId),
 }));
+
+export const readingHistory = pgTable('reading_history', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  contentId: uuid('content_id').references(() => contents.id, { onDelete: 'cascade' }).notNull(),
+  readAt: timestamp('read_at').defaultNow().notNull(),
+}, (table) => ({
+  userContentIdx: index('reading_history_user_content_idx').on(table.userId, table.contentId),
+}));

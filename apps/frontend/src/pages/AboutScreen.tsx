@@ -4,7 +4,7 @@ interface AboutScreenProps {
   onBack: () => void;
 }
 
-const SOURCES = ["Dev.to", "TechCrunch", "Reddit", "YouTube"];
+const SOURCES = ["Dev.to", "TechCrunch", "YouTube"];
 
 const FEATURES = [
   { icon: <Rss size={16} />, title: "Curated feed", desc: "Fresh tech articles & videos from across the web." },
@@ -16,7 +16,7 @@ const FEATURES = [
 export function AboutScreen({ onBack }: AboutScreenProps) {
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-lg mx-auto px-4 py-8 pb-10">
+      <div className="max-w-2xl mx-auto px-4 py-8 pb-10">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"

@@ -274,6 +274,61 @@ export async function handleUpdateProfile(request: FastifyRequest, reply: Fastif
 }
 
 /**
+ * Issues a fresh JWT for an existing (possibly recently expired) session.
+ * The signature is always verified; only the expiration check is relaxed,
+ * and only within a grace period, so forged/tampered tokens are rejected.
+ */
+export async function handleRefresh(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return reply.status(401).send({ error: 'Missing token.' });
+    }
+
+    let payload: any;
+    try {
+      payload = await request.jwtVerify({ ignoreExpiration: true } as any);
+    } catch (err) {
+      request.log.error(err);
+      return reply.status(401).send({ error: 'Invalid or forged token.' });
+    }
+
+    // Grace period: never resurrect a token that expired more than 30 days ago.
+    if (payload.exp) {
+      const expiredMsAgo = Date.now() - payload.exp * 1000;
+      if (expiredMsAgo > 30 * 24 * 60 * 60 * 1000) {
+        return reply.status(401).send({ error: 'Session expired. Please sign in again.' });
+      }
+    }
+
+    const [user] = await db.select().from(users).where(eq(users.id, payload.id)).limit(1);
+    if (!user) {
+      return reply.status(401).send({ error: 'User no longer exists.' });
+    }
+
+    const token = (request.server as any).jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      { expiresIn: '1d' }
+    );
+
+    return reply.status(200).send({
+      message: 'Token refreshed successfully!',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        picture: user.picture ?? null,
+      },
+    });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/**
  * Returns the currently authenticated user from the DB.
  * The JWT only carries id/email/role, so we fetch fresh data (name/picture).
  */

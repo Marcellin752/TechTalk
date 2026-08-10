@@ -86,7 +86,7 @@ export function FeedScreen({
 
   return (
     <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} ref={scrollRef}>
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
+      <div className="max-w-5xl mx-auto px-4 py-4 pb-8">
         {/* Pull-to-refresh indicator */}
         <div
           className="flex items-center justify-center overflow-hidden transition-all duration-200"
@@ -101,7 +101,7 @@ export function FeedScreen({
         </div>
 
         {/* Filter bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-4">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -117,15 +117,18 @@ export function FeedScreen({
           ))}
         </div>
 
-        {items.map((item) => (
-          <FeedCard
-            key={item.id}
-            item={item}
-            onOpen={() => onOpen(item)}
-            onSave={() => onSave(item)}
-            isSaved={savedIds.has(item.id)}
-          />
-        ))}
+        {/* Cards grid: 1 column on mobile, 2 on md+, 3 on xl+ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {items.map((item) => (
+            <FeedCard
+              key={item.id}
+              item={item}
+              onOpen={() => onOpen(item)}
+              onSave={() => onSave(item)}
+              isSaved={savedIds.has(item.id)}
+            />
+          ))}
+        </div>
 
         {!loading && !error && hasMore && items.length > 0 && (
           <div ref={sentinelRef} className="py-4 flex justify-center">
