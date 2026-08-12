@@ -1,92 +1,77 @@
-# Tech Talk - Backend
+# TechTalk Backend
 
-## Database Setup (Drizzle + PostgreSQL)
+Fastify + TypeScript REST API for TechTalk, with PostgreSQL (Drizzle ORM) persistence and hourly content aggregation workers.
 
-We have successfully integrated **Drizzle ORM** and synchronized our local PostgreSQL database with our TypeScript schema! The initial tables for our MVP (`users` and `contents`) are officially live and fully operational.
+## Stack
 
-### How to get started
+- Fastify, TypeScript, Drizzle ORM, PostgreSQL
+- `@fastify/jwt` (Bearer tokens), `bcrypt`, `google-auth-library`
+- Validation, rate limiting, and node-cron scheduled workers
 
-If you are pulling this project to your local machine, follow these steps to get your backend environment up and running perfectly:
+## Getting Started
 
-#### 1. Environment Configuration
-Create a `.env` file in `apps/backend/` by copying the example file:
+### 1. Environment Configuration
+
 ```bash
 cp .env.example .env
 ```
-Inside your .env, update your database connection string and secure credentials:
 
-```text
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teachtalk_db
-JWT_SECRET=your_jwt_secret_key_here
-YOUTUBE_API_KEY=your_google_cloud_youtube_api_key_here
-```
+Set `DATABASE_URL` and `JWT_SECRET` (a long random string). Add `YOUTUBE_API_KEY` to enable the YouTube provider. `GOOGLE_CLIENT_ID` is optional but required for Google Sign-In; `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` are optional (see [Providers](#providers)).
 
-#### 2. Install Dependencies
+### 2. Run
 
-Make sure all required packages are properly installed on your machine:
 ```bash
 npm install
+npm run db:migrate     # apply migrations (src/db/migrations)
+npm run dev            # dev server with watch mode
 ```
 
-#### 3. Database Sync & Operations
-
-Two workflows exist; pick one and stick to it:
-
-* **Migrations (recommended for shared/production databases):** versioned SQL files in `src/db/migrations/`. Apply them with:
+A local PostgreSQL instance is easy to start with the root `docker-compose.yml`:
 
 ```bash
-npm run db:migrate
+docker compose up -d postgres
 ```
 
-* **Push (quick local prototyping only):** syncs the schema directly to your database without versioned files:
+### 3. Database Workflows
 
-```bash
-npm run db:push
-```
+| Command | Use |
+| --- | --- |
+| `db:migrate` | Apply versioned migrations (recommended for shared/production databases) |
+| `db:generate` | Generate a new migration after editing `src/db/schema.ts` |
+| `db:push` | Sync schema directly — **local prototyping only**, never mix with migrations |
+| `test` | Run the Vitest suite (`apps/backend/src/controllers/*.test.ts`) |
 
-Do **not** mix both on the same database — `db:push` can drift from the migration history. To create a new migration after editing `src/db/schema.ts`:
+## Providers
 
-```bash
-npm run db:generate
-```
+Aggregation runs on startup and then hourly (`node-cron`), upserting deduplicated content:
 
-## Automation Service (Background Workers)
+| Provider | Source | Required env |
+| --- | --- | --- |
+| Dev.to | Latest trending articles (TypeScript tag) | — |
+| YouTube | Latest videos from configured tech channels | `YOUTUBE_API_KEY` |
+| RSS | Global tech news feeds | — |
+| Reddit | Tech communities | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` (optional, bypasses cloud IP blocking) |
 
-The backend embeds a modular automation engine powered by node-cron. Upon server startup, an immediate data sync is executed, and the worker then schedules itself to run every hour to pull fresh technical content while safely preserving your API quotas.
+## Schema
 
-The architecture is split into independent data providers:
+Defined in `src/db/schema.ts`; versioned migrations live in `src/db/migrations/` (latest: `0009`).
 
-* Dev.to Provider: Fetches the latest trending technical articles (filtered by the TypeScript tag).
+| Table | Purpose |
+| --- | --- |
+| `users` | Accounts: `id`, `email` (unique), `password` (hashed, nullable for Google-only), `name`, `role` (`user`/`admin`), `picture`, `created_at` |
+| `contents` | Aggregated items: `id`, `title`, `url` (unique), `source`, `type` (`article`/`video`/`social_post`), `summary`, `body`, `categories`, `image`, `embedCode`, `created_at` |
+| `bookmarks` | Per-user saved contents (`user_id`, `content_id`, `created_at`) |
+| `reading_history` | Read tracking (`user_id`, `content_id`, `read_at`) |
 
-* YouTube Provider: Connects to the YouTube Data API v3 using your environment key to pull the latest videos from specified tech channels.
+## API
 
-## Database Schema (Data Models)
+Routes are organized in `src/routes/` and mounted under `/api`:
 
-Here is the current structure of our database tables defined in `src/db/schema.ts`:
+- **Auth** (`/api/auth`): `POST register`, `POST login`, `POST google`, `POST refresh`, `GET me`, `PATCH profile`
+- **Content** (`/api/content`): `GET /` (paginated, searchable, filterable), `POST /` (admin), bookmarks and reading-history endpoints
 
-### 1. `users` Table
-This table stores user credentials and roles to handle RBAC (Role-Based Access Control) security.
+Full request/response contract: [`docs/frontend-integration-guide.md`](../../docs/frontend-integration-guide.md).
 
-| Column Name | Data Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | `uuid` | Primary Key, Default: uuid_generate_v4() | Unique identifier for each user |
-| `email` | `varchar(255)` | Unique, Not Null | User's email address used for login |
-| `password` | `varchar(255)` | Not Null | Hashed password (managed via bcrypt) |
-| `name` | `varchar(100)` | Not Null | User's full name or display name |
-| `role` | `varchar(50)` | Default: 'user' | Access role (`user`, `admin`) |
-| `created_at` | `timestamp` | Default: now() | Account creation timestamp |
+## Deployment
 
-### 2. `contents` Table
-This table centralizes and aggregates all media items collected by our workers or manually created by administrators.
-
-| Column Name | Data Type | Constraints | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | `uuid` | Primary Key, Default: uuid_generate_v4() | Unique identifier for each content piece |
-| `title` | `varchar(255)` | Not Null | Title of the article or video |
-| `url` | `varchar(512)` | Unique, Not Null | Direct link to the source content origin |
-| `source` | `varchar(100)` | Not Null | Platform origin (e.g., `Dev.to`, `YouTube`) |
-| `type` | `varchar(50)` | Not Null | Media format (`article`, `video`) |
-| `summary` | `text` | - | Short snippet or description text |
-| `embedCode` | `text` | Nullable | HTML Iframe code for direct video embedding |
-| `created_at` | `timestamp` | Default: now() | Insertion timestamp into our database |
-
+`npm run build` (tsc) then `npm start`. The production backend runs on Render; migrations must be applied against the production database (via `npm run db:migrate` or a release command).

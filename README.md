@@ -1,53 +1,60 @@
-# Tech Talk Project
+# TechTalk
 
-TechTalk is an educational scrolling application designed for tech professionals and students. It aggregates tech articles, videos, and news from top-tier platforms (like YouTube, Reddit, and RSS feeds) into a single, personalized feed based on user specialties and interests. 
+TechTalk is an educational scrolling application for tech professionals and students. It aggregates articles, videos, and news from top-tier platforms — Dev.to, YouTube, and global RSS feeds — into a single personalized feed, turning passive scrolling into productive tech watch sessions.
 
-The goal is to transform passive scrolling moments into natural, productive, and engaging tech watch sessions.
+## Features
 
----
+- **Personalized feed** — articles and videos aggregated hourly by background workers (`node-cron`), with search, type, and category filters
+- **Authentication** — email/password registration or Google Sign-In, with automatic session refresh
+- **Bookmarks & reading history** — per-user saved content and read tracking, synced across devices
+- **Responsive UI** — mobile-first React client with infinite scroll and pull-to-refresh
 
 ## Project Structure
 
 ```text
 TechTalk/
 ├── apps/
-│   ├── backend/       # Fastify + TypeScript REST API & Background Workers (Drizzle ORM)
-│   └── frontend/      # React client application source code
-├── docs/              # Global documentation, requirements, and database diagrams
-├── package.json       # Root monorepo configuration & workspace orchestration
-└── README.md          # This global guide
+│   ├── backend/     # Fastify + TypeScript REST API, Drizzle ORM, aggregation workers
+│   └── frontend/    # React + TypeScript + Vite client
+├── docs/            # API contract & integration guide, project specification
+└── docker-compose.yml  # Local PostgreSQL
 ```
----
 
 ## Quick Start
 
-To get the full project up and running locally, follow the specific instructions inside each application folder:
-
-* **Backend & Database Setup:** Go to `apps/backend/README.md` to see how to configure your `.env` file, run `npm install`, and synchronize your local PostgreSQL database using Drizzle migrations (`npm run db:migrate`).
-* **Frontend Setup:** Go to `apps/frontend/README.md` to install packages and launch the React development server.
-
-### PostgreSQL via Docker Compose (recommended)
-
-If you just want to bring up PostgreSQL quickly:
-
 ```bash
-docker compose up -d postgres
-```
+docker compose up -d postgres          # local PostgreSQL
+npm install --workspaces
 
-Then continue with backend setup (use `db:migrate` for versioned migrations, or `db:push` for quick local prototyping):
-
-```bash
+# Backend → http://localhost:5000/api
+cp apps/backend/.env.example apps/backend/.env   # set DATABASE_URL, JWT_SECRET
 npm run db:migrate --workspace=apps/backend
 npm run dev:backend
+
+# Frontend → http://localhost:5173
+cp apps/frontend/.env.example apps/frontend/.env.local
+npm run dev:frontend
 ```
 
----
+See [`apps/backend/README.md`](apps/backend/README.md) and [`apps/frontend/README.md`](apps/frontend/README.md) for full setup, environment variables, and database workflows.
+
+## Documentation
+
+| Document | Content |
+| --- | --- |
+| [`docs/frontend-integration-guide.md`](docs/frontend-integration-guide.md) | REST API contract, data models, integration requirements |
+| [`docs/TechTalk_Fiche_Projet.docx`](docs/TechTalk_Fiche_Projet.docx) | Project specification |
+
+## Production
+
+| Service | Host |
+| --- | --- |
+| Backend | https://techtalk-8fci.onrender.com |
+| Frontend | https://tech-talk-frontend.vercel.app |
 
 ## Authors
 
-* [Flavio KOUGBADI](https://github.com/Flavio-KOUGBADI)
-* [Gloria DJIBRINE](https://github.com/Gloria-bot105)
-* [Marcellin SAMBIENI](https://github.com/Marcellin752)
-* [Obafemi TAYEWO](https://github.com/olouwafemi-DIne)
-
----
+- Flavio KOUGBADI
+- Gloria DJIBRINE
+- Marcellin SAMBIENI
+- Obafemi TAYEWO

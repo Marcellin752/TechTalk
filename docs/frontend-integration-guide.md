@@ -1,133 +1,232 @@
-# TechTalk - Frontend Integration Guide & API Contract
+# TechTalk — API Contract & Frontend Integration Guide
 
-This document provides the frontend team with the necessary technical specifications, data models, and API endpoints to begin building the presentation layer and integrating with the backend.
-
----
-
-##  Architectural Context
-* **Backend Stack:** Fastify, TypeScript, Drizzle ORM, PostgreSQL.
-* **Authentication:** Stateful JWT via `@fastify/jwt` (Token must be passed in the `Authorization: Bearer <token>` header).
-* **Data Refresh Rate:** Automated workers (`node-cron`) sync data from **Dev.to**, **YouTube API v3**, and global **RSS feeds** once every hour.
-* **Base URL:** `http://localhost:5000/api` in local development (configurable in the frontend via the `VITE_API_URL` environment variable).
+This document defines the HTTP contract between the TechTalk frontend and backend, the data models exposed by the API, and the integration requirements for the presentation layer.
 
 ---
 
-## Database Models & Payload Structures
+## 1. Architectural Context
 
-When fetching data from the backend, components should expect objects matching the following strict structures:
+| Layer | Technology |
+| --- | --- |
+| Backend | Fastify, TypeScript, Drizzle ORM, PostgreSQL |
+| Frontend | React, TypeScript, Vite, Tailwind CSS |
+| Authentication | Stateful JWT via `@fastify/jwt` (Bearer token) |
+| Content aggregation | Automated workers (`node-cron`, hourly) fetching from Dev.to, YouTube Data API v3, and global RSS feeds |
+| Base URL | `http://localhost:5000/api` (local) — overridable via `VITE_API_URL` |
 
-### 1. Unified Content Object (`contents` table)
-This structure represents any article or video aggregated by the background services.
+### Authentication
 
-```typescript
-interface Content {
-  id: string;          // UUID v4 format
-  title: string;       // Clean text title of the post/video
-  url: string;         // Canonical link to the source platform
-  source: string;      // Platform origin: 'Dev.to', 'YouTube', 'TechCrunch', etc.
-  type: 'article' | 'video'; // Media format indicator
-  summary: string;     // Text snippet, content body, or description
-  embedCode: string | null; // Safe HTML Iframe snippet for direct YouTube embedding
-  created_at: string;  // ISO timestamp of DB insertion
+All protected endpoints require the header:
+
+```
+Authorization: Bearer <jwt_token>
+```
+
+Tokens are signed with a 1-day expiration. Access tokens may be renewed via `POST /api/auth/refresh` (see [2.5](#25-refresh-a-token)).
+
+---
+
+## 2. REST API Endpoints
+
+### 2.1 Register a New Account
+
+**`POST /api/auth/register`** — `application/json`
+
+```json
+{
+  "name": "Jane Doe",
+  "email": "jane@example.com",
+  "password": "secure_password_here"
 }
 ```
 
-### 2. User Authentication Profile (`users` table)
-Returned upon successful registration or login sessions.
+**`201 Created`**
 
-```typescript
-interface UserProfile {
-  id: string;          // UUID v4 format
-  email: string;       // Unique user email
-  name: string;        // Account display name
-  role: 'user' | 'admin'; // Access privilege level
-}
-```
-
-Note: the `created_at` column is not returned by the API on register/login (only `id`, `name`, `email`, `role` are exposed).
-
-## REST API Endpoints Contract
-
-### Authentication Module
-
-#### 1. Register a New Account
-* **Endpoint:** `POST /api/auth/register`
-* **Content-Type:** `application/json`
-* **Request Body:**
-  ```json
-  {
+```json
+{
+  "message": "User registered successfully!",
+  "user": {
+    "id": "a3b89c00-...",
     "name": "Jane Doe",
     "email": "jane@example.com",
-    "password": "secure_password_here"
+    "role": "user",
+    "picture": null
   }
-  ```
-* **Success Response (`201 Created`):**
-  ```json
-  {
-    "message": "User registered successfully!",
-    "user": {
-      "id": "a3b89c...",
-      "email": "jane@example.com",
-      "name": "Jane Doe",
-      "role": "user"
-    }
-  }
-  ```
-#### 2. User Authentication (Login)
-* **Endpoint:** `POST /api/auth/login`
-* **Content-Type:** `application/json`
-* **Request Body:**
-  ```json
-  {
+}
+```
+
+Constraints: email must match a valid format; password must be 12–100 characters and contain at least one uppercase letter, one lowercase letter, one digit, and one special character.
+
+### 2.2 User Login
+
+**`POST /api/auth/login`** — `application/json`
+
+```json
+{
+  "email": "jane@example.com",
+  "password": "secure_password_here"
+}
+```
+
+**`200 OK`**
+
+```json
+{
+  "message": "Login successful!",
+  "token": "eyJhbGciOiJIUzI1NiIsIn...",
+  "user": {
+    "id": "a3b89c00-...",
+    "name": "Jane Doe",
     "email": "jane@example.com",
-    "password": "secure_password_here"
+    "role": "user",
+    "picture": null
   }
-  ```
-* **Success Response (`200 OK`):**
-  ```json
+}
+```
+
+### 2.3 Google Sign-In
+
+**`POST /api/auth/google`** — `application/json`
+
+```json
+{
+  "credential": "<google_id_token>"
+}
+```
+
+The ID token is verified against Google's certificate. A new account is created on first sign-in (passwordless). Returns the same shape as [2.2](#22-user-login).
+
+### 2.4 Refresh a Token
+
+**`POST /api/auth/refresh`** — `Bearer <expired_or_valid_token>`
+
+Server-side verification without expiration enforcement, up to a 30-day grace period. Returns the same shape as [2.2](#22-user-login) with a fresh token.
+
+```json
+{
+  "message": "Token refreshed successfully!",
+  "token": "eyJhbGciOiJIUzI1NiIsIn...",
+  "user": { "id": "...", "name": "Jane Doe", "email": "jane@example.com", "role": "user", "picture": null }
+}
+```
+
+### 2.5 Current User & Profile
+
+**`GET /api/auth/me`** — returns `{ "user": { ... } }` (same user shape as above).
+
+**`PATCH /api/auth/profile`** — `application/json`
+
+```json
+{ "name": "Jane D." }
+```
+
+Returns `{ "message": "Profile updated successfully!", "user": { ... } }`.
+
+> Note: all authentication routes are rate-limited to 20 requests per minute per client.
+
+---
+
+## 3. Content & Feed Module
+
+### 3.1 Fetch Aggregated Feed
+
+**`GET /api/content`** — protected
+
+| Query parameter | Type | Default | Max | Description |
+| --- | --- | --- | --- | --- |
+| `limit` | number | `50` | `100` | Number of items to return |
+| `offset` | number | `0` | — | Number of items to skip |
+| `search` | string | — | — | Case-insensitive match on title, summary, or source |
+| `type` | string | — | — | `article` `\|` `video` `\|` `social_post` |
+| `categories` | string | — | — | Comma-separated list, matches any category |
+
+**`200 OK`** — items ordered by `created_at` descending:
+
+```json
+[
   {
-    "message": "Login successful!",
-    "token": "eyJhbGciOiJIUzI1NiIsIn...",
-    "user": {
-      "id": "a3b89c...",
-      "email": "jane@example.com",
-      "name": "Jane Doe",
-      "role": "user"
-    }
+    "id": "8f4b23b4-e283-4a6c-941d-d9b8e23f11a4",
+    "title": "Understanding TypeScript 5.5 Features",
+    "url": "https://dev.to/example/typescript-features",
+    "source": "Dev.to",
+    "type": "article",
+    "summary": "A deep dive into the latest type-checking enhancements...",
+    "embedCode": null,
+    "createdAt": "2026-06-23T20:44:00.000Z"
+  },
+  {
+    "id": "1c2b3a4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+    "title": "Building Next-Gen Robotics with Assembly",
+    "url": "https://www.youtube.com/watch?v=robotics-vid",
+    "source": "YouTube",
+    "type": "video",
+    "summary": "A video exploring low-level control systems...",
+    "embedCode": "<iframe ...></iframe>",
+    "createdAt": "2026-06-23T21:12:00.000Z"
   }
-  ```
+]
+```
 
-###  Content & Feed Module
+### 3.2 Create Content (admin)
 
-#### 1. Fetch Aggregated Feed
-* **Endpoint:** `GET /api/content`
-* **Headers Required:** `Authorization: Bearer <your_jwt_token>`
-* **Query Parameters (Optional Filtering):**
-  * `limit`: max number of items to return (default `50`, max `100`)
-  * `offset`: number of items to skip (default `0`)
-* **Response:** items are ordered by `created_at` descending.
-* **Success Response (`200 OK`):**
-  ```json
-  [
-    {
-      "id": "8f4b23b4-e283-4a6c-941d-d9b8e23f11a4",
-      "title": "Understanding TypeScript 5.5 Features",
-      "url": "[https://dev.to/example/typescript-features](https://dev.to/example/typescript-features)",
-      "source": "Dev.to",
-      "type": "article",
-      "summary": "A deep dive into the latest type-checking enhancements...",
-      "embedCode": null,
-      "created_at": "2026-06-23T20:44:00.000Z"
-    },
-    {
-      "id": "1c2b3a4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-      "title": "Building Next-Gen Robotics with Assembly",
-      "url": "[https://www.youtube.com/watch?v=robotics-vid](https://www.youtube.com/watch?v=robotics-vid)",
-      "source": "YouTube",
-      "type": "video",
-      "summary": "A video exploring low-level control systems and hardware architecture.",
-      "embedCode": "<iframe width=\"560\" height=\"315\" src=\"[https://www.youtube.com/embed/robotics-vid](https://www.youtube.com/embed/robotics-vid)\" ...></iframe>",
-      "created_at": "2026-06-23T21:12:00.000Z"
-    }
-  ]
-  ```
+**`POST /api/content`** — protected, `role: admin`
+
+```json
+{
+  "title": "My Article",
+  "url": "https://example.com/article",
+  "source": "Custom",
+  "type": "article",
+  "summary": "..."
+}
+```
+
+**`201 Created`** — returns `{ "message": "...", "content": { ... } }`. Duplicate URLs are rejected with `409`.
+
+### 3.3 Bookmarks
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /api/content/bookmarks` | List the current user's bookmarked content (full content objects) |
+| `POST /api/content/bookmarks` | Body `{ "contentId": "..." }` → `201`; idempotent |
+| `DELETE /api/content/bookmarks/:contentId` | Remove a bookmark → `200` |
+
+### 3.4 Reading History
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /api/content/read` | Body `{ "contentId": "..." }` → records a read → `201` |
+| `POST /api/content/read/batch` | Body `{ "contentIds": ["...", "..."] }` → bulk sync, skips already-read and unknown ids → `200` |
+| `GET /api/content/read` | Returns `{ "readIds": string[], "readDates": string[] }` (ISO dates of first reads) |
+
+---
+
+## 4. Data Models
+
+### Content object (`contents` table)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `title` | string | Title of the post/video |
+| `url` | string | Canonical link to the source platform (unique) |
+| `source` | string | Platform origin — `Dev.to`, `YouTube`, `TechCrunch`, etc. |
+| `type` | `article` `\|` `video` `\|` `social_post` | Media format |
+| `summary` | string | Text snippet or description |
+| `body` | string \| null | Full article body |
+| `categories` | string[] | Auto-classified categories |
+| `image` | string \| null | Thumbnail/cover URL |
+| `embedCode` | string \| null | Safe iframe snippet for video embedding |
+| `createdAt` | ISO timestamp | DB insertion time |
+
+### User profile object (`users` table)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | UUID | Primary key |
+| `email` | string | Unique email |
+| `name` | string | Display name |
+| `role` | `user` `\|` `admin` | Access level |
+| `picture` | string \| null | Avatar URL (set on Google sign-in) |
+
+> Registers/logins expose only `id`, `name`, `email`, `role`, `picture` — never the password hash.
