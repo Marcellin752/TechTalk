@@ -50,7 +50,7 @@ See [`apps/backend/README.md`](apps/backend/README.md) and [`apps/frontend/READM
 | Service | Host |
 | --- | --- |
 | Backend | https://techtalk-8fci.onrender.com |
-| Frontend | https://tech-talk-frontend.vercel.app |
+| Frontend | https://tech-talk.vercel.app |
 
 ## Authors
 
