@@ -20,6 +20,14 @@ fastify.register(cors, { origin: config.corsOrigin });
 fastify.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 fastify.register(jwt, { secret: config.jwtSecret });
 
+fastify.addHook('onSend', async (_request, reply, payload) => {
+  reply.header('X-Content-Type-Options', 'nosniff');
+  reply.header('X-Frame-Options', 'DENY');
+  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  return payload;
+});
+
 fastify.decorate('authenticate', async (request: any, reply: any) => {
   try {
     await request.jwtVerify();

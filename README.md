@@ -49,12 +49,4 @@ See [`apps/backend/README.md`](apps/backend/README.md) and [`apps/frontend/READM
 
 | Service | Host |
 | --- | --- |
-| Backend | https://techtalk-8fci.onrender.com |
-| Frontend | https://tech-talk.vercel.app |
-
-## Authors
-
-- Flavio KOUGBADI
-- Gloria DJIBRINE
-- Marcellin SAMBIENI
-- Obafemi TAYEWO
+| Frontend | https://t3chtalk.vercel.app |
