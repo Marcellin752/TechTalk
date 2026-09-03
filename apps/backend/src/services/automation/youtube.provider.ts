@@ -2,61 +2,171 @@ import { db } from '../../db/db.js';
 import { contents } from '../../db/schema.js';
 import { classifyContent } from '../../utils/classify.js';
 
-/**
- * Fetches latest videos from a specific YouTube Channel using YouTube Data API v3.
- */
+const CHANNELS = (process.env.YOUTUBE_CHANNELS || '')
+  .split(',')
+  .map((c) => c.trim())
+  .filter(Boolean);
+
+const KEYWORDS = (process.env.YOUTUBE_KEYWORDS || 'programming,web development,typescript,javascript,AI technology')
+  .split(',')
+  .map((k) => k.trim())
+  .filter(Boolean);
+
+const MAX_RESULTS = parseInt(process.env.YOUTUBE_MAX_RESULTS || '10', 10);
+
+interface VideoItem {
+  videoId: string;
+  title: string;
+  description: string;
+  channelTitle: string;
+  thumbnail: string | null;
+}
+
+async function fetchVideosForKeyword(
+  apiKey: string,
+  keyword: string,
+  existingIds: Set<string>,
+): Promise<{ videos: VideoItem[]; consumed: number }> {
+  const params = new URLSearchParams({
+    part: 'snippet',
+    maxResults: String(MAX_RESULTS),
+    order: 'date',
+    type: 'video',
+    q: keyword,
+    relevanceLanguage: 'en',
+    key: apiKey,
+  });
+
+  const url = `https://www.googleapis.com/youtube/v3/search?${params}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`YouTube API error: ${response.status}`);
+  }
+
+  const data = await response.json() as any;
+  const videos: VideoItem[] = [];
+
+  for (const item of data.items || []) {
+    const videoId = item.id?.videoId;
+    if (!videoId || existingIds.has(videoId)) continue;
+    existingIds.add(videoId);
+
+    videos.push({
+      videoId,
+      title: item.snippet.title,
+      description: item.snippet.description || '',
+      channelTitle: item.snippet.channelTitle,
+      thumbnail: item.snippet.thumbnails?.high?.url
+        || item.snippet.thumbnails?.default?.url
+        || null,
+    });
+  }
+
+  return { videos, consumed: 100 };
+}
+
+async function fetchVideosForChannel(
+  apiKey: string,
+  channelId: string,
+  existingIds: Set<string>,
+): Promise<{ videos: VideoItem[]; consumed: number }> {
+  const params = new URLSearchParams({
+    part: 'snippet',
+    channelId,
+    maxResults: String(MAX_RESULTS),
+    order: 'date',
+    type: 'video',
+    key: apiKey,
+  });
+
+  const url = `https://www.googleapis.com/youtube/v3/search?${params}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`YouTube API error for channel ${channelId}: ${response.status}`);
+  }
+
+  const data = await response.json() as any;
+  const videos: VideoItem[] = [];
+
+  for (const item of data.items || []) {
+    const videoId = item.id?.videoId;
+    if (!videoId || existingIds.has(videoId)) continue;
+    existingIds.add(videoId);
+
+    videos.push({
+      videoId,
+      title: item.snippet.title,
+      description: item.snippet.description || '',
+      channelTitle: item.snippet.channelTitle,
+      thumbnail: item.snippet.thumbnails?.high?.url
+        || item.snippet.thumbnails?.default?.url
+        || null,
+    });
+  }
+
+  return { videos, consumed: 100 };
+}
+
+async function insertVideos(videos: VideoItem[]): Promise<number> {
+  let inserted = 0;
+
+  for (const v of videos) {
+    const result = await db.insert(contents).values({
+      title: v.title,
+      url: `https://www.youtube.com/watch?v=${v.videoId}`,
+      source: v.channelTitle,
+      type: 'video',
+      summary: v.description || 'No description available.',
+      categories: classifyContent(v.title, v.description),
+      image: v.thumbnail,
+      embedCode: `<iframe width="560" height="315" src="https://www.youtube.com/embed/${v.videoId}" frameborder="0" allowfullscreen></iframe>`,
+    }).onConflictDoNothing({ target: contents.url }).returning();
+
+    if (result.length > 0) inserted++;
+  }
+
+  return inserted;
+}
+
 export async function fetchLiveYouTubeVideos(): Promise<void> {
-  console.log('[Automation Worker] Fetching live videos from YouTube API...');
-  
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    console.warn('[Automation Worker] Skipping YouTube sync: YOUTUBE_API_KEY is missing in .env');
+    console.warn('[YouTube] Skipped: YOUTUBE_API_KEY is not set');
     return;
   }
 
-  const channelId = 'UC_x5XG1OV2P6uZZ5FSM9Ttw'; 
-  const maxResults = 5;
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=${maxResults}&order=date&type=video&key=${apiKey}`;
+  console.log(`[YouTube] Fetching with keywords: ${KEYWORDS.join(', ')}`
+    + (CHANNELS.length ? ` and channels: ${CHANNELS.join(', ')}` : ''));
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`YouTube API responded with status: ${response.status}`);
-    }
+  const seenIds = new Set<string>();
+  const allVideos: VideoItem[] = [];
+  let totalQuota = 0;
 
-    const data = await response.json() as any;
-    const videos = data.items || [];
-    let insertedCount = 0;
+  const keywordTasks = KEYWORDS.map((kw) =>
+    fetchVideosForKeyword(apiKey, kw, seenIds).then((r) => {
+      totalQuota += r.consumed;
+      allVideos.push(...r.videos);
+    }).catch((err) => {
+      console.error(`[YouTube] Keyword "${kw}" failed:`, err.message);
+    })
+  );
 
-    for (const video of videos) {
-      const videoId = video.id?.videoId;
-      if (!videoId) continue; 
+  const channelTasks = CHANNELS.map((ch) =>
+    fetchVideosForChannel(apiKey, ch, seenIds).then((r) => {
+      totalQuota += r.consumed;
+      allVideos.push(...r.videos);
+    }).catch((err) => {
+      console.error(`[YouTube] Channel "${ch}" failed:`, err.message);
+    })
+  );
 
-      const snippet = video.snippet;
+  await Promise.all([...keywordTasks, ...channelTasks]);
 
-      const item = {
-        title: snippet.title,
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        source: 'YouTube',
-        type: 'video',
-        summary: snippet.description || 'No description available.',
-        categories: classifyContent(snippet.title, snippet.description),
-        image: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || null,
-        embedCode: `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`
-      };
-
-      const result = await db.insert(contents)
-        .values(item)
-        .onConflictDoNothing({ target: contents.url })
-        .returning();
-
-      if (result && result.length > 0) {
-        insertedCount++;
-      }
-    }
-
-    console.log(`[Automation Worker] YouTube task completed. Added ${insertedCount} new videos.`);
-  } catch (error) {
-    console.error('[Automation Worker] Error fetching from YouTube:', error);
+  if (allVideos.length === 0) {
+    console.log('[YouTube] No new videos found.');
+    return;
   }
+
+  const inserted = await insertVideos(allVideos);
+  console.log(`[YouTube] Done. ${inserted} new video(s) inserted.`);
 }
