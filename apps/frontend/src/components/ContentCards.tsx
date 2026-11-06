@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bookmark, Play, Star, GitFork, Briefcase, GitPullRequest, ArrowUpRight, MapPin, Wallet } from "lucide-react";
+import { Bookmark, Sparkles, Play, Star, GitFork, Briefcase, GitPullRequest, ArrowUpRight, MapPin, Wallet } from "lucide-react";
 import { ContentItem } from "../types/content";
 
 /* Three card formats, one visual language. The feed mixes them in rows:
@@ -14,7 +14,7 @@ export function compact(n: number | undefined): string {
   return String(n);
 }
 
-const LANGUAGE_COLORS: Record<string, string> = {
+export const LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
   JavaScript: "#f1e05a",
   Python: "#3572a5",
@@ -41,6 +41,17 @@ export function LanguageDot({ language }: { language?: string | null }) {
     <span className="inline-flex items-center gap-1.5">
       <span className="w-2.5 h-2.5 rounded-full" style={{ background: LANGUAGE_COLORS[language] ?? "#7c7c86" }} />
       {language}
+    </span>
+  );
+}
+
+/** Why the "For you" feed picked this item, when it can say. */
+function Reason({ text }: { text?: string | null }) {
+  if (!text) return null;
+  return (
+    <span className="flex items-center gap-1 mt-1.5 text-[11.5px] text-primary leading-tight">
+      <Sparkles size={11} className="flex-shrink-0" />
+      <span className="truncate">{text}</span>
     </span>
   );
 }
@@ -98,6 +109,7 @@ export function VideoCard({ item, onOpen, onSave, isSaved }: CardProps) {
         <span className="block mt-2.5 pr-2">
           <span className="block text-[14px] font-medium leading-snug line-clamp-2 text-foreground">{item.title}</span>
           <span className="block text-[12px] text-muted-foreground mt-1 truncate">{item.source} · {item.date}</span>
+          <Reason text={item.reason} />
         </span>
       </button>
       <SaveButton onSave={onSave} isSaved={isSaved} />
@@ -138,6 +150,7 @@ export function RepoCard({ item, onOpen, onSave, isSaved, className = "" }: Card
             ))}
           </span>
         )}
+        <Reason text={item.reason} />
         <span className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-auto pt-3.5 text-[12px] text-muted-foreground">
           <span className="inline-flex items-center gap-1 text-foreground font-medium">
             <Star size={13} className="fill-current text-primary" /> {compact(m.stars)}
@@ -184,6 +197,7 @@ export function ArticleCard({ item, onOpen, onSave, isSaved, className = "" }: C
             ))}
           </span>
         )}
+        <Reason text={item.reason} />
       </button>
       <SaveButton onSave={onSave} isSaved={isSaved} />
     </article>

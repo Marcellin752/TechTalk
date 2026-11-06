@@ -11,6 +11,36 @@ export interface CommentItem {
   author: { id: string; name: string; picture: string | null };
 }
 
+export interface GithubLanguage { name: string; share: number }
+export interface GithubRepoSummary {
+  name: string;
+  description: string | null;
+  stars: number;
+  forks: number;
+  language: string | null;
+  url: string;
+  pushedAt: string;
+}
+export interface GithubProfile {
+  login: string;
+  name: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  htmlUrl: string | null;
+  publicRepos: number;
+  followers: number;
+  totalStars: number;
+  languages: GithubLanguage[];
+  topRepos: GithubRepoSummary[];
+  syncedAt: string;
+}
+export interface GithubProfileState {
+  linked: boolean;
+  profile: GithubProfile | null;
+  error?: string | null;
+  throttled?: boolean;
+}
+
 export interface Identities {
   email: string;
   hasPassword: boolean;
@@ -252,6 +282,24 @@ export const api = {
     }
   },
 
+  /** The developer profile imported from the linked GitHub account. */
+  async getGithubProfile(): Promise<GithubProfileState> {
+    const res = await this.fetchWithAuth('/profile/github');
+    if (!res.ok) throw new Error('profile_unavailable');
+    return res.json();
+  },
+
+  async syncGithubProfile(): Promise<{ success: boolean; state?: GithubProfileState; error?: string }> {
+    try {
+      const res = await this.fetchWithAuth('/profile/github/sync', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || 'Could not refresh from GitHub' };
+      return { success: true, state: data };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
   /** Which sign-in methods are attached to the signed-in account. */
   async getIdentities(): Promise<{ success: boolean; identities?: Identities; error?: string }> {
     return this.identityCall('/auth/identities');
@@ -332,13 +380,17 @@ export const api = {
     }
   },
 
-  async getContents(limit?: number, offset?: number, search?: string, type?: string, categories?: string[]): Promise<Content[]> {
+  async getContents(limit?: number, offset?: number, search?: string, type?: string, categories?: string[], rank?: { sort: 'foryou'; interests?: string[] }): Promise<Content[]> {
     const url = new URL(`${API_URL}/content`);
     if (limit !== undefined) url.searchParams.append('limit', limit.toString());
     if (offset !== undefined) url.searchParams.append('offset', offset.toString());
     if (search) url.searchParams.append('search', search);
     if (type) url.searchParams.append('type', type);
     if (categories && categories.length > 0) url.searchParams.append('categories', categories.join(','));
+    if (rank) {
+      url.searchParams.append('sort', rank.sort);
+      if (rank.interests?.length) url.searchParams.append('interests', rank.interests.join(','));
+    }
 
     const response = await this.fetchWithAuth(`/content${url.search}`);
     if (!response.ok) {

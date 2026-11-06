@@ -41,6 +41,8 @@ export interface ContentItem {
   date: string;
   embedCode?: string | null;
   meta?: RepoMeta;
+  /** Why the personalised feed chose this item, when it can tell. */
+  reason?: string | null;
 }
 
 export type AppScreen = "auth" | "app";

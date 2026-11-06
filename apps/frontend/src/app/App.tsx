@@ -7,7 +7,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { api, User as ApiUser } from "../services/api";
 import { ContentItem, AppScreen, AppTab } from "../types/content";
 import { AuthScreen } from "../pages/AuthScreen";
-import { FeedScreen, type FeedFilter } from "../pages/FeedScreen";
+import { FeedScreen, type FeedFilter, type FeedMode } from "../pages/FeedScreen";
 import { SavedScreen } from "../pages/SavedScreen";
 import { ProfileScreen } from "../pages/ProfileScreen";
 import { SettingsScreen } from "../pages/SettingsScreen";
@@ -28,6 +28,21 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   
   const [searchQuery, setSearchQuery] = useState("");
   const [contentType, setContentType] = useState<FeedFilter>("all");
+  const [feedMode, setFeedModeState] = useState<FeedMode>(() => {
+    try {
+      return localStorage.getItem("teachtalk_feed_mode") === "latest" ? "latest" : "foryou";
+    } catch {
+      return "foryou";
+    }
+  });
+  const setFeedMode = (m: FeedMode) => {
+    setFeedModeState(m);
+    try {
+      localStorage.setItem("teachtalk_feed_mode", m);
+    } catch {
+      /* the choice just will not be remembered */
+    }
+  };
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
@@ -91,6 +106,10 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
   const typeParam = contentType === "all" ? undefined : contentType;
   const interestParam = interests.length > 0 ? interests : undefined;
+  // "For you": interests become a ranking signal (not a filter) and the server orders the page.
+  const forYou = feedMode === "foryou";
+  const rankOpts = forYou ? ({ sort: "foryou", interests } as const) : undefined;
+  const filterParam = forYou ? undefined : interestParam;
 
   // The home feed is built from three separate streams so no format can crowd
   // the others out (new repositories would otherwise fill every page).
@@ -100,7 +119,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     const types = ["video", "repo", "article", "opportunity"] as const;
     // Opportunities are not filtered by interest chips: they are few and always welcome.
     const [videos, repos, articles, opportunities] = await Promise.all(
-      types.map((t) => api.getContents(MIXED_PAGE[t], o[t], undefined, t, t === "opportunity" ? undefined : interestParam)),
+      types.map((t) => api.getContents(MIXED_PAGE[t], o[t], undefined, t, t === "opportunity" ? undefined : filterParam, rankOpts)),
     );
     o.video += videos.length;
     o.repo += repos.length;
@@ -124,7 +143,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
         setHasMore(mixed.more);
         return;
       }
-      const backendContents = await api.getContents(50, 0, undefined, typeParam, interestParam);
+      const backendContents = await api.getContents(50, 0, undefined, typeParam, filterParam, rankOpts);
       const mappedItems = backendContents.map(mapBackendContentToItem);
       setItems(mappedItems);
       setOffset(0);
@@ -225,7 +244,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
       }
       const nextOffset = offset + 50;
       const q = searchQuery.trim();
-      const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam, q ? undefined : interestParam);
+      const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam, q ? undefined : filterParam, q ? undefined : rankOpts);
       if (backendContents.length === 0) {
         setHasMore(false);
       } else {
@@ -245,7 +264,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     if (searchQuery.trim()) return;
     loadFeed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentType, interests.join(",")]);
+  }, [contentType, interests.join(","), feedMode]);
 
   useEffect(() => {
     loadBookmarks();
@@ -428,6 +447,8 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             hasMore={hasMore && !searchQuery}
             onLoadMore={loadMore}
             contentType={contentType}
+            feedMode={feedMode}
+            onFeedModeChange={setFeedMode}
             onFilterChange={setContentType}
             searchQuery={searchQuery}
           />

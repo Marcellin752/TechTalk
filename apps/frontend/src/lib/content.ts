@@ -87,5 +87,6 @@ export function mapBackendContentToItem(c: any): ContentItem {
     date: new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     embedCode: c.embedCode,
     meta: c.meta ?? undefined,
+    reason: c.reason ?? null,
   };
 }

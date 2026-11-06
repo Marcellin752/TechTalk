@@ -3,6 +3,7 @@ import { ArticleCard, CardFor, OpportunityBand, RepoCard } from "../components/C
 import { buildSections, type SectionKind } from "../lib/feedLayout";
 import { ContentItem } from "../types/content";
 
+export type FeedMode = "foryou" | "latest";
 export type FeedFilter = "all" | "article" | "video" | "repo" | "opportunity";
 
 interface FeedScreenProps {
@@ -16,6 +17,8 @@ interface FeedScreenProps {
   hasMore: boolean;
   onLoadMore: () => void;
   contentType: FeedFilter;
+  feedMode: FeedMode;
+  onFeedModeChange: (m: FeedMode) => void;
   onFilterChange: (t: FeedFilter) => void;
   searchQuery?: string;
 }
@@ -55,6 +58,8 @@ export function FeedScreen({
   hasMore,
   onLoadMore,
   contentType,
+  feedMode,
+  onFeedModeChange,
   onFilterChange,
   searchQuery = "",
 }: FeedScreenProps) {
@@ -123,12 +128,29 @@ export function FeedScreen({
         </div>
 
         {/* Filter bar */}
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto no-scrollbar">
+          {!searchQuery.trim() && (
+            <div role="radiogroup" aria-label="Feed order" className="flex flex-shrink-0 rounded-lg border border-border bg-secondary p-0.5 mr-2">
+              {([["foryou", "For you"], ["latest", "Latest"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  role="radio"
+                  aria-checked={feedMode === id}
+                  onClick={() => onFeedModeChange(id)}
+                  className={`px-3 h-7 rounded-md text-[13px] font-medium transition-colors ${
+                    feedMode === id ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {FILTERS.map((f) => (
             <button
               key={f.id}
               onClick={() => onFilterChange(f.id)}
-              className={`px-3.5 h-8 rounded-lg text-[13px] font-medium transition-colors ${
+              className={`px-3.5 h-8 flex-shrink-0 rounded-lg text-[13px] font-medium transition-colors ${
                 contentType === f.id
                   ? "bg-foreground text-background"
                   : "bg-secondary text-foreground hover:bg-muted"
