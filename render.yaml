@@ -1,12 +1,6 @@
 # Render Blueprint for the TechTalk API (Fastify + Postgres).
 # New > Blueprint > pick this repository. Values marked `sync: false` are asked
 # for in the dashboard so secrets never live in git.
-databases:
-  - name: techtalk-db
-    databaseName: techtalk
-    user: techtalk
-    plan: free # free databases are time-limited on Render: check current terms, upgrade for real use
-
 services:
   - type: web
     name: techtalk-api
@@ -15,18 +9,16 @@ services:
     # The repo is an npm-workspaces monorepo: build from the root.
     # --include=dev because the TypeScript compiler and drizzle-kit are devDependencies.
     buildCommand: npm ci --include=dev && npm run build --workspace=apps/backend
-    # Apply pending migrations, then start the server.
-    startCommand: npm run db:migrate --workspace=apps/backend && npm run start --workspace=apps/backend
+    # Migrations are applied from your machine with the direct Supabase URL (see README).
+    startCommand: npm run start --workspace=apps/backend
     healthCheckPath: /api/ready
     envVars:
       - key: NODE_VERSION
         value: 22 # sanitize-html needs Node >= 22
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: techtalk-db
-          property: connectionString
+      - key: DATABASE_URL # Supabase "Transaction pooler" string (port 6543)
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL # exact origin of the site, no trailing slash, e.g. https://t3chtalk.vercel.app
