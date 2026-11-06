@@ -36,7 +36,7 @@ const SECTION_TITLES: Record<SectionKind, string | null> = {
 };
 
 const ROW_GRID: Record<SectionKind, string> = {
-  videos: "grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-6",
+  videos: "grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4",
   repos: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4",
   articles: "grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-5",
 };
@@ -157,7 +157,11 @@ export function FeedScreen({
           /* Home: rows that alternate format, like a video site's shelves. */
           <div className="space-y-9">
             {sections.map((section, i) => (
-              <section key={`${section.kind}-${i}`}>
+              <section
+                key={`${section.kind}-${i}`}
+                // Video bands sit on a soft panel; project shelves use outlined cards instead.
+                className={section.kind === "videos" ? "rounded-2xl bg-secondary/60 p-3 sm:p-4" : undefined}
+              >
                 {SECTION_TITLES[section.kind] && (
                   <h2 className="text-[15px] font-semibold text-foreground mb-3.5">{SECTION_TITLES[section.kind]}</h2>
                 )}

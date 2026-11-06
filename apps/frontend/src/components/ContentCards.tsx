@@ -89,7 +89,7 @@ export function VideoCard({ item, onOpen, onSave, isSaved }: CardProps) {
   return (
     <article className="group relative min-w-0">
       <button onClick={onOpen} className="block w-full text-left outline-none" aria-label={item.title}>
-        <span className="relative block rounded-xl overflow-hidden">
+        <span className="relative block rounded-xl overflow-hidden ring-1 ring-border">
           <Thumb item={item} />
           <span className="absolute bottom-1.5 right-1.5 text-[11px] font-medium text-white bg-black/80 px-1.5 py-px rounded">
             {item.duration}

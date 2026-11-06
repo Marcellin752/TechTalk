@@ -8,9 +8,11 @@ export interface Section {
 }
 
 /** How many cards each row shows, and the order the formats alternate in:
- *  a row of videos, then a shelf of projects, more videos, then reading. */
+ *  two bands of videos, a shelf of projects, two more bands of videos, then a
+ *  shelf of reading. The rhythm is fixed so the page never feels random; change
+ *  PATTERN to retune it. */
 const ROW_SIZE: Record<SectionKind, number> = { videos: 4, repos: 3, articles: 3 };
-const PATTERN: SectionKind[] = ["videos", "repos", "videos", "articles"];
+const PATTERN: SectionKind[] = ["videos", "videos", "repos", "videos", "videos", "articles"];
 
 /** Splits the feed by format and weaves the pieces into rows. A format that
  *  runs out is skipped, so a missing source never leaves a hole. With

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
+import { useTheme } from "../lib/theme";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { api, User as ApiUser } from "../services/api";
 import { ContentItem, AppScreen, AppTab } from "../types/content";
 import { AuthScreen } from "../pages/AuthScreen";
@@ -95,6 +97,9 @@ function mapBackendContentToItem(c: any): ContentItem {
 }
 
 
+/** Items fetched per format and page; two cycles of the feed rhythm. */
+const MIXED_PAGE = { video: 32, repo: 6, article: 6 } as const;
+
 function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUserUpdate: (u: ApiUser) => void; onLogout: () => void }) {
   const [tab, setTab] = useState<AppTab>(() => (/^#link(_error)?=/.test(window.location.hash) ? "profile" : "feed"));
   const [reader, setReader] = useState<ContentItem | null>(null);
@@ -170,10 +175,35 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   const typeParam = contentType === "all" ? undefined : contentType;
   const interestParam = interests.length > 0 ? interests : undefined;
 
+  // The home feed is built from three separate streams so no format can crowd
+  // the others out (new repositories would otherwise fill every page).
+  const mixedOffsets = useRef({ video: 0, repo: 0, article: 0 });
+  const fetchMixed = async () => {
+    const o = mixedOffsets.current;
+    const [videos, repos, articles] = await Promise.all(
+      (["video", "repo", "article"] as const).map((t) => api.getContents(MIXED_PAGE[t], o[t], undefined, t, interestParam)),
+    );
+    o.video += videos.length;
+    o.repo += repos.length;
+    o.article += articles.length;
+    return {
+      items: [...videos, ...repos, ...articles].map(mapBackendContentToItem),
+      more: videos.length === MIXED_PAGE.video || repos.length === MIXED_PAGE.repo || articles.length === MIXED_PAGE.article,
+    };
+  };
+
   const loadFeed = async () => {
     setLoading(true);
     setFeedError(null);
     try {
+      if (contentType === "all") {
+        mixedOffsets.current = { video: 0, repo: 0, article: 0 };
+        const mixed = await fetchMixed();
+        setItems(mixed.items);
+        setOffset(0);
+        setHasMore(mixed.more);
+        return;
+      }
       const backendContents = await api.getContents(50, 0, undefined, typeParam, interestParam);
       const mappedItems = backendContents.map(mapBackendContentToItem);
       setItems(mappedItems);
@@ -210,10 +240,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     setFeedError(null);
     try {
       if (!trimmed) {
-        const backendContents = await api.getContents(50, 0, undefined, typeParam, interestParam);
-        setItems(backendContents.map(mapBackendContentToItem));
-        setOffset(0);
-        setHasMore(backendContents.length >= 50);
+        await loadFeed();
         return;
       }
       // Searching looks at everything, not just the interest chips; and a slower,
@@ -270,6 +297,12 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     if (loading || !hasMore) return;
     setLoading(true);
     try {
+      if (contentType === "all" && !searchQuery.trim()) {
+        const mixed = await fetchMixed();
+        setItems((prev) => [...prev, ...mixed.items.filter((m) => !prev.some((p) => p.id === m.id))]);
+        setHasMore(mixed.more);
+        return;
+      }
       const nextOffset = offset + 50;
       const q = searchQuery.trim();
       const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam, q ? undefined : interestParam);
@@ -381,6 +414,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
+              <ThemeToggle />
               <button
                 onClick={() => setTab("saved")}
                 className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
@@ -414,6 +448,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
           <>
             <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
             <div className="flex items-center gap-1">
+              <ThemeToggle />
               {tab !== "saved" && (
                 <button
                   onClick={() => setTab("saved")}
@@ -531,6 +566,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
 
 export default function App() {
+  const theme = useTheme();
   const [screen, setScreen] = useState<AppScreen>(() => {
     return api.getToken() ? "app" : "auth";
   });
@@ -574,8 +610,8 @@ export default function App() {
   };
 
   return (
-    <div className="dark min-h-screen bg-background">
-      <Toaster position="top-center" theme="dark" />
+    <div className="min-h-screen bg-background">
+      <Toaster position="top-center" theme={theme} />
       {bootstrapping ? (
         <div className="min-h-screen flex items-center justify-center">
           <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
