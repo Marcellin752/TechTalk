@@ -40,6 +40,16 @@ export const contents = pgTable('contents', {
   createdAtIdx: index('contents_created_at_idx').on(table.createdAt),
 }));
 
+export const comments = pgTable('comments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  contentId: uuid('content_id').references(() => contents.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  contentCreatedIdx: index('comments_content_created_idx').on(table.contentId, table.createdAt),
+}));
+
 export const bookmarks = pgTable('bookmarks', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
