@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 import { ContentItem, AppScreen, AppTab } from "../types/content";
 import { AuthScreen } from "../pages/AuthScreen";
-import { FeedScreen } from "../pages/FeedScreen";
+import { FeedScreen, type FeedFilter } from "../pages/FeedScreen";
 import { SavedScreen } from "../pages/SavedScreen";
 import { ProfileScreen } from "../pages/ProfileScreen";
 import { SettingsScreen } from "../pages/SettingsScreen";
@@ -44,7 +44,7 @@ function mapBackendContentToItem(c: any): ContentItem {
     duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  let author = "Tech Talker";
+  let author = c.type === "repo" && c.meta?.owner ? c.meta.owner : "Tech Talker";
   if (c.source.toLowerCase().includes("dev.to")) {
     author = "Dev.to Contributor";
   } else if (c.source.toLowerCase().includes("techcrunch")) {
@@ -89,13 +89,14 @@ function mapBackendContentToItem(c: any): ContentItem {
     body: c.summary || "No full text available.",
     bodyHtml: c.body || null,
     date: new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    embedCode: c.embedCode
+    embedCode: c.embedCode,
+    meta: c.meta ?? undefined,
   };
 }
 
 
 function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUserUpdate: (u: ApiUser) => void; onLogout: () => void }) {
-  const [tab, setTab] = useState<AppTab>("feed");
+  const [tab, setTab] = useState<AppTab>(() => (/^#link(_error)?=/.test(window.location.hash) ? "profile" : "feed"));
   const [reader, setReader] = useState<ContentItem | null>(null);
   const [saved, setSaved] = useState<ContentItem[]>([]);
   const [items, setItems] = useState<ContentItem[]>([]);
@@ -103,9 +104,8 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   const [feedError, setFeedError] = useState<string | null>(null);
   const [savedError, setSavedError] = useState<string | null>(null);
   
-  const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [contentType, setContentType] = useState<"all" | "article" | "video">("all");
+  const [contentType, setContentType] = useState<FeedFilter>("all");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
@@ -201,8 +201,11 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
   const searchDebounceRef = useRef<number | null>(null);
 
+  const searchSeq = useRef(0);
+
   const runSearch = async (term: string) => {
     const trimmed = term.trim();
+    const seq = ++searchSeq.current;
     setLoading(true);
     setFeedError(null);
     try {
@@ -213,19 +216,35 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
         setHasMore(backendContents.length >= 50);
         return;
       }
-      const results = await api.getContents(50, 0, trimmed, typeParam, interestParam);
+      // Searching looks at everything, not just the interest chips; and a slower,
+      // older request must never overwrite a newer one.
+      const results = await api.getContents(50, 0, trimmed, typeParam);
+      if (seq !== searchSeq.current) return;
       setItems(results.map(mapBackendContentToItem));
       setOffset(0);
       setHasMore(results.length >= 50);
     } catch (err) {
       console.error("Failed to search feed:", err);
-      setFeedError("Search failed. Check your connection and try again.");
+      if (seq === searchSeq.current) setFeedError("Search failed. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (seq === searchSeq.current) setLoading(false);
     }
   };
 
   const prevSearchRef = useRef("");
+
+  // The GitHub link round trip lands back here with the outcome in the fragment.
+  useEffect(() => {
+    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+    const params = new URLSearchParams(hash);
+    const linked = params.get("link");
+    const linkError = params.get("link_error");
+    if (!linked && !linkError) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (linked) toast.success("GitHub account linked.");
+    else if (linkError === "taken") toast.error("That GitHub account is already linked to another TechTalk account.");
+    else toast.error("GitHub linking failed. Please try again.");
+  }, []);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -241,7 +260,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
       runSearch("");
       return;
     }
-    searchDebounceRef.current = window.setTimeout(() => runSearch(q), 350);
+    searchDebounceRef.current = window.setTimeout(() => runSearch(q), 250);
     return () => {
       if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
     };
@@ -253,7 +272,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     try {
       const nextOffset = offset + 50;
       const q = searchQuery.trim();
-      const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam, interestParam);
+      const backendContents = await api.getContents(50, nextOffset, q || undefined, typeParam, q ? undefined : interestParam);
       if (backendContents.length === 0) {
         setHasMore(false);
       } else {
@@ -329,46 +348,39 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     <div className="h-dvh bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
       <header className="z-40 bg-background/90 backdrop-blur-md border-b border-border flex-shrink-0">
-        <div className="max-w-5xl mx-auto px-4 h-[57px] flex items-center justify-between">
-        {tab === "feed" && isSearching ? (
-          <div className="flex items-center gap-2 w-full">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Search articles, videos, topics..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                autoFocus
-                className="w-full bg-secondary border border-border rounded-xl pl-9 pr-4 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary transition-all"
-              />
-              <Search size={14} className="absolute left-3 top-2.5 text-muted-foreground" />
-            </div>
-            <button
-              onClick={() => {
-                setIsSearching(false);
-                setSearchQuery("");
-              }}
-              className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ) : tab === "feed" ? (
-          <>
-            <div className="flex items-center gap-2">
+        <div className="max-w-7xl mx-auto px-4 h-[57px] flex items-center justify-between">
+        {tab === "feed" ? (
+          <div className="flex items-center gap-3 w-full">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
                 <Rss size={13} className="text-white" />
               </div>
-              <span className="text-[18px] font-bold tracking-tight text-foreground">TechTalk</span>
+              <span className="hidden sm:block text-[18px] font-bold tracking-tight text-foreground">TechTalk</span>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setIsSearching(true)}
-                className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-secondary"
+            {/* Live search: results update as you type (name, keyword, language, topic). */}
+            <div className="relative flex-1 max-w-2xl mx-auto">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="search"
+                inputMode="search"
+                placeholder="Search a name, a keyword, a language…"
                 aria-label="Search"
-              >
-                <Search size={18} />
-              </button>
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && setSearchQuery("")}
+                className="w-full h-10 bg-secondary border border-border rounded-full pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors [&::-webkit-search-cancel-button]:hidden"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={() => setTab("saved")}
                 className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
@@ -389,11 +401,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 aria-label="Profile"
               >
                 {user?.picture ? (
-                  <img
-                    src={user.picture}
-                    alt={user.name || "Profile"}
-                    className="w-7 h-7 rounded-full object-cover"
-                  />
+                  <img src={user.picture} alt={user.name || "Profile"} className="w-7 h-7 rounded-full object-cover" />
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
                     <User size={14} className="text-primary" />
@@ -401,7 +409,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 )}
               </button>
             </div>
-          </>
+          </div>
         ) : (
           <>
             <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
@@ -466,6 +474,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             onLoadMore={loadMore}
             contentType={contentType}
             onFilterChange={setContentType}
+            searchQuery={searchQuery}
           />
         )}
         {tab === "saved" && (

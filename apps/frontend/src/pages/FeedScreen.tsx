@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, type TouchEvent } from "react";
-import { FeedCard } from "../components/FeedCard";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { ArticleCard, CardFor, RepoCard } from "../components/ContentCards";
+import { buildSections, type SectionKind } from "../lib/feedLayout";
 import { ContentItem } from "../types/content";
+
+export type FeedFilter = "all" | "article" | "video" | "repo";
 
 interface FeedScreenProps {
   items: ContentItem[];
@@ -12,17 +15,31 @@ interface FeedScreenProps {
   onRetry: () => void;
   hasMore: boolean;
   onLoadMore: () => void;
-  contentType: "all" | "article" | "video";
-  onFilterChange: (t: "all" | "article" | "video") => void;
+  contentType: FeedFilter;
+  onFilterChange: (t: FeedFilter) => void;
+  searchQuery?: string;
 }
 
 const PULL_THRESHOLD = 72;
 
-const FILTERS: { id: "all" | "article" | "video"; label: string }[] = [
+const FILTERS: { id: FeedFilter; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "article", label: "Articles" },
   { id: "video", label: "Videos" },
+  { id: "repo", label: "Projects" },
+  { id: "article", label: "Articles" },
 ];
+
+const SECTION_TITLES: Record<SectionKind, string | null> = {
+  videos: null,
+  repos: "Projects worth exploring",
+  articles: "Worth a read",
+};
+
+const ROW_GRID: Record<SectionKind, string> = {
+  videos: "grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-6",
+  repos: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4",
+  articles: "grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-5",
+};
 
 export function FeedScreen({
   items,
@@ -36,6 +53,7 @@ export function FeedScreen({
   onLoadMore,
   contentType,
   onFilterChange,
+  searchQuery = "",
 }: FeedScreenProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -82,10 +100,12 @@ export function FeedScreen({
   };
 
   const refreshing = pullDistance >= PULL_THRESHOLD;
+  const flat = contentType !== "all" || !!searchQuery.trim();
+  const sections = useMemo(() => (flat ? [] : buildSections(items, !hasMore)), [flat, items, hasMore]);
 
   return (
     <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} ref={scrollRef}>
-      <div className="max-w-5xl mx-auto px-4 py-4 pb-8">
+      <div className="max-w-7xl mx-auto px-4 py-4 pb-8">
         {/* Pull-to-refresh indicator */}
         <div
           className="flex items-center justify-center overflow-hidden transition-all duration-200"
@@ -105,10 +125,10 @@ export function FeedScreen({
             <button
               key={f.id}
               onClick={() => onFilterChange(f.id)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              className={`px-3.5 h-8 rounded-lg text-[13px] font-medium transition-colors ${
                 contentType === f.id
-                  ? "bg-primary text-white shadow-sm shadow-primary/20"
-                  : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
+                  ? "bg-foreground text-background"
+                  : "bg-secondary text-foreground hover:bg-muted"
               }`}
             >
               {f.label}
@@ -116,18 +136,46 @@ export function FeedScreen({
           ))}
         </div>
 
-        {/* Cards grid: 1 column on mobile, 2 on md+, 3 on xl+ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {items.map((item) => (
-            <FeedCard
-              key={item.id}
-              item={item}
-              onOpen={() => onOpen(item)}
-              onSave={() => onSave(item)}
-              isSaved={savedIds.has(item.id)}
-            />
-          ))}
-        </div>
+        {searchQuery.trim() && !loading && !error && items.length > 0 && (
+          <p className="text-xs text-muted-foreground font-mono mb-4">
+            {items.length}{hasMore ? "+" : ""} results for “{searchQuery.trim()}”
+          </p>
+        )}
+
+        {flat ? (
+          /* Searching or filtering: one even grid, every card in its own format. */
+          <div className={`grid gap-x-4 gap-y-6 ${contentType === "repo" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
+            {items.map((item) =>
+              contentType === "repo" ? (
+                <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+              ) : (
+                <CardFor key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+              ),
+            )}
+          </div>
+        ) : (
+          /* Home: rows that alternate format, like a video site's shelves. */
+          <div className="space-y-9">
+            {sections.map((section, i) => (
+              <section key={`${section.kind}-${i}`}>
+                {SECTION_TITLES[section.kind] && (
+                  <h2 className="text-[15px] font-semibold text-foreground mb-3.5">{SECTION_TITLES[section.kind]}</h2>
+                )}
+                <div className={`grid ${ROW_GRID[section.kind]}`}>
+                  {section.items.map((item) =>
+                    section.kind === "repos" ? (
+                      <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ) : section.kind === "articles" ? (
+                      <ArticleCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ) : (
+                      <CardFor key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ),
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
 
         {!loading && !error && hasMore && items.length > 0 && (
           <div ref={sentinelRef} className="py-4 flex justify-center">

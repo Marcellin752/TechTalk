@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { desc, eq, and, ilike, or, arrayOverlaps, inArray } from 'drizzle-orm';
+import { desc, eq, and, ilike, or, arrayOverlaps, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
 import { contents, bookmarks, readingHistory } from '../db/schema.js';
 import { classifyContent } from '../utils/classify.js';
@@ -18,11 +18,17 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
       .filter(Boolean);
 
     const conditions = [];
-    if (search) {
+    // Every word must match somewhere (name, description, source, category,
+    // language/topics held in meta), so "react state" narrows as you type more.
+    const terms = search.split(/\s+/).filter(Boolean).slice(0, 6);
+    for (const term of terms) {
+      const like = `%${term.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
       conditions.push(or(
-        ilike(contents.title, `%${search}%`),
-        ilike(contents.summary, `%${search}%`),
-        ilike(contents.source, `%${search}%`)
+        ilike(contents.title, like),
+        ilike(contents.summary, like),
+        ilike(contents.source, like),
+        sql`array_to_string(${contents.categories}, ' ') ilike ${like}`,
+        sql`${contents.meta}::text ilike ${like}`,
       ));
     }
     if (type) {
@@ -36,7 +42,11 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
       ? db.select().from(contents).where(and(...conditions))
       : db.select().from(contents);
 
-    const allContents = await filtered.orderBy(desc(contents.createdAt)).limit(limit).offset(offset);
+    // Name matches first, then the newest.
+    const order = search
+      ? [sql`(${contents.title} ilike ${'%' + search + '%'}) desc`, desc(contents.createdAt)]
+      : [desc(contents.createdAt)];
+    const allContents = await filtered.orderBy(...order).limit(limit).offset(offset);
 
     return reply.status(200).send(allContents);
   } catch (error) {

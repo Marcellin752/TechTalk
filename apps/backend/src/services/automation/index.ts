@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { fetchLiveDevToArticles } from './devto.provider.js';
 import { fetchLiveYouTubeVideos } from './youtube.provider.js';
 import { fetchLiveRedditPosts } from './reddit.provider.js';
+import { fetchLiveGithubRepos } from './github.provider.js';
 import { backfillMissingBodies } from './backfill.provider.js';
 
 /**
@@ -13,6 +14,7 @@ async function runAllAutomationProviders(): Promise<void> {
   await fetchLiveDevToArticles();
   await fetchLiveYouTubeVideos();
   await fetchLiveRedditPosts();
+  await fetchLiveGithubRepos();
   await backfillMissingBodies();
   
   console.log('[Automation Engine] All sync tasks successfully finished.');

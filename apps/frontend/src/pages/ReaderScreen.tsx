@@ -1,5 +1,6 @@
 import { ArrowLeft, Bookmark, BookmarkCheck, User } from "lucide-react";
 import { ContentItem } from "../types/content";
+import { RepoReader } from "./RepoReader";
 
 interface ReaderScreenProps {
   item: ContentItem;
@@ -30,6 +31,7 @@ export function ReaderScreen({
   onSave,
   isSaved,
 }: ReaderScreenProps) {
+  if (item.type === "repo") return <RepoReader item={item} onBack={onBack} onSave={onSave} isSaved={isSaved} />;
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col overflow-hidden">
       {/* Top bar */}
