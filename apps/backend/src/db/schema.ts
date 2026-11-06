@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, customType } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, customType, integer } from 'drizzle-orm/pg-core';
+
+/** Any JSON value (arrays included) with the same double-encoding protection. */
+const jsonbOf = <T>() =>
+  customType<{ data: T; driverData: unknown }>({
+    dataType: () => 'jsonb',
+    toDriver: (value) => sql`${JSON.stringify(value)}::text::jsonb`,
+    fromDriver: (value) => (typeof value === 'string' ? JSON.parse(value) : (value as T)),
+  });
 
 /* drizzle-orm 0.30 + postgres-js JSON-encodes jsonb values twice, so an object
    ends up stored as a JSON *string*. An explicit ::jsonb cast on the way in
@@ -17,6 +25,7 @@ export const users = pgTable('users', {
   password: varchar('password', { length: 255 }), // nullable: Google-only accounts have no password
   googleId: varchar('google_id', { length: 255 }).unique(),
   githubId: varchar('github_id', { length: 64 }).unique(),
+  githubLogin: varchar('github_login', { length: 100 }), // public handle, shown on the profile
   picture: varchar('picture', { length: 500 }), // avatar URL (Google profile picture)
   role: varchar('role', { length: 20 }).default('user').notNull(), // 'user' or 'admin'
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -67,3 +76,30 @@ export const readingHistory = pgTable('reading_history', {
 }, (table) => ({
   userContentIdx: index('reading_history_user_content_idx').on(table.userId, table.contentId),
 }));
+
+export interface GithubLanguageShare { name: string; share: number }
+export interface GithubTopRepo {
+  name: string;
+  description: string | null;
+  stars: number;
+  forks: number;
+  language: string | null;
+  url: string;
+  pushedAt: string;
+}
+
+/** A snapshot of the user's public GitHub activity, refreshed on demand. */
+export const githubProfiles = pgTable('github_profiles', {
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).primaryKey(),
+  login: varchar('login', { length: 100 }).notNull(),
+  name: varchar('name', { length: 200 }),
+  bio: text('bio'),
+  avatarUrl: varchar('avatar_url', { length: 500 }),
+  htmlUrl: varchar('html_url', { length: 300 }),
+  publicRepos: integer('public_repos').default(0).notNull(),
+  followers: integer('followers').default(0).notNull(),
+  totalStars: integer('total_stars').default(0).notNull(),
+  languages: jsonbOf<GithubLanguageShare[]>()('languages').notNull(),
+  topRepos: jsonbOf<GithubTopRepo[]>()('top_repos').notNull(),
+  syncedAt: timestamp('synced_at').defaultNow().notNull(),
+});

@@ -3,10 +3,14 @@ import { desc, eq, and, ilike, or, arrayOverlaps, inArray, sql } from 'drizzle-o
 import { db } from '../db/db.js';
 import { contents, bookmarks, readingHistory } from '../db/schema.js';
 import { classifyContent } from '../utils/classify.js';
+import { loadRankSignals, rankContents } from '../services/ranking.js';
+
+/** How many recent items of one format are scored when building a personalised page. */
+const FORYOU_POOL = 400;
 
 export async function handleGetContents(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string };
+    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string; sort?: string; interests?: string };
     const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(query.offset || '0', 10) || 0, 0);
 
@@ -36,6 +40,20 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
     }
     if (categories.length > 0) {
       conditions.push(arrayOverlaps(contents.categories, categories));
+    }
+
+    // Personalised ordering ("For you"): score a pool of recent items against what
+    // we know about the user. A text search keeps its own relevance ordering.
+    if (query.sort === 'foryou' && !search) {
+      const userId = (request.user as { id: string }).id;
+      const interests = (query.interests || '').split(',').map((c) => c.trim()).filter(Boolean);
+      const [signals, pool] = await Promise.all([
+        loadRankSignals(userId, interests),
+        (conditions.length > 0 ? db.select().from(contents).where(and(...conditions)) : db.select().from(contents))
+          .orderBy(desc(contents.createdAt))
+          .limit(FORYOU_POOL),
+      ]);
+      return reply.status(200).send(rankContents(pool, signals).slice(offset, offset + limit));
     }
 
     const filtered = conditions.length > 0

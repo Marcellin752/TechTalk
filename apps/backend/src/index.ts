@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import { config } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { contentRoutes } from './routes/content.routes.js';
+import { profileRoutes } from './routes/profile.routes.js';
 import { initAutomationWorkers } from './services/automation/index.js';
 
 const fastify = Fastify({ logger: config.nodeEnv !== 'test' });
@@ -47,6 +48,7 @@ fastify.decorate('requireAdmin', async (request: any, reply: any) => {
 
 fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(contentRoutes, { prefix: '/api/content' });
+fastify.register(profileRoutes, { prefix: '/api/profile' });
 
 fastify.get('/api/health', async () => {
   return { status: 'OK', message: 'TechTalk API is running smoothly' };

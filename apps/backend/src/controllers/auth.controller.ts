@@ -6,6 +6,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { db } from '../db/db.js';
 import { users } from '../db/schema.js';
 import { config } from '../config/env.js';
+import { syncGithubProfileInBackground } from '../services/github-profile.js';
 import { validateEmail, validatePassword } from '../utils/validators.js';
 
 export async function handleRegister(request: FastifyRequest, reply: FastifyReply) {
@@ -468,6 +469,7 @@ export async function handleGithubCallback(request: FastifyRequest, reply: Fasti
           .set({ githubId, ...(picture && !me.picture ? { picture } : {}) })
           .where(eq(users.id, me.id));
       }
+      syncGithubProfileInBackground(parsedState.linkUserId, ghUser.login);
       return back('link=github');
     }
 
@@ -498,6 +500,7 @@ export async function handleGithubCallback(request: FastifyRequest, reply: Fasti
       }
     }
     if (!user) return fail('persist', { githubId, email });
+    syncGithubProfileInBackground(user.id, ghUser.login);
 
     const token = (request.server as any).jwt.sign(
       { id: user.id, email: user.email, role: user.role },
