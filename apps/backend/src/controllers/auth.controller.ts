@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { OAuth2Client } from 'google-auth-library';
 import { db } from '../db/db.js';
@@ -320,5 +321,191 @@ export async function handleGetMe(request: FastifyRequest, reply: FastifyReply) 
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+// OAuth endpoints live on github.com; the REST API (profile, emails) lives on api.github.com.
+const GITHUB_API = 'https://github.com';
+const GITHUB_REST = 'https://api.github.com';
+
+/** The exact callback URL GitHub must be told to redirect back to. Derived from
+ *  the incoming request so one codebase works on localhost and behind a proxy. */
+function githubRedirectUri(request: FastifyRequest): string {
+  const proto = (request.headers['x-forwarded-proto'] as string) || (config.nodeEnv === 'production' ? 'https' : 'http');
+  const host = (request.headers['x-forwarded-host'] as string) || request.host;
+  return `${proto}://${host}/api/auth/github/callback`;
+}
+
+// CSRF: the state is a signed, expiring token echoed back by GitHub; no cookie
+// plugin is required to verify it came from this server. It may carry the id of
+// an already signed-in user, which turns the round trip into "link this GitHub
+// account to me" instead of "sign me in".
+const STATE_TTL_MS = 10 * 60 * 1000;
+function signState(payload: string): string {
+  return createHmac('sha256', config.jwtSecret).update(payload).digest('hex');
+}
+export function makeGithubState(linkUserId?: string): string {
+  const payload = `${randomBytes(16).toString('hex')}.${linkUserId ?? '-'}.${Date.now()}`;
+  return `${payload}.${signState(payload)}`;
+}
+function parseGithubState(state: string | undefined): { ok: boolean; linkUserId?: string } {
+  if (!state) return { ok: false };
+  const parts = state.split('.');
+  if (parts.length !== 4) return { ok: false };
+  const [nonce, uid, ts, signature] = parts as [string, string, string, string];
+  const payload = `${nonce}.${uid}.${ts}`;
+  try {
+    const expected = Buffer.from(signState(payload));
+    const given = Buffer.from(signature);
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) return { ok: false };
+  } catch {
+    return { ok: false };
+  }
+  if (!Number.isFinite(Number(ts)) || Date.now() - Number(ts) > STATE_TTL_MS) return { ok: false };
+  return { ok: true, linkUserId: uid === '-' ? undefined : uid };
+}
+
+/** The GitHub consent URL; `linkUserId` makes the round trip a link, not a login. */
+export function githubAuthorizeUrl(request: FastifyRequest, clientId: string, linkUserId?: string): string {
+  const url = new URL(`${GITHUB_API}/login/oauth/authorize`);
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('redirect_uri', githubRedirectUri(request));
+  url.searchParams.set('scope', 'read:user user:email');
+  url.searchParams.set('state', makeGithubState(linkUserId));
+  return url.toString();
+}
+
+/**
+ * §49 OAuth (GitHub): start the redirect. Unconfigured installs bounce back to
+ * the login screen with a flag so the button can show a friendly message rather
+ * than a raw error page.
+ */
+export async function handleGithubStart(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    if (!config.githubClientId || !config.githubClientSecret) {
+      return reply.redirect(`${config.corsOrigin}/login#gh_unavailable=1`);
+    }
+    return reply.redirect(githubAuthorizeUrl(request, config.githubClientId));
+  } catch (error) {
+    request.log.error(error);
+    return reply.redirect(`${config.corsOrigin}/login#gh_error=server`);
+  }
+}
+
+/**
+ * §49 OAuth (GitHub): the code GitHub hands back is exchanged server-side (the
+ * client secret never reaches the browser), the GitHub profile is normalised
+ * into our single users row, and the resulting JWT travels back to the SPA in
+ * the URL fragment — which is never sent to any server or logged in a Referer.
+ */
+export async function handleGithubCallback(request: FastifyRequest, reply: FastifyReply) {
+  const frontend = config.corsOrigin;
+  const fail = (reason: string, detail?: unknown) => {
+    request.log.warn({ reason, detail }, 'github_oauth_fail');
+    return reply.redirect(`${frontend}/login#gh_error=${reason}`);
+  };
+  try {
+    const { code, state, error } = request.query as { code?: string; state?: string; error?: string };
+    if (error) return fail(error === 'access_denied' ? 'cancelled' : 'provider', error);
+    const parsedState = parseGithubState(state);
+    if (!code || !parsedState.ok) return fail('state', { hasCode: !!code });
+    if (!config.githubClientId || !config.githubClientSecret) return fail('unconfigured');
+
+    const tokenRes = await fetch(`${GITHUB_API}/login/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        client_id: config.githubClientId,
+        client_secret: config.githubClientSecret,
+        code,
+        redirect_uri: githubRedirectUri(request),
+      }),
+    });
+    const tokenJson: any = await tokenRes.json().catch(() => ({}));
+    const accessToken = tokenJson?.access_token;
+    if (!accessToken) return fail('token', { status: tokenRes.status, body: tokenJson });
+
+    const ghHeaders = {
+      authorization: `Bearer ${accessToken}`,
+      'user-agent': 'TechTalk',
+      accept: 'application/vnd.github+json',
+    };
+
+    const userRes = await fetch(`${GITHUB_REST}/user`, { headers: ghHeaders });
+    if (!userRes.ok) {
+      const body = await userRes.text().catch(() => '');
+      return fail('profile', { status: userRes.status, body });
+    }
+    const ghUser: any = await userRes.json();
+    if (!ghUser?.id) return fail('profile', ghUser);
+
+    let email: string | null = typeof ghUser.email === 'string' && ghUser.email ? ghUser.email : null;
+    if (!email) {
+      const emailsRes = await fetch(`${GITHUB_REST}/user/emails`, { headers: ghHeaders });
+      if (emailsRes.ok) {
+        const emails: any[] = await emailsRes.json().catch(() => []);
+        const verified = emails.filter((e) => e?.verified);
+        email = verified.find((e) => e.primary)?.email || verified[0]?.email || null;
+      }
+    }
+    // A stable, collision-free stand-in when GitHub exposes no email at all.
+    if (!email) email = `${ghUser.id}+${ghUser.login}@users.noreply.github.com`;
+
+    const githubId = String(ghUser.id);
+    const name = ghUser.name || ghUser.login || email.split('@')[0];
+    const picture = ghUser.avatar_url || null;
+
+    // Link mode: attach this GitHub identity to the signed-in account.
+    if (parsedState.linkUserId) {
+      const back = (query: string) => reply.redirect(`${frontend}/#${query}`);
+      const [owner] = await db.select().from(users).where(eq(users.githubId, githubId)).limit(1);
+      if (owner && owner.id !== parsedState.linkUserId) return back('link_error=taken');
+      if (!owner) {
+        const [me] = await db.select().from(users).where(eq(users.id, parsedState.linkUserId)).limit(1);
+        if (!me) return back('link_error=state');
+        await db
+          .update(users)
+          .set({ githubId, ...(picture && !me.picture ? { picture } : {}) })
+          .where(eq(users.id, me.id));
+      }
+      return back('link=github');
+    }
+
+    const existingByGithub = await db.select().from(users).where(eq(users.githubId, githubId)).limit(1);
+    let user;
+    if (existingByGithub[0]) {
+      user = existingByGithub[0];
+      if (picture && user.picture !== picture) {
+        const [updated] = await db.update(users).set({ picture }).where(eq(users.id, user.id)).returning();
+        if (updated) user = updated;
+      }
+    } else {
+      const existingByEmail = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (existingByEmail[0]) {
+        // Link GitHub to an account that already exists (password or Google).
+        const [updated] = await db
+          .update(users)
+          .set({ githubId, ...(picture && !existingByEmail[0].picture ? { picture } : {}) })
+          .where(eq(users.id, existingByEmail[0].id))
+          .returning();
+        user = updated ?? existingByEmail[0];
+      } else {
+        const [created] = await db
+          .insert(users)
+          .values({ name, email, password: null, githubId, picture, role: 'user' })
+          .returning();
+        user = created;
+      }
+    }
+    if (!user) return fail('persist', { githubId, email });
+
+    const token = (request.server as any).jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      { expiresIn: '1d' }
+    );
+    return reply.redirect(`${frontend}/login#gh_token=${encodeURIComponent(token)}`);
+  } catch (error) {
+    request.log.error(error);
+    return fail('server');
   }
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, User, Info, LogOut, Bookmark, ChevronRight } from "lucide-react";
 import { User as ApiUser } from "../services/api";
+import { LinkedAccounts } from "../components/LinkedAccounts";
 
 interface ProfileScreenProps {
   user: ApiUser | null;
@@ -156,6 +157,8 @@ export function ProfileScreen({
             </div>
           )}
         </div>
+
+        <LinkedAccounts />
 
         {/* Menu */}
         <div className="rounded-2xl border border-border overflow-hidden bg-card">

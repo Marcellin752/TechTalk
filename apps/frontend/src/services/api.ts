@@ -4,6 +4,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const REFRESH_BEFORE_EXPIRY_MS = 10 * 60 * 1000;
 
+export interface Identities {
+  email: string;
+  hasPassword: boolean;
+  google: boolean;
+  github: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -187,6 +194,68 @@ export const api = {
       this.setToken(data.token);
       this.setUser(data.user);
       return { success: true, token: data.token, user: data.user };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
+  /** §49 OAuth: the browser is handed to the backend, which redirects to GitHub. */
+  githubStartUrl(): string {
+    return `${API_URL}/auth/github`;
+  },
+
+  /** The callback returns the JWT in the URL fragment; adopt it, then load /me. */
+  async adoptGithubToken(token: string): Promise<{ success: boolean; user?: User; error?: string }> {
+    this.setToken(token);
+    const me = await this.getMe();
+    if (!me.success) {
+      this.logout();
+      return { success: false, error: me.error || 'GitHub sign-in failed' };
+    }
+    return { success: true, user: me.user };
+  },
+
+  /** Which sign-in methods are attached to the signed-in account. */
+  async getIdentities(): Promise<{ success: boolean; identities?: Identities; error?: string }> {
+    return this.identityCall('/auth/identities');
+  },
+
+  async linkGoogle(credential: string) {
+    return this.identityCall('/auth/link/google', { method: 'POST', body: JSON.stringify({ credential }) });
+  },
+
+  /** Returns the GitHub consent URL; the browser must navigate to it. */
+  async startGithubLink(): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+      const res = await this.fetchWithAuth('/auth/link/github', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || 'Could not start GitHub linking' };
+      return { success: true, url: data.url };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
+  async unlinkProvider(provider: 'google' | 'github') {
+    return this.identityCall(`/auth/link/${provider}`, { method: 'DELETE' });
+  },
+
+  async setPassword(newPassword: string, currentPassword?: string) {
+    return this.identityCall('/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({ newPassword, ...(currentPassword ? { currentPassword } : {}) }),
+    });
+  },
+
+  async identityCall(path: string, init: RequestInit = {}): Promise<{ success: boolean; identities?: Identities; error?: string }> {
+    try {
+      const res = await this.fetchWithAuth(path, {
+        ...init,
+        headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || 'Request failed' };
+      return { success: true, identities: data as Identities };
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error' };
     }

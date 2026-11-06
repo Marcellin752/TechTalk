@@ -1,4 +1,14 @@
-import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, customType } from 'drizzle-orm/pg-core';
+
+/* drizzle-orm 0.30 + postgres-js JSON-encodes jsonb values twice, so an object
+   ends up stored as a JSON *string*. An explicit ::jsonb cast on the way in
+   (and a defensive parse on the way out) keeps real objects in the column. */
+const jsonbObject = customType<{ data: Record<string, unknown>; driverData: unknown }>({
+  dataType: () => 'jsonb',
+  toDriver: (value) => sql`${JSON.stringify(value)}::text::jsonb`,
+  fromDriver: (value) => (typeof value === 'string' ? JSON.parse(value) : (value as Record<string, unknown>)),
+});
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -6,6 +16,7 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   password: varchar('password', { length: 255 }), // nullable: Google-only accounts have no password
   googleId: varchar('google_id', { length: 255 }).unique(),
+  githubId: varchar('github_id', { length: 64 }).unique(),
   picture: varchar('picture', { length: 500 }), // avatar URL (Google profile picture)
   role: varchar('role', { length: 20 }).default('user').notNull(), // 'user' or 'admin'
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -22,6 +33,8 @@ export const contents = pgTable('contents', {
   categories: text('categories').array(),
   image: varchar('image', { length: 1000 }),
   embedCode: text('embed_code'),
+  // Provider-specific facts (stars, language, topics…) that do not deserve a column each.
+  meta: jsonbObject('meta'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   createdAtIdx: index('contents_created_at_idx').on(table.createdAt),

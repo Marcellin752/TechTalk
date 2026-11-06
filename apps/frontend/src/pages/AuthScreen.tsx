@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Rss } from "lucide-react";
+import { Github, Rss } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 import { Field } from "../components/Field";
@@ -37,6 +37,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
   const gisInitialized = useRef(false);
   const lastWidth = useRef(0);
@@ -109,6 +110,44 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     } finally {
       setGoogleLoading(false);
     }
+  };
+
+  // The GitHub callback returns to /login with the session in the URL fragment.
+  // Adopt it, then scrub the fragment so the token is not left in history.
+  useEffect(() => {
+    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+    if (!hash) return;
+    const params = new URLSearchParams(hash);
+    const token = params.get("gh_token");
+    const ghError = params.get("gh_error");
+    const unavailable = params.get("gh_unavailable");
+    if (!token && !ghError && !unavailable) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+
+    if (unavailable) {
+      setError("GitHub sign-in is not configured on this server.");
+      return;
+    }
+    if (ghError) {
+      setError(ghError === "cancelled" ? "GitHub sign-in cancelled." : "GitHub sign-in failed. Try again or use email.");
+      return;
+    }
+    if (token) {
+      setGithubLoading(true);
+      api
+        .adoptGithubToken(token)
+        .then((res) => {
+          if (res.success && res.user) onAuthSuccess(res.user);
+          else setError(res.error || "GitHub sign-in failed.");
+        })
+        .finally(() => setGithubLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleGithubClick = () => {
+    setGithubLoading(true);
+    window.location.assign(api.githubStartUrl());
   };
 
   const handleGoogleClick = () => {
@@ -233,6 +272,15 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               {googleLoading ? "Signing in..." : "Continue with Google"}
             </button>
           )}
+
+          <button
+            onClick={handleGithubClick}
+            disabled={githubLoading}
+            className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
+          >
+            <Github size={17} />
+            {githubLoading ? "Signing in..." : "Continue with GitHub"}
+          </button>
         </div>
       </div>
     </div>

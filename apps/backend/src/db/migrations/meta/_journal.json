@@ -71,6 +71,20 @@
       "when": 1786357630504,
       "tag": "0009_familiar_xavin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793973461624,
+      "tag": "0010_confused_fallen_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793975798268,
+      "tag": "0011_lush_iceman",
+      "breakpoints": true
     }
   ]
 }
