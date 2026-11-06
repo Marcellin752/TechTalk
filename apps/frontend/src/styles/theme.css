@@ -1,65 +1,72 @@
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .dark));
 
+/* Light ("white") theme: the default token set. */
 :root {
   --font-size: 16px;
-  --background: #0a0a0c;
-  --foreground: #f0f0f2;
-  --card: #111114;
-  --card-foreground: #f0f0f2;
-  --popover: #111114;
-  --popover-foreground: #f0f0f2;
-  --primary: #f04f23;
+  --background: #ffffff;
+  --foreground: #0c0c10;
+  --card: #ffffff;
+  --card-foreground: #0c0c10;
+  --popover: #ffffff;
+  --popover-foreground: #0c0c10;
+  --primary: #e8430f;
   --primary-foreground: #ffffff;
-  --secondary: #18181c;
-  --secondary-foreground: #f0f0f2;
-  --muted: #18181c;
-  --muted-foreground: #6b6b78;
-  --accent: #f04f23;
+  --secondary: #f1f1f4;
+  --secondary-foreground: #0c0c10;
+  --muted: #e9e9ee;
+  --muted-foreground: #55555f;
+  --accent: #e8430f;
   --accent-foreground: #ffffff;
   --destructive: #d4183d;
   --destructive-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.07);
-  --input: #18181c;
-  --input-background: #18181c;
-  --switch-background: #2a2a30;
+  /* Borders are meant to be seen: ~3:1 against the surface they sit on. */
+  --border: rgba(12, 12, 16, 0.2);
+  --input: #f1f1f4;
+  --input-background: #f1f1f4;
+  --switch-background: #c9c9d1;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #f04f23;
-  --chart-1: #f04f23;
+  --ring: #e8430f;
+  --chart-1: #e8430f;
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.75rem;
-  --sidebar: #111114;
-  --sidebar-foreground: #f0f0f2;
-  --sidebar-primary: #f04f23;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0c0c10;
+  --sidebar-primary: #e8430f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #18181c;
-  --sidebar-accent-foreground: #f0f0f2;
-  --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: #f04f23;
+  --sidebar-accent: #f1f1f4;
+  --sidebar-accent-foreground: #0c0c10;
+  --sidebar-border: rgba(12, 12, 16, 0.2);
+  --sidebar-ring: #e8430f;
+  color-scheme: light;
 }
 
+/* Dark ("black") theme. Surfaces step up clearly from the page (page < card <
+   secondary), secondary text is a readable grey, and borders are visible. */
 .dark {
-  --background: #0a0a0c;
-  --foreground: #f0f0f2;
-  --card: #111114;
-  --card-foreground: #f0f0f2;
-  --popover: #111114;
-  --popover-foreground: #f0f0f2;
+  --background: #09090c;
+  --foreground: #f4f4f6;
+  --card: #141419;
+  --card-foreground: #f4f4f6;
+  --popover: #141419;
+  --popover-foreground: #f4f4f6;
   --primary: #f04f23;
   --primary-foreground: #ffffff;
-  --secondary: #18181c;
-  --secondary-foreground: #f0f0f2;
-  --muted: #18181c;
-  --muted-foreground: #6b6b78;
+  --secondary: #1e1e25;
+  --secondary-foreground: #f4f4f6;
+  --muted: #26262e;
+  --muted-foreground: #a3a3b0;
   --accent: #f04f23;
   --accent-foreground: #ffffff;
-  --destructive: #d4183d;
+  --destructive: #e5484d;
   --destructive-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.07);
-  --input: #18181c;
+  --border: rgba(255, 255, 255, 0.18);
+  --input: #1e1e25;
+  --input-background: #1e1e25;
+  --switch-background: #3a3a44;
   --ring: #f04f23;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -68,14 +75,15 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: #111114;
-  --sidebar-foreground: #f0f0f2;
+  --sidebar: #141419;
+  --sidebar-foreground: #f4f4f6;
   --sidebar-primary: #f04f23;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #18181c;
-  --sidebar-accent-foreground: #f0f0f2;
-  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-accent: #1e1e25;
+  --sidebar-accent-foreground: #f4f4f6;
+  --sidebar-border: rgba(255, 255, 255, 0.18);
   --sidebar-ring: #f04f23;
+  color-scheme: dark;
 }
 
 @theme inline {

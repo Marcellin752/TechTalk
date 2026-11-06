@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowLeft, Info } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
+import { setThemePreference, useThemePreference, type ThemePreference } from "../lib/theme";
 
 interface SettingsScreenProps {
   user: ApiUser | null;
@@ -22,6 +23,7 @@ export function SettingsScreen({
   onBack,
   onNavigateToAbout,
 }: SettingsScreenProps) {
+  const themePreference = useThemePreference();
   const [name, setName] = useState(user?.name || "");
   const [savingName, setSavingName] = useState(false);
 
@@ -57,6 +59,26 @@ export function SettingsScreen({
         </button>
 
         {/* Edit profile */}
+        <section>
+          <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">Appearance</h3>
+          <div role="radiogroup" aria-label="Theme" className="flex gap-1 rounded-xl border border-border bg-secondary p-1">
+            {(["system", "light", "dark"] as ThemePreference[]).map((t) => (
+              <button
+                key={t}
+                role="radio"
+                aria-checked={themePreference === t}
+                onClick={() => setThemePreference(t)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                  themePreference === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">System follows your device and switches automatically.</p>
+        </section>
+
         <section>
           <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">
             Edit Profile

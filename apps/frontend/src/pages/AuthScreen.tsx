@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
 import { Field } from "../components/Field";
 import { GoogleIcon } from "../components/GoogleIcon";
+import { ThemeToggle } from "../components/ThemeToggle";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
@@ -198,7 +199,10 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-12">
+    <div className="relative min-h-screen bg-background flex flex-col items-center justify-center px-6 py-12">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       {/* Wordmark */}
       <div className="mb-14 text-center">
         <div className="flex items-center gap-2.5 justify-center mb-3">
