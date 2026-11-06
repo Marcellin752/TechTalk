@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bookmark, Play, Star, GitFork } from "lucide-react";
+import { Bookmark, Play, Star, GitFork, Briefcase, GitPullRequest, ArrowUpRight, MapPin, Wallet } from "lucide-react";
 import { ContentItem } from "../types/content";
 
 /* Three card formats, one visual language. The feed mixes them in rows:
@@ -156,34 +156,113 @@ export function RepoCard({ item, onOpen, onSave, isSaved, className = "" }: Card
   );
 }
 
+/** An article is something to read: cover on top (wide and short, unlike a
+ *  video), then source, headline, an excerpt and tags. No box and no panel, so
+ *  it differs from both outlined projects and paneled video bands. */
 export function ArticleCard({ item, onOpen, onSave, isSaved, className = "" }: CardProps & { className?: string }) {
   return (
     <article className={`group relative min-w-0 ${className}`}>
-      <button
-        onClick={onOpen}
-        className="flex gap-3.5 w-full text-left outline-none rounded-xl p-2.5 -m-2.5 hover:bg-secondary/70 transition-colors"
-        aria-label={item.title}
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-mono text-muted-foreground uppercase tracking-wide">{item.source}</span>
-          <span className="block text-[15px] font-semibold leading-snug line-clamp-2 text-foreground mt-1">{item.title}</span>
-          <span className="block text-[12.5px] text-muted-foreground leading-snug line-clamp-2 mt-1.5">{item.summary}</span>
-          <span className="block text-[11.5px] text-muted-foreground mt-2">
-            {item.readTime} read · {item.date}
+      <button onClick={onOpen} className="block w-full text-left outline-none" aria-label={item.title}>
+        <span className="block rounded-xl overflow-hidden ring-1 ring-border">
+          <Thumb item={item} className="aspect-[5/2]" />
+        </span>
+        <span className="flex items-center gap-2 mt-3.5 text-[11.5px]">
+          <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono font-medium">{item.source}</span>
+          <span className="text-muted-foreground">{item.readTime} read</span>
+          <span className="text-muted-foreground">· {item.date}</span>
+        </span>
+        <span className="block text-[17px] font-bold tracking-tight leading-snug text-foreground mt-2 line-clamp-2 group-hover:text-primary transition-colors">
+          {item.title}
+        </span>
+        <span className="block text-[13px] text-foreground/70 leading-relaxed mt-1.5 line-clamp-3">{item.summary}</span>
+        {item.categories && item.categories.length > 0 && (
+          <span className="flex flex-wrap gap-1.5 mt-2.5">
+            {item.categories.slice(0, 2).map((c) => (
+              <span key={c} className="text-[11px] text-muted-foreground">
+                #{c.toLowerCase().replace(/[^a-z0-9]+/g, "")}
+              </span>
+            ))}
           </span>
-        </span>
-        <span className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 rounded-lg overflow-hidden">
-          <Thumb item={item} className="w-full h-full" />
-        </span>
+        )}
       </button>
       <SaveButton onSave={onSave} isSaved={isSaved} />
     </article>
   );
 }
 
+/** A full-width strip that interrupts the feed with one opportunity: a remote
+ *  job or a beginner-friendly issue to contribute to. It is deliberately a
+ *  different shape from every card: horizontal, tinted, with a clear action. */
+export function OpportunityBand({ item }: { item: ContentItem }) {
+  const m = item.meta ?? {};
+  const isJob = m.kind === "job";
+  const [failed, setFailed] = useState(false);
+  return (
+    <aside
+      aria-label="Opportunity"
+      className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 sm:p-5"
+    >
+      <span className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-white ring-1 ring-border overflow-hidden flex items-center justify-center flex-shrink-0">
+        {item.image && !failed ? (
+          <img src={item.image} alt="" loading="lazy" onError={() => setFailed(true)} className="w-full h-full object-contain p-1.5" />
+        ) : isJob ? (
+          <Briefcase size={22} className="text-neutral-500" />
+        ) : (
+          <GitPullRequest size={22} className="text-neutral-500" />
+        )}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wide text-primary">
+          {isJob ? <Briefcase size={12} /> : <GitPullRequest size={12} />}
+          {isJob ? "Remote job" : "Open source · good first issue"}
+        </div>
+        <div className="text-[16px] font-bold tracking-tight text-foreground leading-snug mt-1 truncate">{item.title}</div>
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 mt-1 text-[12.5px] text-muted-foreground">
+          {isJob ? (
+            <>
+              {m.company && <span className="text-foreground/80 font-medium">{m.company}</span>}
+              {m.location && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin size={12} /> {m.location}
+                </span>
+              )}
+              {m.salary && (
+                <span className="inline-flex items-center gap-1">
+                  <Wallet size={12} /> {m.salary}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              {m.repo && <span className="font-mono text-foreground/80">{m.repo}</span>}
+              {m.labels?.map((l) => (
+                <span key={l} className="px-2 py-0.5 rounded-full bg-secondary text-[11px]">
+                  {l}
+                </span>
+              ))}
+            </>
+          )}
+        </div>
+        <p className="text-[13px] text-foreground/70 leading-snug mt-1.5 line-clamp-2">{item.summary}</p>
+      </div>
+
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center justify-center gap-1.5 flex-shrink-0 bg-primary hover:bg-primary/90 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all shadow-md shadow-primary/25"
+      >
+        View <ArrowUpRight size={15} />
+      </a>
+    </aside>
+  );
+}
+
 export function CardFor(props: CardProps) {
   if (props.item.type === "video") return <VideoCard {...props} />;
   // In a mixed grid a project spans two columns: wider than a video, never the same box.
+  if (props.item.type === "opportunity") return <div className="sm:col-span-2 lg:col-span-4"><OpportunityBand item={props.item} /></div>;
   if (props.item.type === "repo") return <RepoCard {...props} className="sm:col-span-2" />;
   return <ArticleCard {...props} className="sm:col-span-2" />;
 }

@@ -4,6 +4,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const REFRESH_BEFORE_EXPIRY_MS = 10 * 60 * 1000;
 
+export interface CommentItem {
+  id: string;
+  body: string;
+  createdAt: string;
+  author: { id: string; name: string; picture: string | null };
+}
+
 export interface Identities {
   email: string;
   hasPassword: boolean;
@@ -213,6 +220,36 @@ export const api = {
       return { success: false, error: me.error || 'GitHub sign-in failed' };
     }
     return { success: true, user: me.user };
+  },
+
+  async getComments(contentId: string, offset = 0): Promise<{ comments: CommentItem[]; total: number }> {
+    const res = await this.fetchWithAuth(`/content/${contentId}/comments?limit=30&offset=${offset}`);
+    if (!res.ok) throw new Error('comments_unavailable');
+    return res.json();
+  },
+
+  async addComment(contentId: string, body: string): Promise<{ success: boolean; comment?: CommentItem; error?: string }> {
+    try {
+      const res = await this.fetchWithAuth(`/content/${contentId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || 'Could not post the comment' };
+      return { success: true, comment: data };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
+  async deleteComment(commentId: string): Promise<boolean> {
+    try {
+      const res = await this.fetchWithAuth(`/content/comments/${commentId}`, { method: 'DELETE' });
+      return res.ok;
+    } catch {
+      return false;
+    }
   },
 
   /** Which sign-in methods are attached to the signed-in account. */

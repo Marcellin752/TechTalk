@@ -1,5 +1,5 @@
 export type ContentSource = "Reddit" | "GitHub" | "YouTube" | "Medium" | "Dev.to" | "TechCrunch";
-export type ContentType = "article" | "video" | "repo" | "social_post";
+export type ContentType = "article" | "video" | "repo" | "opportunity" | "social_post";
 
 /** Facts the GitHub provider stores next to a repository. */
 export interface RepoMeta {
@@ -11,6 +11,16 @@ export interface RepoMeta {
   pushedAt?: string;
   owner?: string;
   avatarUrl?: string;
+  /* Opportunities: a remote job or a beginner-friendly issue. */
+  kind?: "job" | "issue";
+  company?: string;
+  location?: string;
+  salary?: string | null;
+  jobType?: string | null;
+  tags?: string[];
+  repo?: string;
+  labels?: string[];
+  comments?: number;
 }
 
 export interface ContentItem {

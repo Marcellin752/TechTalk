@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
-import { ArticleCard, CardFor, RepoCard } from "../components/ContentCards";
+import { ArticleCard, CardFor, OpportunityBand, RepoCard } from "../components/ContentCards";
 import { buildSections, type SectionKind } from "../lib/feedLayout";
 import { ContentItem } from "../types/content";
 
-export type FeedFilter = "all" | "article" | "video" | "repo";
+export type FeedFilter = "all" | "article" | "video" | "repo" | "opportunity";
 
 interface FeedScreenProps {
   items: ContentItem[];
@@ -27,18 +27,21 @@ const FILTERS: { id: FeedFilter; label: string }[] = [
   { id: "video", label: "Videos" },
   { id: "repo", label: "Projects" },
   { id: "article", label: "Articles" },
+  { id: "opportunity", label: "Opportunities" },
 ];
 
 const SECTION_TITLES: Record<SectionKind, string | null> = {
   videos: null,
+  opportunity: null,
   repos: "Projects worth exploring",
   articles: "Worth a read",
 };
 
 const ROW_GRID: Record<SectionKind, string> = {
+  opportunity: "grid-cols-1",
   videos: "grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4",
   repos: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4",
-  articles: "grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-5",
+  articles: "grid-cols-1 md:grid-cols-3 gap-6",
 };
 
 export function FeedScreen({
@@ -144,9 +147,11 @@ export function FeedScreen({
 
         {flat ? (
           /* Searching or filtering: one even grid, every card in its own format. */
-          <div className={`grid gap-x-4 gap-y-6 ${contentType === "repo" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
+          <div className={`grid gap-x-4 gap-y-6 ${contentType === "repo" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : contentType === "opportunity" ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
             {items.map((item) =>
-              contentType === "repo" ? (
+              contentType === "opportunity" ? (
+                <OpportunityBand key={item.id} item={item} />
+              ) : contentType === "repo" ? (
                 <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
               ) : (
                 <CardFor key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
@@ -167,7 +172,9 @@ export function FeedScreen({
                 )}
                 <div className={`grid ${ROW_GRID[section.kind]}`}>
                   {section.items.map((item) =>
-                    section.kind === "repos" ? (
+                    section.kind === "opportunity" ? (
+                      <OpportunityBand key={item.id} item={item} />
+                    ) : section.kind === "repos" ? (
                       <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
                     ) : section.kind === "articles" ? (
                       <ArticleCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
