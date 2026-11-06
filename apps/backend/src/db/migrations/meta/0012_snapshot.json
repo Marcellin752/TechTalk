@@ -1,7 +1,5 @@
 {
-  "id": "2822c704-f890-419a-a2f2-9a32489c6939",
-  "prevId": "4e47ac2d-ba29-4550-8d91-65499e189cb6",
-  "version": "6",
+  "version": "7",
   "dialect": "postgresql",
   "tables": {
     "public.bookmarks": {
@@ -37,47 +35,63 @@
       },
       "indexes": {
         "bookmarks_user_content_unique_idx": {
-          "name": "bookmarks_user_content_unique_idx",
           "columns": [
-            "user_id",
-            "content_id"
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "content_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "with": {},
+          "name": "bookmarks_user_content_unique_idx",
+          "isUnique": true,
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "bookmarks_user_id_users_id_fk": {
           "name": "bookmarks_user_id_users_id_fk",
           "tableFrom": "bookmarks",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "bookmarks_content_id_contents_id_fk": {
           "name": "bookmarks_content_id_contents_id_fk",
           "tableFrom": "bookmarks",
-          "tableTo": "contents",
           "columnsFrom": [
             "content_id"
           ],
+          "tableTo": "contents",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "public.campus_members": {
-      "name": "campus_members",
+    "public.comments": {
+      "name": "comments",
       "schema": "",
       "columns": {
         "id": {
@@ -87,8 +101,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "campus_id": {
-          "name": "campus_id",
+        "content_id": {
+          "name": "content_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -99,116 +113,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "role": {
-          "name": "role",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'member'"
-        },
-        "joined_at": {
-          "name": "joined_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "campus_members_campus_user_unique_idx": {
-          "name": "campus_members_campus_user_unique_idx",
-          "columns": [
-            "campus_id",
-            "user_id"
-          ],
-          "isUnique": true
-        },
-        "campus_members_user_idx": {
-          "name": "campus_members_user_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "campus_members_campus_id_campuses_id_fk": {
-          "name": "campus_members_campus_id_campuses_id_fk",
-          "tableFrom": "campus_members",
-          "tableTo": "campuses",
-          "columnsFrom": [
-            "campus_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "campus_members_user_id_users_id_fk": {
-          "name": "campus_members_user_id_users_id_fk",
-          "tableFrom": "campus_members",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "public.campuses": {
-      "name": "campuses",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(120)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "slug": {
-          "name": "slug",
-          "type": "varchar(140)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "city": {
-          "name": "city",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "description": {
-          "name": "description",
+        "body": {
+          "name": "body",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
-        },
-        "is_public": {
-          "name": "is_public",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -219,39 +128,61 @@
         }
       },
       "indexes": {
-        "campuses_organization_idx": {
-          "name": "campuses_organization_idx",
+        "comments_content_created_idx": {
           "columns": [
-            "organization_id"
+            {
+              "expression": "content_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "with": {},
+          "name": "comments_content_created_idx",
+          "isUnique": false,
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {
-        "campuses_organization_id_organizations_id_fk": {
-          "name": "campuses_organization_id_organizations_id_fk",
-          "tableFrom": "campuses",
-          "tableTo": "organizations",
+        "comments_content_id_contents_id_fk": {
+          "name": "comments_content_id_contents_id_fk",
+          "tableFrom": "comments",
           "columnsFrom": [
-            "organization_id"
+            "content_id"
           ],
+          "tableTo": "contents",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "comments_user_id_users_id_fk": {
+          "name": "comments_user_id_users_id_fk",
+          "tableFrom": "comments",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "tableTo": "users",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "campuses_slug_unique": {
-          "name": "campuses_slug_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
-        }
-      }
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
     "public.contents": {
       "name": "contents",
@@ -318,6 +249,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "meta": {
+          "name": "meta",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -328,11 +265,19 @@
       },
       "indexes": {
         "contents_created_at_idx": {
-          "name": "contents_created_at_idx",
           "columns": [
-            "created_at"
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "with": {},
+          "name": "contents_created_at_idx",
+          "isUnique": false,
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -340,725 +285,15 @@
       "uniqueConstraints": {
         "contents_url_unique": {
           "name": "contents_url_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "url"
-          ]
-        }
-      }
-    },
-    "public.courses": {
-      "name": "courses",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(160)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "slug": {
-          "name": "slug",
-          "type": "varchar(160)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          ],
+          "nullsNotDistinct": false
         }
       },
-      "indexes": {
-        "courses_organization_slug_unique_idx": {
-          "name": "courses_organization_slug_unique_idx",
-          "columns": [
-            "organization_id",
-            "slug"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "courses_organization_id_organizations_id_fk": {
-          "name": "courses_organization_id_organizations_id_fk",
-          "tableFrom": "courses",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "public.documents": {
-      "name": "documents",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "course_id": {
-          "name": "course_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "storage_key": {
-          "name": "storage_key",
-          "type": "varchar(512)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "checksum": {
-          "name": "checksum",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "file_name": {
-          "name": "file_name",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mime_type": {
-          "name": "mime_type",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size_bytes": {
-          "name": "size_bytes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period": {
-          "name": "period",
-          "type": "varchar(8)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "academic_year": {
-          "name": "academic_year",
-          "type": "varchar(9)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "uploader_id": {
-          "name": "uploader_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "campus_id": {
-          "name": "campus_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "downloads": {
-          "name": "downloads",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "documents_course_idx": {
-          "name": "documents_course_idx",
-          "columns": [
-            "course_id"
-          ],
-          "isUnique": false
-        },
-        "documents_uploader_idx": {
-          "name": "documents_uploader_idx",
-          "columns": [
-            "uploader_id"
-          ],
-          "isUnique": false
-        },
-        "documents_course_checksum_unique_idx": {
-          "name": "documents_course_checksum_unique_idx",
-          "columns": [
-            "course_id",
-            "checksum"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "documents_course_id_courses_id_fk": {
-          "name": "documents_course_id_courses_id_fk",
-          "tableFrom": "documents",
-          "tableTo": "courses",
-          "columnsFrom": [
-            "course_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "documents_uploader_id_users_id_fk": {
-          "name": "documents_uploader_id_users_id_fk",
-          "tableFrom": "documents",
-          "tableTo": "users",
-          "columnsFrom": [
-            "uploader_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "documents_campus_id_campuses_id_fk": {
-          "name": "documents_campus_id_campuses_id_fk",
-          "tableFrom": "documents",
-          "tableTo": "campuses",
-          "columnsFrom": [
-            "campus_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "documents_storage_key_unique": {
-          "name": "documents_storage_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "storage_key"
-          ]
-        }
-      }
-    },
-    "public.event_rsvps": {
-      "name": "event_rsvps",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "event_id": {
-          "name": "event_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'going'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "event_rsvps_event_user_unique_idx": {
-          "name": "event_rsvps_event_user_unique_idx",
-          "columns": [
-            "event_id",
-            "user_id"
-          ],
-          "isUnique": true
-        },
-        "event_rsvps_user_idx": {
-          "name": "event_rsvps_user_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "event_rsvps_event_id_events_id_fk": {
-          "name": "event_rsvps_event_id_events_id_fk",
-          "tableFrom": "event_rsvps",
-          "tableTo": "events",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "event_rsvps_user_id_users_id_fk": {
-          "name": "event_rsvps_user_id_users_id_fk",
-          "tableFrom": "event_rsvps",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "public.events": {
-      "name": "events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "campus_id": {
-          "name": "campus_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "group_id": {
-          "name": "group_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "title": {
-          "name": "title",
-          "type": "varchar(160)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "location": {
-          "name": "location",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "starts_at": {
-          "name": "starts_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ends_at": {
-          "name": "ends_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "capacity": {
-          "name": "capacity",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'scheduled'"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "events_campus_starts_at_idx": {
-          "name": "events_campus_starts_at_idx",
-          "columns": [
-            "campus_id",
-            "starts_at"
-          ],
-          "isUnique": false
-        },
-        "events_group_idx": {
-          "name": "events_group_idx",
-          "columns": [
-            "group_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "events_campus_id_campuses_id_fk": {
-          "name": "events_campus_id_campuses_id_fk",
-          "tableFrom": "events",
-          "tableTo": "campuses",
-          "columnsFrom": [
-            "campus_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "events_group_id_groups_id_fk": {
-          "name": "events_group_id_groups_id_fk",
-          "tableFrom": "events",
-          "tableTo": "groups",
-          "columnsFrom": [
-            "group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "events_created_by_users_id_fk": {
-          "name": "events_created_by_users_id_fk",
-          "tableFrom": "events",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "public.group_members": {
-      "name": "group_members",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "group_id": {
-          "name": "group_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'member'"
-        },
-        "joined_at": {
-          "name": "joined_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "group_members_group_user_unique_idx": {
-          "name": "group_members_group_user_unique_idx",
-          "columns": [
-            "group_id",
-            "user_id"
-          ],
-          "isUnique": true
-        },
-        "group_members_user_idx": {
-          "name": "group_members_user_idx",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "group_members_group_id_groups_id_fk": {
-          "name": "group_members_group_id_groups_id_fk",
-          "tableFrom": "group_members",
-          "tableTo": "groups",
-          "columnsFrom": [
-            "group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "group_members_user_id_users_id_fk": {
-          "name": "group_members_user_id_users_id_fk",
-          "tableFrom": "group_members",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "public.groups": {
-      "name": "groups",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "campus_id": {
-          "name": "campus_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(120)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "slug": {
-          "name": "slug",
-          "type": "varchar(140)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "topic": {
-          "name": "topic",
-          "type": "varchar(60)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "capacity": {
-          "name": "capacity",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "groups_campus_idx": {
-          "name": "groups_campus_idx",
-          "columns": [
-            "campus_id"
-          ],
-          "isUnique": false
-        },
-        "groups_campus_slug_unique_idx": {
-          "name": "groups_campus_slug_unique_idx",
-          "columns": [
-            "campus_id",
-            "slug"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "groups_campus_id_campuses_id_fk": {
-          "name": "groups_campus_id_campuses_id_fk",
-          "tableFrom": "groups",
-          "tableTo": "campuses",
-          "columnsFrom": [
-            "campus_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "groups_created_by_users_id_fk": {
-          "name": "groups_created_by_users_id_fk",
-          "tableFrom": "groups",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "public.organizations": {
-      "name": "organizations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(120)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "slug": {
-          "name": "slug",
-          "type": "varchar(120)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "email_domains": {
-          "name": "email_domains",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "organizations_slug_unique": {
-          "name": "organizations_slug_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
-        }
-      }
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
     "public.reading_history": {
       "name": "reading_history",
@@ -1093,44 +328,60 @@
       },
       "indexes": {
         "reading_history_user_content_idx": {
-          "name": "reading_history_user_content_idx",
           "columns": [
-            "user_id",
-            "content_id"
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "content_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "with": {},
+          "name": "reading_history_user_content_idx",
+          "isUnique": false,
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "reading_history_user_id_users_id_fk": {
           "name": "reading_history_user_id_users_id_fk",
           "tableFrom": "reading_history",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "reading_history_content_id_contents_id_fk": {
           "name": "reading_history_content_id_contents_id_fk",
           "tableFrom": "reading_history",
-          "tableTo": "contents",
           "columnsFrom": [
             "content_id"
           ],
+          "tableTo": "contents",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
     "public.users": {
       "name": "users",
@@ -1167,6 +418,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "github_id": {
+          "name": "github_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "picture": {
           "name": "picture",
           "type": "varchar(500)",
@@ -1194,26 +451,42 @@
       "uniqueConstraints": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ]
+          ],
+          "nullsNotDistinct": false
         },
         "users_google_id_unique": {
           "name": "users_google_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "google_id"
-          ]
+          ],
+          "nullsNotDistinct": false
+        },
+        "users_github_id_unique": {
+          "name": "users_github_id_unique",
+          "columns": [
+            "github_id"
+          ],
+          "nullsNotDistinct": false
         }
-      }
+      },
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     }
   },
   "enums": {},
   "schemas": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
-  }
+    "tables": {},
+    "columns": {}
+  },
+  "id": "17fbd329-ca23-4396-a81c-9e39d9acd3e5",
+  "prevId": "11adcf76-1e25-4891-a9ea-2d2983f8db74",
+  "sequences": {},
+  "policies": {},
+  "views": {},
+  "roles": {}
 }

@@ -1,3 +1,4 @@
+import { useI18n } from "../lib/i18n";
 import { ArrowLeft, Rss, Bookmark, Search, User } from "lucide-react";
 import { BrandMark, BrandWord } from "../components/Brand";
 
@@ -8,13 +9,14 @@ interface AboutScreenProps {
 const SOURCES = ["Dev.to", "TechCrunch", "YouTube", "Reddit"];
 
 const FEATURES = [
-  { icon: <Rss size={16} />, title: "Un fil éditorialisé", desc: "Des articles et vidéos tech récents, agrégés depuis le web." },
-  { icon: <Bookmark size={16} />, title: "À garder pour plus tard", desc: "Enregistrez un contenu et retrouvez-le quand vous voulez." },
-  { icon: <Search size={16} />, title: "Recherche plein texte", desc: "Trouvez exactement ce que vous cherchez, instantanément." },
-  { icon: <User size={16} />, title: "Votre profil", desc: "Suivez vos jours actifs et affinez vos centres d'intérêt." },
-];
+  { icon: <Rss size={16} />, title: "about.f1", desc: "about.f1d" },
+  { icon: <Bookmark size={16} />, title: "about.f2", desc: "about.f2d" },
+  { icon: <Search size={16} />, title: "about.f3", desc: "about.f3d" },
+  { icon: <User size={16} />, title: "about.f4", desc: "about.f4d" },
+] as const;
 
 export function AboutScreen({ onBack }: AboutScreenProps) {
+  const { t } = useI18n();
   return (
     <div className="tt-fade-up flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-5 py-8 pb-10">
@@ -23,7 +25,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
           className="-ml-2 mb-6 flex items-center gap-2 rounded-full px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
         >
           <ArrowLeft size={18} />
-          <span>Retour au fil</span>
+          <span className="text-sm">{t("about.back")}</span>
         </button>
 
         {/* App info */}
@@ -40,13 +42,8 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
         </div>
 
         {/* About */}
-        <div className="tt-card p-6">
-          <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
-            TechTalk est un <span className="font-semibold text-foreground">fil tech façon TikTok</span> — découvre,
-            scrolle, apprends. Plutôt qu'un timeline saturé, l'app sélectionne des articles et vidéos techniques de
-            qualité depuis le web dans un flux unique, pensé pour le mobile. Les recommandations suivent des règles
-            simples et lisibles : correspondance de thèmes, popularité et fraîcheur, puis diversité du fil.
-          </p>
+        <div className="rounded-2xl border border-border overflow-hidden bg-card p-5">
+          <p className="text-sm text-foreground/85 leading-relaxed mb-4">{t("about.intro")}</p>
 
           <div className="mb-6 flex flex-wrap gap-2">
             {SOURCES.map((s) => (
@@ -65,8 +62,8 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
                   <span className="text-primary">{f.icon}</span>
                 </div>
                 <div>
-                  <div className="text-sm font-semibold tracking-tight text-foreground">{f.title}</div>
-                  <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{f.desc}</div>
+                  <div className="text-sm font-semibold text-foreground">{t(f.title)}</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">{t(f.desc)}</div>
                 </div>
               </div>
             ))}

@@ -1,27 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  User as UserIcon,
-  Bookmark,
-  History,
-  Sparkles,
-  Settings,
-  Pencil,
-  Check,
-  LogOut,
-  Info,
-  Sun,
-  Moon,
-} from "lucide-react";
-import { toast } from "sonner";
-import { api, TagRef } from "../services/api";
-import { ContentItem } from "../types/content";
-import { mapBackendContentToItem, groupTagsByKind } from "../lib/content";
-import { VideoTile } from "../components/VideoTile";
-import { useTheme, toggleTheme } from "../app/theme";
-import { useAppStore } from "../app/store";
+import { useState } from "react";
+import { ArrowLeft, User, Info, LogOut, Bookmark, ChevronRight, Github, Globe, MapPin, Pencil, Sparkles } from "lucide-react";
+import { User as ApiUser, LearningPath } from "../services/api";
+import { useI18n } from "../lib/i18n";
+import { EditProfileDialog } from "../components/EditProfileDialog";
+import { api, ProfileSettings } from "../services/api";
+import { useEffect } from "react";
+import { LearningSummary } from "../components/LearningSummary";
+import { ActivityHistory } from "../components/ActivityHistory";
+import { DeveloperHeader, LanguageBar, LinkGithubPrompt, ProjectsGrid, useGithubProfile } from "../components/DeveloperProfile";
 
-type Section = "profil" | "favoris" | "historique" | "abonnements" | "parametres";
+interface ProfileScreenProps {
+  user: ApiUser | null;
+  savedCount: number;
+  readCount: number;
+  readDates: string[];
+  interests: string[];
+  onToggleInterest: (interest: string) => void;
+  onNavigateToSaved: () => void;
+  onNavigateToAbout: () => void;
+  onLogout: () => void;
+  onBack: () => void;
+  onUserUpdate?: (user: ApiUser) => void;
+  learningPath?: LearningPath | null;
+  learningLoaded?: boolean;
+  onOpenPath?: () => void;
+  onStartOnboarding?: () => void;
+}
 
 const SECTIONS: { id: Section; label: string; icon: typeof UserIcon }[] = [
   { id: "profil", label: "Mon profil", icon: UserIcon },
@@ -44,21 +48,34 @@ export function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [catalog, setCatalog] = useState<TagRef[]>([]);
 
-  useEffect(() => {
-    api
-      .getTags({ limit: 60 })
-      .then(setCatalog)
-      .catch(() => setCatalog([]));
-  }, []);
+export function ProfileScreen({
+  user,
+  savedCount,
+  readCount,
+  readDates,
+  interests,
+  onToggleInterest,
+  onNavigateToSaved,
+  onNavigateToAbout,
+  onLogout,
+  onBack,
+  onUserUpdate = () => undefined,
+  learningPath = null,
+  learningLoaded = true,
+  onOpenPath = () => undefined,
+  onStartOnboarding = () => undefined,
+}: ProfileScreenProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
 
   const topicGroups = useMemo(() => groupTagsByKind(catalog), [catalog]);
 
-  useEffect(() => {
-    api
-      .getContents(200, 0)
-      .then((c) => setPool(c.map(mapBackendContentToItem)))
-      .catch(() => undefined);
-  }, []);
+  const streak = computeStreak(readDates);
+  const stats = [
+    { label: "profile.stats.saved" as const, value: savedCount.toString() },
+    { label: "profile.stats.read" as const, value: readCount.toString() },
+    { label: "profile.stats.streak" as const, value: streak > 0 ? `${streak}d` : "—" },
+  ];
 
   const history = pool.filter((i) => readIds.has(i.id));
   const videos = pool.filter((i) => i.type === "video");
@@ -101,150 +118,208 @@ export function ProfileScreen() {
     .join("")
     .toUpperCase();
 
-  return (
-    <div className="flex-1 overflow-y-auto tt-scrollbar">
-      <div className="max-w-5xl mx-auto px-3 md:px-6 py-6 grid md:grid-cols-[220px_minmax(0,1fr)] gap-6">
-        {/* Section menu */}
-        <nav className="flex md:flex-col gap-1 md:sticky md:top-6 overflow-x-auto tt-scrollbar">
-          {SECTIONS.map(({ id, label, icon: Icon }) => {
-            const active = section === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setSection(id)}
-                className={`tt-btn gap-2.5 px-4 py-2.5 justify-start text-sm whitespace-nowrap ${
-                  active ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                }`}
-              >
-                <Icon size={16} /> {label}
-              </button>
-            );
-          })}
-        </nav>
+  const { t } = useI18n();
+  const { state: gh, failed: ghFailed, syncing, sync } = useGithubProfile();
+  const profile = gh?.profile ?? null;
+  const [details, setDetails] = useState<ProfileSettings | null>(null);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    api.getProfileSettings().then((r) => setDetails(r.settings)).catch(() => undefined);
+  }, []);
+  // What the learner wrote wins over what GitHub or Google say.
+  const avatar = details?.avatarUrl || user?.picture || profile?.avatarUrl || null;
+  const bio = details?.bio || profile?.bio || null;
+  const topLanguages = profile?.languages.slice(0, 3) ?? [];
 
-        <div className="min-w-0 tt-fade-up">
-          {/* ---------------- Mon profil ---------------- */}
-          {section === "profil" && (
-            <div className="space-y-6">
-              <div className="tt-card p-6 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-                {user?.picture ? (
-                  <img src={user.picture} alt="" className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/40" />
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-6xl mx-auto px-4 py-7 pb-12">
+        <button onClick={onBack} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6">
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back to Feed</span>
+        </button>
+
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-8 items-start">
+          {/* Main column: who you are as a developer */}
+          <div className="min-w-0 space-y-8">
+            <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+              <div className="flex items-start gap-4 sm:gap-5">
+                {avatar ? (
+                  <img src={avatar} alt={user?.name || "Profile"} className="w-20 h-20 rounded-2xl object-cover border border-border flex-shrink-0" />
                 ) : (
-                  <span className="tt-brand-tile w-20 h-20 rounded-full text-xl font-bold">{initials}</span>
+                  <div className="w-20 h-20 rounded-2xl bg-primary/15 border border-border flex items-center justify-center flex-shrink-0">
+                    <User size={32} className="text-primary" />
+                  </div>
                 )}
-                <div className="flex-1 min-w-0">
-                  {editingName ? (
-                    <div className="flex items-center gap-2 justify-center sm:justify-start">
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="tt-field px-3 py-1.5 text-sm flex-1 max-w-xs"
-                        autoFocus
-                      />
-                      <button onClick={saveName} disabled={saving} className="tt-btn tt-btn-brand p-2" aria-label="Enregistrer">
-                        <Check size={15} />
-                      </button>
-                      <button onClick={() => setEditingName(false)} className="tt-btn tt-btn-ghost px-3 py-2 text-xs">
-                        Annuler
-                      </button>
-                    </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight truncate">{user?.name || profile?.name || "Tech Enthusiast"}</h2>
+                  {profile ? (
+                    <a href={profile.htmlUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary font-mono mt-0.5">
+                      <Github size={13} /> @{profile.login}
+                    </a>
                   ) : (
-                    <div className="flex items-center gap-2 justify-center sm:justify-start">
-                      <h1 className="text-xl font-bold tracking-tight truncate">{user?.name || "Tech Talker"}</h1>
-                      <button
-                        onClick={() => {
-                          setName(user?.name || "");
-                          setEditingName(true);
-                        }}
-                        className="tt-btn tt-btn-ghost gap-1.5 px-3 py-1 text-[11px]"
-                      >
-                        <Pencil size={11} /> Modifier le profil
-                      </button>
-                    </div>
+                    <p className="text-sm text-muted-foreground font-mono mt-0.5 truncate">{user?.email}</p>
                   )}
-                  <p className="text-[12px] text-muted-foreground mt-1">{user?.email}</p>
+                  {bio && <p className="text-sm text-foreground/80 leading-relaxed mt-2">{bio}</p>}
+                  {(details?.location || details?.website) && (
+                    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground mt-2">
+                      {details?.location && <span className="inline-flex items-center gap-1.5"><MapPin size={13} /> {details.location}</span>}
+                      {details?.website && (
+                        <a href={details.website} target="_blank" rel="noopener noreferrer nofollow me" className="inline-flex items-center gap-1.5 hover:text-primary truncate max-w-full">
+                          <Globe size={13} /> {details.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                        </a>
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
+              <button onClick={() => setEditing(true)} className="mt-4 inline-flex items-center gap-2 px-4 h-9 rounded-xl border border-border text-[13px] font-medium text-foreground hover:bg-secondary">
+                <Pencil size={14} /> {t("profile.edit")}
+              </button>
+              {profile && <DeveloperHeader profile={profile} syncing={syncing} onSync={sync} />}
+            </section>
 
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Historique", value: readIds.size },
-                  { label: "Favoris", value: saved.length },
-                  { label: "Jours actifs", value: readDates.length },
-                ].map((s) => (
-                  <div key={s.label} className="tt-card p-4 text-center">
-                    <p className="text-xl font-bold">{s.value}</p>
-                    <p className="tt-label mt-1">{s.label}</p>
-                  </div>
+            <LearningSummary path={learningPath} loaded={learningLoaded} onOpen={onOpenPath} onStart={onStartOnboarding} />
+
+            {gh === null && !ghFailed && <div className="h-40 rounded-2xl bg-secondary animate-pulse" />}
+            {ghFailed && <p className="text-sm text-muted-foreground">Couldn't load your developer profile. Try again later.</p>}
+            {gh && !gh.linked && <LinkGithubPrompt />}
+            {gh?.linked && !profile && (
+              <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+                {gh.error ? `GitHub import failed: ${gh.error}` : "Importing from GitHub…"}
+                <button onClick={sync} disabled={syncing} className="ml-2 text-primary underline">
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {profile && (
+              <>
+                <section>
+                  <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">{t("profile.languages")}</h3>
+                  <LanguageBar languages={profile.languages} />
+                </section>
+                <section>
+                  <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">{t("profile.projects")}</h3>
+                  <ProjectsGrid repos={profile.topRepos} />
+                </section>
+              </>
+            )}
+
+            <ActivityHistory />
+          </div>
+
+          {/* Side column: your activity, your feed, your account */}
+          <div className="min-w-0 space-y-8">
+            <div className="grid grid-cols-3 gap-3">
+              {stats.map((s) => (
+                <div key={s.label} className="bg-secondary border border-border rounded-2xl p-4 text-center">
+                  <div className="text-2xl font-bold text-foreground">{s.value}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono mt-1 uppercase tracking-wide">{t(s.label)}</div>
+                </div>
+              ))}
+            </div>
+
+            <section className="rounded-2xl border border-border bg-card p-4">
+              <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-2.5 flex items-center gap-1.5">
+                <Sparkles size={12} className="text-primary" /> {t("profile.shapes")}
+              </h3>
+              <ul className="text-[13px] text-foreground/80 space-y-1.5 leading-snug">
+                <li>
+                  <span className="text-muted-foreground">Topics: </span>
+                  {interests.length ? interests.join(", ") : "none chosen yet"}
+                </li>
+                <li>
+                  <span className="text-muted-foreground">Languages: </span>
+                  {topLanguages.length ? topLanguages.map((l) => l.name).join(", ") : profile ? "none detected" : "link GitHub to add yours"}
+                </li>
+                <li>
+                  <span className="text-muted-foreground">Activity: </span>
+                  {savedCount} saved, {readCount} read
+                </li>
+              </ul>
+            </section>
+
+            {/* Interests */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em]">My Interests</h3>
+                <button onClick={() => setIsEditing(!isEditing)} className="text-xs text-primary font-mono hover:underline">
+                  {isEditing ? "✓ Done" : "+ Edit"}
+                </button>
+              </div>
+              {isEditing ? (
+                <div className="flex flex-wrap gap-2 p-3 rounded-2xl bg-secondary border border-border">
+                  {allAvailableInterests.map((tag) => {
+                    const active = interests.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => onToggleInterest(tag)}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                          active ? "bg-primary text-white border border-primary shadow-sm shadow-primary/20" : "bg-background text-muted-foreground border border-border hover:text-foreground"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {interests.map((tag) => (
+                    <span key={tag} className="px-3 py-1.5 bg-secondary border border-border rounded-full text-xs text-muted-foreground">
+                      {tag}
+                    </span>
+                  ))}
+                  {interests.length === 0 && <span className="text-xs text-muted-foreground font-mono">No interests added yet. Click edit to choose!</span>}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="rounded-2xl border border-border overflow-hidden bg-card">
+                {menuItems.map((item, idx) => (
+                  <button
+                    key={item.label}
+                    onClick={item.action}
+                    className={`w-full text-left px-4 py-3.5 text-sm text-foreground hover:bg-secondary transition-colors flex items-center justify-between ${
+                      idx < menuItems.length - 1 ? "border-b border-border" : ""
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{item.icon}</span>
+                      {item.label}
+                    </span>
+                    <ChevronRight size={14} className="text-muted-foreground" />
+                  </button>
                 ))}
               </div>
 
-              <section>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-bold">Mes vidéos regardées</h2>
-                  <button onClick={() => setSection("historique")} className="text-[12px] font-semibold text-primary hover:underline">
-                    Voir tout →
-                  </button>
-                </div>
-                {readVideos.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {readVideos.slice(0, 4).map((i) => (
-                      <VideoTile key={i.id} item={i} onOpen={() => openItem(i)} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[13px] text-muted-foreground">Regardez des contenus pour remplir votre historique.</p>
-                )}
-              </section>
+              <button
+                onClick={() => setConfirmingLogout(true)}
+                className="w-full mt-3 px-4 py-3.5 rounded-2xl text-sm text-red-400 hover:bg-secondary border border-border transition-colors flex items-center gap-2"
+              >
+                <LogOut size={14} />
+                Sign Out
+              </button>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* ---------------- Mes favoris ---------------- */}
-          {section === "favoris" && (
-            <section>
-              <h2 className="text-sm font-bold mb-3">Mes favoris · {saved.length}</h2>
-              {saved.length === 0 ? (
-                <div className="tt-card p-8 text-center">
-                  <p className="text-[13px] text-muted-foreground">
-                    Rien d'enregistré pour l'instant. Cliquez sur l'icône marque-page d'une carte pour la retrouver ici.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 tt-stagger">
-                  {saved.map((i) => (
-                    <div key={i.id} className="flex items-start gap-2">
-                      <div className="flex-1 min-w-0">
-                        <VideoTile item={i} onOpen={() => openItem(i)} />
-                      </div>
-                      <button
-                        onClick={() => toggleSave(i)}
-                        className="tt-btn p-2 mt-2 text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                        aria-label="Retirer des favoris"
-                      >
-                        <Bookmark size={15} className="fill-current" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* ---------------- Historique ---------------- */}
-          {section === "historique" && (
-            <section>
-              <h2 className="text-sm font-bold mb-3">Historique de lecture · {history.length}</h2>
-              {history.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">Aucun contenu consulté pour l'instant.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {history.map((i) => (
-                    <VideoTile key={i.id} item={i} onOpen={() => openItem(i)} />
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+        {editing && (
+          <EditProfileDialog
+            user={user}
+            settings={details}
+            githubAvatar={profile?.avatarUrl ?? null}
+            githubBio={profile?.bio ?? null}
+            onClose={() => setEditing(false)}
+            onSaved={(settings, nextUser) => {
+              setDetails(settings);
+              if (nextUser) onUserUpdate(nextUser);
+            }}
+          />
+        )}
 
           {/* ---------------- Abonnements (intérêts) ---------------- */}
           {section === "abonnements" && (

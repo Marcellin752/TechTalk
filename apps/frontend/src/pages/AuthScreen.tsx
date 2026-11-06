@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { Github, Rss } from "lucide-react";
 import { toast } from "sonner";
 import { Github } from "lucide-react";
 import { api, User as ApiUser } from "../services/api";
+import { useI18n } from "../lib/i18n";
 import { Field } from "../components/Field";
 import { GoogleIcon } from "../components/GoogleIcon";
-import { BrandMark, BrandWord } from "../components/Brand";
 import { ThemeToggle } from "../components/ThemeToggle";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -32,6 +33,7 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
+  const { t, lang } = useI18n();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -72,7 +74,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           shape: "rectangular",
           width,
           text: "continue_with",
-          locale: "fr",
+          locale: lang,
         });
       };
 
@@ -85,7 +87,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       setupGis();
     } else {
       const script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client?hl=fr";
+      script.src = `https://accounts.google.com/gsi/client?hl=${lang}`;
       script.async = true;
       script.defer = true;
       script.onload = setupGis;
@@ -144,20 +146,56 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       if (res.success && res.user) {
         onAuthSuccess(res.user);
       } else {
-        setError(res.error || "La connexion Google a échoué.");
+        setError(res.error || t("auth.googleFailed"));
       }
     } catch {
-      setError("Une erreur inattendue est survenue. Réessayez.");
+      setError(t("auth.unexpected"));
     } finally {
       setGoogleLoading(false);
     }
   };
 
+  // The GitHub callback returns to /login with the session in the URL fragment.
+  // Adopt it, then scrub the fragment so the token is not left in history.
+  useEffect(() => {
+    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+    if (!hash) return;
+    const params = new URLSearchParams(hash);
+    const token = params.get("gh_token");
+    const ghError = params.get("gh_error");
+    const unavailable = params.get("gh_unavailable");
+    if (!token && !ghError && !unavailable) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+
+    if (unavailable) {
+      setError(t("auth.ghUnavailable"));
+      return;
+    }
+    if (ghError) {
+      setError(ghError === "cancelled" ? t("auth.ghCancelled") : t("auth.ghFailed"));
+      return;
+    }
+    if (token) {
+      setGithubLoading(true);
+      api
+        .adoptGithubToken(token)
+        .then((res) => {
+          if (res.success && res.user) onAuthSuccess(res.user);
+          else setError(res.error || t("auth.ghFailed"));
+        })
+        .finally(() => setGithubLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleGithubClick = () => {
+    setGithubLoading(true);
+    window.location.assign(api.githubStartUrl());
+  };
+
   const handleGoogleClick = () => {
     if (!GOOGLE_CLIENT_ID || !window.google?.accounts?.id) {
-      toast.info(
-        "La connexion Google arrive bientôt. Utilisez l’e-mail pour l’instant."
-      );
+      toast.info(t("auth.googleSoon"));
       return;
     }
     setGoogleLoading(true);
@@ -171,7 +209,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
   const handleSubmit = async () => {
     if (!email || !password || (mode === "signup" && !name)) {
-      setError("Merci de remplir tous les champs.");
+      setError(t("auth.fillAll"));
       return;
     }
     setError(null);
@@ -182,7 +220,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         if (res.success && res.user) {
           onAuthSuccess(res.user);
         } else {
-          setError(res.error || "Connexion impossible.");
+          setError(res.error || t("auth.loginFailed"));
         }
       } else {
         const res = await api.register(name, email, password);
@@ -191,31 +229,57 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           if (loginRes.success && loginRes.user) {
             onAuthSuccess(loginRes.user);
           } else {
-            setError("Compte créé ! Connectez-vous.");
+            setError(t("auth.created"));
             setMode("login");
           }
         } else {
-          setError(res.error || "L’inscription a échoué.");
+          setError(res.error || t("auth.registerFailed"));
         }
       }
     } catch (err) {
-      setError("Une erreur inattendue est survenue. Réessayez.");
+      setError(t("auth.unexpected"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="tt-fade-up relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6 py-12">
-      <div className="absolute right-4 top-4 z-10">
+    <div className="relative min-h-screen bg-background flex flex-col items-center justify-center px-6 py-12">
+      <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
-
       {/* Wordmark */}
-      <div className="relative mb-10 text-center">
-        <div className="mb-4 flex items-center justify-center gap-3">
-          <BrandMark size={44} radius="12px" glyph={21} />
-          <BrandWord size="text-3xl" />
+      <div className="mb-14 text-center">
+        <div className="flex items-center gap-2.5 justify-center mb-3">
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+            <Rss size={16} className="text-white" />
+          </div>
+          <span className="text-[26px] font-bold tracking-tight text-foreground">TechTalk</span>
+        </div>
+        <p className="text-muted-foreground text-sm font-mono tracking-wide">
+          {t("auth.tagline")}
+        </p>
+      </div>
+
+      <div className="w-full max-w-sm">
+        {/* Mode toggle */}
+        <div className="flex bg-secondary rounded-xl p-1 mb-8 border border-border">
+          {(["login", "signup"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => {
+                setMode(m);
+                setError(null);
+              }}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                mode === m
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m === "login" ? t("auth.signIn") : t("auth.signUp")}
+            </button>
+          ))}
         </div>
         <p className="mt-4 text-sm text-muted-foreground">Le contenu tech, réuni.</p>
       </div>
@@ -242,54 +306,48 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             ))}
           </div>
 
-          {error && (
-            <div className="mb-6 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-xs text-destructive">
-              {error}
-            </div>
+        <div className="space-y-4">
+          {mode === "signup" && (
+            <Field label={t("auth.name")} type="text" placeholder="Alex Kim" value={name} onChange={setName} />
           )}
+          <Field label={t("auth.email")} type="email" placeholder="you@example.com" value={email} onChange={setEmail} />
+          <Field label={t("auth.password")} type="password" placeholder="••••••••" value={password} onChange={setPassword} />
 
-          <div className="space-y-5">
-            {mode === "signup" && (
-              <Field label="Nom" type="text" placeholder="Alex Kim" value={name} onChange={setName} />
-            )}
-            <Field label="Adresse e-mail" type="email" placeholder="vous@exemple.com" value={email} onChange={setEmail} />
-            <Field label="Mot de passe" type="password" placeholder="••••••••" value={password} onChange={setPassword} />
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full bg-primary text-white py-3.5 rounded-xl font-semibold text-sm mt-2 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+          >
+            {loading ? t("auth.wait") : mode === "login" ? t("auth.signInGo") : t("auth.createGo")}
+          </button>
 
+          <div className="flex items-center gap-3 my-2">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground font-mono">{t("auth.or")}</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {GOOGLE_CLIENT_ID && !googleLoading ? (
+            <div ref={googleBtnRef} className="w-full h-12" />
+          ) : (
             <button
               onClick={handleSubmit}
               disabled={loading}
               className="tt-btn tt-btn-brand mt-2 w-full px-5 py-3 text-sm"
             >
-              {loading ? "Patientez…" : mode === "login" ? "Se connecter" : "Créer un compte"}
+              <GoogleIcon />
+              {googleLoading ? t("auth.signingIn") : t("auth.google")}
             </button>
+          )}
 
-            <div className="flex items-center gap-3 my-1">
-              <div className="tt-divider-brand flex-1" />
-              <span className="text-xs text-muted-foreground">ou</span>
-              <div className="tt-divider-brand flex-1" />
-            </div>
-
-            {GOOGLE_CLIENT_ID && !googleLoading ? (
-              <div ref={googleBtnRef} className="w-full h-12" />
-            ) : (
-              <button
-                onClick={handleGoogleClick}
-                disabled={googleLoading}
-                className="tt-btn tt-btn-ghost w-full px-4 py-3 text-sm"
-              >
-                <GoogleIcon />
-                {googleLoading ? "Connexion…" : "Continuer avec Google"}
-              </button>
-            )}
-
-            <button
-              onClick={handleGithubClick}
-              disabled={githubLoading}
-              className="tt-btn tt-btn-ghost w-full gap-2 px-4 py-3 text-sm"
-            >
-              <Github size={17} /> {githubLoading ? "Connexion…" : "Continuer avec GitHub"}
-            </button>
-          </div>
+          <button
+            onClick={handleGithubClick}
+            disabled={githubLoading}
+            className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
+          >
+            <Github size={17} />
+            {githubLoading ? t("auth.signingIn") : t("auth.github")}
+          </button>
         </div>
       </div>
     </div>

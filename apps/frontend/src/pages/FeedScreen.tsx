@@ -1,125 +1,86 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Clapperboard, Inbox, LayoutGrid, RefreshCw, Rows3, Sparkles } from "lucide-react";
-import { toast } from "sonner";
-import { api } from "../services/api";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useI18n } from "../lib/i18n";
+import type { Keys } from "../locales/en";
+import { ArticleCard, CardFor, OpportunityBand, RepoCard } from "../components/ContentCards";
+import { buildSections, type SectionKind } from "../lib/feedLayout";
 import { ContentItem } from "../types/content";
-import { mapFeedItemToItem } from "../lib/content";
-import { DWELL_MS, trackInteraction } from "../lib/telemetry";
-import { FeedCard } from "../components/FeedCard";
-import { VideoTile } from "../components/VideoTile";
-import { ShortsFeed } from "../components/ShortsFeed";
-import { SourceBadge } from "../components/SourceBadge";
-import { formatCount } from "../lib/content";
-import { useAppStore } from "../app/store";
+import type { LearningPath } from "../services/api";
+import { ContinueBand } from "../components/ContinueBand";
 
-type FeedMode = "flux" | "videos" | "shorts";
-type LengthFilter = "long" | "short";
+export type FeedMode = "foryou" | "latest";
+export type FeedFilter = "all" | "article" | "video" | "repo" | "opportunity";
 
-const MODES: { id: FeedMode; label: string; icon: typeof Rows3 }[] = [
-  { id: "flux", label: "Découverte", icon: Rows3 },
-  { id: "videos", label: "YouTube", icon: LayoutGrid },
-  { id: "shorts", label: "Vertical", icon: Clapperboard },
+interface FeedScreenProps {
+  items: ContentItem[];
+  onOpen: (item: ContentItem) => void;
+  onSave: (item: ContentItem) => void;
+  savedIds: Set<string>;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  contentType: FeedFilter;
+  feedMode: FeedMode;
+  onFeedModeChange: (m: FeedMode) => void;
+  onFilterChange: (t: FeedFilter) => void;
+  searchQuery?: string;
+  learningPath?: LearningPath | null;
+  learningLoaded?: boolean;
+  hasLearningProfile?: boolean;
+  onOpenPath?: () => void;
+  onStartOnboarding?: () => void;
+}
+
+const PULL_THRESHOLD = 72;
+
+const FILTERS: { id: FeedFilter; label: Keys }[] = [
+  { id: "all", label: "feed.all" },
+  { id: "video", label: "feed.videos" },
+  { id: "repo", label: "feed.projects" },
+  { id: "article", label: "feed.articles" },
+  { id: "opportunity", label: "feed.opportunities" },
 ];
 
-/* Which slice of /api/feed each view of the screen asks the server for.
-   Ranking and diversity happen there (§10/§11), so the client only paginates. */
-function feedParams(mode: FeedMode, length: LengthFilter, tab: "pour-toi" | "abonnements") {
-  const surface: "feed" | "shorts" = mode === "shorts" ? "shorts" : "feed";
-  return {
-    limit: mode === "flux" ? 20 : 30,
-    type: mode === "flux" ? undefined : ("video" as const),
-    // Vertical/shorts mode deliberately sends no `shape` filter: the catalog has
-    // no duration data, so a strict "short" predicate returns nothing. The reel
-    // shows videos, like the classic TikTok feed. Length toggling stays in "Vidéos".
-    shape: mode === "videos" ? (length === "short" ? ("short" as const) : ("long" as const)) : undefined,
-    match: tab === "abonnements" ? ("interests" as const) : undefined,
-    surface,
-  };
-}
+const SECTION_TITLES: Record<SectionKind, Keys | null> = {
+  videos: null,
+  opportunity: null,
+  repos: "feed.projectsTitle",
+  articles: "feed.readTitle",
+};
 
-function SkeletonCard() {
-  return (
-    <div className="tt-card p-4 flex flex-col sm:flex-row gap-4">
-      <div className="tt-skeleton sm:w-72 md:w-80 aspect-[16/9] rounded-2xl flex-shrink-0" />
-      <div className="flex-1 space-y-3 py-1">
-        <div className="tt-skeleton h-4 w-40 rounded-full" />
-        <div className="tt-skeleton h-4 w-4/5" />
-        <div className="tt-skeleton h-3 w-full" />
-        <div className="tt-skeleton h-3 w-2/3" />
-        <div className="tt-skeleton h-4 w-32 rounded-full mt-4" />
-      </div>
-    </div>
-  );
-}
+const ROW_GRID: Record<SectionKind, string> = {
+  opportunity: "grid-cols-1",
+  videos: "grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4",
+  repos: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4",
+  articles: "grid-cols-1 md:grid-cols-3 gap-6",
+};
 
-export function FeedScreen() {
-  const navigate = useNavigate();
-  const { savedIds, toggleSave, likedIds, toggleLike, markRead } = useAppStore();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const tab = searchParams.get("tab") === "abonnements" ? "abonnements" : "pour-toi";
-  const modeParam = searchParams.get("mode");
-  const mode: FeedMode = modeParam === "videos" || modeParam === "shorts" ? modeParam : "flux";
-  const length: LengthFilter = searchParams.get("length") === "short" ? "short" : "long";
-
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(searchParams);
-    next.set(key, value);
-    setSearchParams(next, { replace: true });
-  };
-
-  const [items, setItems] = useState<ContentItem[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [strategy, setStrategy] = useState("hybrid");
-
-  const load = useCallback(
-    async (nextCursor: string | null, replace: boolean) => {
-      setLoading(true);
-      setError(null);
-      const { limit, type, shape, match, surface } = feedParams(mode, length, tab);
-      try {
-        const page = await api.getFeed({ limit, cursor: nextCursor ?? undefined, type, shape, match });
-        const mapped = page.items.map(mapFeedItemToItem);
-        for (const [index, item] of mapped.entries()) {
-          trackInteraction({ contentId: item.id, type: "view", surface, context: { rank: replace ? index : index } });
-        }
-        setStrategy(page.strategy);
-        setItems((prev) => (replace ? mapped : [...prev, ...mapped]));
-        setCursor(page.nextCursor);
-        setHasMore(page.nextCursor !== null);
-      } catch (err) {
-        console.error("Failed to fetch feed:", err);
-        setError("Impossible de charger le flux. Vérifiez votre connexion et réessayez.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [mode, length, tab]
-  );
-
-  useEffect(() => {
-    setItems([]);
-    setCursor(null);
-    load(null, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, length, tab]);
-
-  /* A subscription tab may legitimately return an empty page mid-walk; keep
-     advancing the cursor until the server runs out, so a short page is not
-     mistaken for the end of the feed. */
-  const autoAdvance = useRef(false);
-  useEffect(() => {
-    if (loading || error || !hasMore || items.length > 0 || cursor === null) return;
-    if (autoAdvance.current) return;
-    autoAdvance.current = true;
-    load(cursor, false).finally(() => {
-      autoAdvance.current = false;
-    });
-  }, [loading, error, hasMore, items.length, cursor, load]);
+export function FeedScreen({
+  items,
+  onOpen,
+  onSave,
+  savedIds,
+  loading,
+  error,
+  onRetry,
+  hasMore,
+  onLoadMore,
+  contentType,
+  feedMode,
+  onFeedModeChange,
+  onFilterChange,
+  searchQuery = "",
+  learningPath = null,
+  learningLoaded = false,
+  hasLearningProfile = false,
+  onOpenPath,
+  onStartOnboarding,
+}: FeedScreenProps) {
+  const { t } = useI18n();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const pullStartY = useRef<number | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const shouldObserve = !loading && !error && hasMore && items.length > 0;
@@ -162,74 +123,116 @@ export function FeedScreen() {
     setItems((prev) => prev.filter((i) => i.id !== item.id));
   };
 
-  const likeItem = (item: ContentItem) => {
-    trackInteraction({ contentId: item.id, type: likedIds.has(item.id) ? "unlike" : "like", surface: "feed" });
-    toggleLike(item);
-  };
-
-  const saveItem = (item: ContentItem) => {
-    trackInteraction({ contentId: item.id, type: savedIds.has(item.id) ? "unsave" : "save", surface: "feed" });
-    toggleSave(item);
-  };
-
-  const loadMore = useCallback(() => {
-    if (shouldObserve && cursor) load(cursor, false);
-  }, [shouldObserve, load, cursor]);
-
-  if (mode === "shorts") {
-    return (
-      <div className="flex-1 min-h-0 flex flex-col">
-        <FeedBar
-          tab={tab}
-          mode={mode}
-          length={length}
-          onTab={(t) => setParam("tab", t)}
-          onMode={(m) => setParam("mode", m)}
-          onLength={(l) => setParam("length", l)}
-        />
-        {loading && items.length === 0 ? (
-          <ShortsSkeleton />
-        ) : items.length === 0 ? (
-          <EmptyState tab={tab} mode={mode} />
-        ) : (
-          <ShortsFeed
-            items={items}
-            savedIds={savedIds}
-            likedIds={likedIds}
-            onLoadMore={loadMore}
-            onSave={saveItem}
-            onLike={likeItem}
-            onShare={(item) => shareItem(item, "shorts")}
-            onOpen={(item) => openItem(item, "shorts")}
-          />
-        )}
-      </div>
-    );
-  }
+  const refreshing = pullDistance >= PULL_THRESHOLD;
+  const flat = contentType !== "all" || !!searchQuery.trim();
+  const sections = useMemo(() => (flat ? [] : buildSections(items, !hasMore)), [flat, items, hasMore]);
 
   return (
-    <div className="flex-1 overflow-y-auto tt-scrollbar">
-      <div className="max-w-3xl mx-auto px-3 md:px-6 pt-4 pb-16">
-        <FeedBar
-          tab={tab}
-          mode={mode}
-          length={length}
-          onTab={(t) => setParam("tab", t)}
-          onMode={(m) => setParam("mode", m)}
-          onLength={(l) => setParam("length", l)}
-        />
+    <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} ref={scrollRef}>
+      <div className="max-w-7xl mx-auto px-4 py-4 pb-8">
+        {/* Pull-to-refresh indicator */}
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-200"
+          style={{ height: pullDistance }}
+        >
+          <div
+            className={`w-6 h-6 border-2 border-primary/20 rounded-full ${
+              refreshing ? "border-t-primary animate-spin" : "border-t-primary"
+            }`}
+            style={{ transform: `rotate(${pullDistance * 3}deg)` }}
+          />
+        </div>
 
-        {tab === "abonnements" && strategy === "hybrid" && items.length === 0 && !loading && (
-          <p className="mb-4 text-[13px] text-muted-foreground">
-            Ajoutez des centres d'intérêt dans votre profil pour remplir cet onglet.
+        {!searchQuery.trim() && learningLoaded && (
+          <ContinueBand path={learningPath} hasProfile={hasLearningProfile} onOpenPath={onOpenPath} onStart={onStartOnboarding} />
+        )}
+
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto no-scrollbar">
+          {!searchQuery.trim() && (
+            <div role="radiogroup" aria-label="Feed order" className="flex flex-shrink-0 rounded-lg border border-border bg-secondary p-0.5 mr-2">
+              {([["foryou", "feed.forYou"], ["latest", "feed.latest"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  role="radio"
+                  aria-checked={feedMode === id}
+                  onClick={() => onFeedModeChange(id)}
+                  className={`px-3 h-7 rounded-md text-[13px] font-medium transition-colors ${
+                    feedMode === id ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t(label)}
+                </button>
+              ))}
+            </div>
+          )}
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => onFilterChange(f.id)}
+              className={`px-3.5 h-8 flex-shrink-0 rounded-lg text-[13px] font-medium transition-colors ${
+                contentType === f.id
+                  ? "bg-foreground text-background"
+                  : "bg-secondary text-foreground hover:bg-muted"
+              }`}
+            >
+              {t(f.label)}
+            </button>
+          ))}
+        </div>
+
+        {searchQuery.trim() && !loading && !error && items.length > 0 && (
+          <p className="text-xs text-muted-foreground font-mono mb-4">
+            {items.length}{hasMore ? "+" : ""} results for “{searchQuery.trim()}”
           </p>
         )}
 
-        {loading && items.length === 0 && (
-          <div className="space-y-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <SkeletonCard key={i} />
+        {flat ? (
+          /* Searching or filtering: one even grid, every card in its own format. */
+          <div className={`grid gap-x-4 gap-y-6 ${contentType === "repo" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : contentType === "opportunity" ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
+            {items.map((item) =>
+              contentType === "opportunity" ? (
+                <OpportunityBand key={item.id} item={item} />
+              ) : contentType === "repo" ? (
+                <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+              ) : (
+                <CardFor key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+              ),
+            )}
+          </div>
+        ) : (
+          /* Home: rows that alternate format, like a video site's shelves. */
+          <div className="space-y-9">
+            {sections.map((section, i) => (
+              <section
+                key={`${section.kind}-${i}`}
+                // Video bands sit on a soft panel; project shelves use outlined cards instead.
+                className={section.kind === "videos" ? "rounded-2xl bg-secondary/60 p-3 sm:p-4" : undefined}
+              >
+                {SECTION_TITLES[section.kind] && (
+                  <h2 className="text-[15px] font-semibold text-foreground mb-3.5">{t(SECTION_TITLES[section.kind]!)}</h2>
+                )}
+                <div className={`grid ${ROW_GRID[section.kind]}`}>
+                  {section.items.map((item) =>
+                    section.kind === "opportunity" ? (
+                      <OpportunityBand key={item.id} item={item} />
+                    ) : section.kind === "repos" ? (
+                      <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ) : section.kind === "articles" ? (
+                      <ArticleCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ) : (
+                      <CardFor key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ),
+                  )}
+                </div>
+              </section>
             ))}
+          </div>
+        )}
+
+        {!loading && !error && hasMore && items.length > 0 && (
+          <div ref={sentinelRef} className="py-4 flex justify-center">
+            <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
           </div>
         )}
 
@@ -284,15 +287,27 @@ export function FeedScreen() {
         {shouldObserve && (
           <div ref={sentinelRef} className="py-6 flex justify-center">
             <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+            <span className="text-xs text-muted-foreground font-mono tracking-wide">
+              {t("common.loading")}
+            </span>
           </div>
         )}
 
         {!loading && error && (
-          <div className="tt-card tt-ring-brand p-8 text-center space-y-4 max-w-md mx-auto mt-6">
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <button onClick={() => load(null, true)} className="tt-btn tt-btn-brand px-5 py-2.5 text-sm gap-2">
-              <RefreshCw size={14} /> Réessayer
+          <div className="py-12 text-center text-muted-foreground text-sm font-mono space-y-4">
+            <div>{error}</div>
+            <button
+              onClick={onRetry}
+              className="px-4 py-2 rounded-xl bg-secondary border border-border text-foreground hover:bg-muted transition-colors"
+            >
+              {t("common.retry")}
             </button>
+          </div>
+        )}
+
+        {!loading && !error && items.length === 0 && (
+          <div className="py-12 text-center text-muted-foreground text-sm font-mono">
+            {t("feed.empty")}
           </div>
         )}
       </div>

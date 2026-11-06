@@ -1,0 +1,51 @@
+# Render Blueprint for the TechTalk API (Fastify + Postgres).
+# New > Blueprint > pick this repository. Values marked `sync: false` are asked
+# for in the dashboard so secrets never live in git.
+services:
+  - type: web
+    name: techtalk-api
+    runtime: node
+    plan: free # sleeps after ~15 min idle (cold start on the next request); use a paid plan to stay awake
+    # The repo is an npm-workspaces monorepo: build from the root.
+    # --include=dev because the TypeScript compiler and drizzle-kit are devDependencies.
+    buildCommand: npm ci --include=dev && npm run build --workspace=apps/backend
+    # Migrations are applied from your machine with the direct Supabase URL (see README).
+    startCommand: npm run start --workspace=apps/backend
+    healthCheckPath: /api/ready
+    envVars:
+      - key: NODE_VERSION
+        value: 22 # sanitize-html needs Node >= 22
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL # Supabase "Transaction pooler" string (port 6543)
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL # exact origin of the site, no trailing slash, e.g. https://t3chtalk.vercel.app
+        sync: false
+      - key: SITE_URL # public address of the site (sitemap, share previews); defaults to FRONTEND_URL
+        sync: false
+      - key: ADMIN_EMAIL # optional: run `npm run db:seed --workspace=apps/backend` in the Render shell to create the admin
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: REDDIT_CLIENT_ID
+        sync: false
+      - key: REDDIT_CLIENT_SECRET
+        sync: false

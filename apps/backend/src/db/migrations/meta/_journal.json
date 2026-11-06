@@ -75,64 +75,57 @@
     {
       "idx": 10,
       "version": "6",
-      "when": 1790707647781,
-      "tag": "0010_graceful_starhawk",
+      "when": 1793973461624,
+      "tag": "0010_confused_fallen_one",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "6",
-      "when": 1790773480809,
-      "tag": "0011_dusty_black_bird",
+      "when": 1793975798268,
+      "tag": "0011_lush_iceman",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "6",
-      "when": 1790785901324,
-      "tag": "0012_loud_justice",
+      "when": 1793977960495,
+      "tag": "0012_dashing_husk",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "6",
-      "when": 1790921492468,
-      "tag": "0013_narrow_slayback",
+      "when": 1793978866045,
+      "tag": "0013_eminent_energizer",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "6",
-      "when": 1790936288837,
-      "tag": "0014_jittery_matthew_murdock",
+      "when": 1793995071650,
+      "tag": "0014_fresh_baron_zemo",
       "breakpoints": true
     },
     {
       "idx": 15,
       "version": "6",
-      "when": 1790937078268,
-      "tag": "0015_needy_legion",
+      "when": 1793997287172,
+      "tag": "0015_worried_chamber",
       "breakpoints": true
     },
     {
       "idx": 16,
       "version": "6",
-      "when": 1790937339060,
-      "tag": "0016_robust_dust",
+      "when": 1793998266434,
+      "tag": "0016_optimal_scarlet_spider",
       "breakpoints": true
     },
     {
       "idx": 17,
       "version": "6",
-      "when": 1790938270020,
-      "tag": "0017_sturdy_the_watchers",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "6",
-      "when": 1790959162939,
-      "tag": "0018_normal_falcon",
+      "when": 1793998979022,
+      "tag": "0017_demonic_puff_adder",
       "breakpoints": true
     }
   ]

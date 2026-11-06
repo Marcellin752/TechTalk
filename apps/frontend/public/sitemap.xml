@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Static pages. Public profiles are listed by the API at /api/public/sitemap.xml:
+     once the API address is known, point a Vercel rewrite of /sitemap.xml at it
+     (see README "SEO") to serve the complete list from this domain. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://t3chtalk.vercel.app/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://t3chtalk.vercel.app/people</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://t3chtalk.vercel.app/login</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+</urlset>

@@ -2,6 +2,10 @@ import cron from 'node-cron';
 import { fetchLiveDevToArticles } from './devto.provider.js';
 import { fetchLiveYouTubeVideos } from './youtube.provider.js';
 import { fetchLiveRedditPosts } from './reddit.provider.js';
+import { fetchLiveGithubRepos } from './github.provider.js';
+import { fetchLiveOpportunities } from './opportunities.provider.js';
+import { fetchLiveLearning } from './learn/index.js';
+import { fetchLivePractice } from './practice/index.js';
 import { backfillMissingBodies } from './backfill.provider.js';
 import { rebuildTagUsageCounts, tagUntaggedContents } from '../taxonomy.js';
 
@@ -14,6 +18,10 @@ async function runAllAutomationProviders(): Promise<void> {
   await fetchLiveDevToArticles();
   await fetchLiveYouTubeVideos();
   await fetchLiveRedditPosts();
+  await fetchLiveGithubRepos();
+  await fetchLiveOpportunities();
+  await fetchLiveLearning();
+  await fetchLivePractice();
   await backfillMissingBodies();
 
   // Providers write their own labels; anything that arrived untagged is caught
