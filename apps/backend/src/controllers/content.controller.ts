@@ -73,6 +73,22 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** One item by id, so a shared or reloaded link can open its own page. */
+export async function handleGetContent(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { contentId } = request.params as { contentId?: string };
+    if (!contentId || !UUID_RE.test(contentId)) return reply.status(400).send({ error: 'Invalid content id.' });
+    const [content] = await db.select().from(contents).where(eq(contents.id, contentId)).limit(1);
+    if (!content) return reply.status(404).send({ error: 'Content not found.' });
+    return reply.status(200).send(content);
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
 export async function handleCreateContent(request: FastifyRequest, reply: FastifyReply) {
   try {
     const { title, url, source, type, summary, embedCode } = request.body as any;

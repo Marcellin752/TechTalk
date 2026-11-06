@@ -399,6 +399,14 @@ export const api = {
     return response.json();
   },
 
+  /** One item by id; lets a shared or reloaded link open its own page. */
+  async getContent(contentId: string): Promise<Content> {
+    const res = await this.fetchWithAuth(`/content/${contentId}`);
+    if (res.status === 404 || res.status === 400) throw new Error('not_found');
+    if (!res.ok) throw new Error('content_unavailable');
+    return res.json();
+  },
+
   async getBookmarks(): Promise<Content[]> {
     const response = await this.fetchWithAuth('/content/bookmarks');
     if (!response.ok) {

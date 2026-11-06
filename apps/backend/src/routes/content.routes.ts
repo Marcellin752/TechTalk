@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { 
   handleGetContents, 
+  handleGetContent,
   handleCreateContent,
   handleGetBookmarks,
   handleCreateBookmark,
@@ -29,4 +30,7 @@ export async function contentRoutes(fastify: FastifyInstance) {
   fastify.get('/:contentId/comments', { preHandler: [fastify.authenticate] }, handleListComments);
   fastify.post('/:contentId/comments', { preHandler: [fastify.authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, handleCreateComment);
   fastify.delete('/comments/:commentId', { preHandler: [fastify.authenticate] }, handleDeleteComment);
+
+  // Declared last: the static paths above (bookmarks, read…) must keep winning.
+  fastify.get('/:contentId', { preHandler: [fastify.authenticate] }, handleGetContent);
 }

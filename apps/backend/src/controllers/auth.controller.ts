@@ -458,7 +458,7 @@ export async function handleGithubCallback(request: FastifyRequest, reply: Fasti
 
     // Link mode: attach this GitHub identity to the signed-in account.
     if (parsedState.linkUserId) {
-      const back = (query: string) => reply.redirect(`${frontend}/#${query}`);
+      const back = (query: string) => reply.redirect(`${frontend}/profile#${query}`);
       const [owner] = await db.select().from(users).where(eq(users.githubId, githubId)).limit(1);
       if (owner && owner.id !== parsedState.linkUserId) return back('link_error=taken');
       if (!owner) {

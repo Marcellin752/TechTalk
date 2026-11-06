@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useTheme } from "../lib/theme";
 import { mapBackendContentToItem } from "../lib/content";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { api, User as ApiUser } from "../services/api";
-import { ContentItem, AppScreen, AppTab } from "../types/content";
+import { ContentItem, AppTab } from "../types/content";
+import { pathFor, ROUTES, TAB_PATHS, tabFor } from "../lib/routes";
 import { AuthScreen } from "../pages/AuthScreen";
 import { FeedScreen, type FeedFilter, type FeedMode } from "../pages/FeedScreen";
 import { SavedScreen } from "../pages/SavedScreen";
@@ -17,17 +19,108 @@ import { ReaderScreen } from "../pages/ReaderScreen";
 /** Items fetched per format and page; two cycles of the feed rhythm. */
 const MIXED_PAGE = { video: 32, repo: 6, article: 6, opportunity: 3 } as const;
 
+function Spinner() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+    </div>
+  );
+}
+
+function NotFound({ message = "This page doesn't exist." }: { message?: string }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+      <div className="text-5xl font-bold text-foreground">404</div>
+      <p className="text-sm text-muted-foreground">{message}</p>
+      <Link to={ROUTES.home} className="mt-2 px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold">
+        Back to the feed
+      </Link>
+    </div>
+  );
+}
+
+/** Goes back in history when there is a previous page of ours, otherwise to the feed. */
+function useGoBack() {
+  const navigate = useNavigate();
+  return () => (typeof window.history.state?.idx === "number" && window.history.state.idx > 0 ? navigate(-1) : navigate(ROUTES.home, { replace: true }));
+}
+
+/** One content page. Resolves the item from navigation state, the feed in memory,
+ *  or the API, so a link opened cold (shared, reloaded) works too. */
+function ContentRoute({
+  items,
+  saved,
+  savedIds,
+  onSave,
+  onSeen,
+  onOpenItem,
+}: {
+  items: ContentItem[];
+  saved: ContentItem[];
+  savedIds: Set<string>;
+  onSave: (item: ContentItem) => void;
+  onSeen: (item: ContentItem) => void;
+  onOpenItem: (item: ContentItem) => void;
+}) {
+  const { id = "" } = useParams();
+  const location = useLocation();
+  const goBack = useGoBack();
+  const fromState = (location.state as { item?: ContentItem } | null)?.item;
+  const known = (fromState?.id === id ? fromState : null) ?? items.find((i) => i.id === id) ?? saved.find((i) => i.id === id) ?? null;
+  const [item, setItem] = useState<ContentItem | null>(known);
+  const [missing, setMissing] = useState(false);
+
+  useEffect(() => {
+    setMissing(false);
+    if (known) {
+      setItem(known);
+      return;
+    }
+    let cancelled = false;
+    setItem(null);
+    api
+      .getContent(id)
+      .then((c) => !cancelled && setItem(mapBackendContentToItem(c)))
+      .catch(() => !cancelled && setMissing(true));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  useEffect(() => {
+    if (item) onSeen(item);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.id]);
+
+  if (missing) return <NotFound message="This content doesn't exist or was removed." />;
+  if (!item) return <Spinner />;
+  const to = pathFor(item);
+  if (!to) return <Navigate to={ROUTES.home} replace />;
+  // A video opened at /article/... (or the reverse) is sent to its proper address.
+  if (to !== location.pathname) return <Navigate to={to} replace state={{ item }} />;
+
+  return <ReaderScreen item={item} onBack={goBack} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} onOpenItem={onOpenItem} />;
+}
+
 function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUserUpdate: (u: ApiUser) => void; onLogout: () => void }) {
-  const [tab, setTab] = useState<AppTab>(() => (/^#link(_error)?=/.test(window.location.hash) ? "profile" : "feed"));
-  const [reader, setReader] = useState<ContentItem | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const tab = tabFor(location.pathname);
+  const goTab = (t: AppTab) => navigate(TAB_PATHS[t]);
   const [saved, setSaved] = useState<ContentItem[]>([]);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [savedError, setSavedError] = useState<string | null>(null);
   
-  const [searchQuery, setSearchQuery] = useState("");
-  const [contentType, setContentType] = useState<FeedFilter>("all");
+  // Search text and the format filter live in the address (?q=…&type=…) so a feed view can be shared.
+  const [searchQuery, setSearchQuery] = useState(() => params.get("q") ?? "");
+  const [contentType, setContentType] = useState<FeedFilter>(() => {
+    const t = params.get("type");
+    return t === "video" || t === "repo" || t === "article" || t === "opportunity" ? t : "all";
+  });
   const [feedMode, setFeedModeState] = useState<FeedMode>(() => {
     try {
       return localStorage.getItem("teachtalk_feed_mode") === "latest" ? "latest" : "foryou";
@@ -69,9 +162,10 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
   const todayKey = () => new Date().toISOString().slice(0, 10);
 
-  const handleOpenReader = (item: ContentItem) => {
-    setReader(item);
+  /** Records that an item was opened (local streak and the server's history). */
+  const markRead = (item: ContentItem) => {
     setReadIds((prev) => {
+      if (prev.has(item.id)) return prev;
       const next = new Set(prev);
       next.add(item.id);
       localStorage.setItem("teachtalk_read_ids", JSON.stringify(Array.from(next)));
@@ -85,6 +179,16 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
       return next;
     });
     api.markContentRead(item.id);
+  };
+
+  /** Open an item on its own page; the item rides along so the page paints instantly. */
+  const handleOpenReader = (item: ContentItem) => {
+    const to = pathFor(item);
+    if (!to) {
+      window.open(item.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    navigate(to, { state: { item } });
   };
 
   const [interests, setInterests] = useState<string[]>(() => {
@@ -101,6 +205,15 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
       return next;
     });
   };
+
+  useEffect(() => {
+    if (location.pathname !== ROUTES.home) return;
+    const next = new URLSearchParams();
+    if (searchQuery.trim()) next.set("q", searchQuery.trim());
+    if (contentType !== "all") next.set("type", contentType);
+    if (next.toString() !== params.toString()) setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, contentType, location.pathname]);
 
   const savedIds = new Set(saved.map((i) => i.id));
 
@@ -355,21 +468,21 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             <div className="flex items-center gap-1 flex-shrink-0">
               <ThemeToggle />
               <button
-                onClick={() => setTab("saved")}
+                onClick={() => goTab("saved")}
                 className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
                 aria-label="Saved"
               >
                 <Bookmark size={18} />
               </button>
               <button
-                onClick={() => setTab("settings")}
+                onClick={() => goTab("settings")}
                 className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
                 aria-label="Settings"
               >
                 <Settings size={18} />
               </button>
               <button
-                onClick={() => setTab("profile")}
+                onClick={() => goTab("profile")}
                 className="p-1 rounded-full hover:bg-secondary transition-colors"
                 aria-label="Profile"
               >
@@ -390,7 +503,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
               <ThemeToggle />
               {tab !== "saved" && (
                 <button
-                  onClick={() => setTab("saved")}
+                  onClick={() => goTab("saved")}
                   className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
                     tab === "saved" ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   }`}
@@ -400,7 +513,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 </button>
               )}
               <button
-                onClick={() => setTab("settings")}
+                onClick={() => goTab("settings")}
                 className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
                   tab === "settings" ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -409,7 +522,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 <Settings size={18} />
               </button>
               <button
-                onClick={() => setTab("profile")}
+                onClick={() => goTab("profile")}
                 className={`p-1 rounded-full hover:bg-secondary transition-colors ${
                   tab === "profile" ? "ring-2 ring-primary/40" : ""
                 }`}
@@ -435,86 +548,105 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
       {/* Screen content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {tab === "feed" && (
-          <FeedScreen
-            items={items}
-            onOpen={handleOpenReader}
-            onSave={toggleSave}
-            savedIds={savedIds}
-            loading={loading}
-            error={feedError}
-            onRetry={loadFeed}
-            hasMore={hasMore && !searchQuery}
-            onLoadMore={loadMore}
-            contentType={contentType}
-            feedMode={feedMode}
-            onFeedModeChange={setFeedMode}
-            onFilterChange={setContentType}
-            searchQuery={searchQuery}
+        <Routes>
+          <Route
+            path={ROUTES.home}
+            element={
+              <FeedScreen
+                items={items}
+                onOpen={handleOpenReader}
+                onSave={toggleSave}
+                savedIds={savedIds}
+                loading={loading}
+                error={feedError}
+                onRetry={loadFeed}
+                hasMore={hasMore && !searchQuery}
+                onLoadMore={loadMore}
+                contentType={contentType}
+                feedMode={feedMode}
+                onFeedModeChange={setFeedMode}
+                onFilterChange={setContentType}
+                searchQuery={searchQuery}
+              />
+            }
           />
-        )}
-        {tab === "saved" && (
-          <SavedScreen
-            saved={saved}
-            onOpen={handleOpenReader}
-            onRemove={async (id) => {
-              setSaved((prev) => prev.filter((i) => i.id !== id));
-              await api.deleteBookmark(id);
-            }}
-            onBack={() => setTab("feed")}
-            error={savedError}
+          <Route
+            path={ROUTES.saved}
+            element={
+              <SavedScreen
+                saved={saved}
+                onOpen={handleOpenReader}
+                onRemove={async (id) => {
+                  setSaved((prev) => prev.filter((i) => i.id !== id));
+                  await api.deleteBookmark(id);
+                }}
+                onBack={() => goTab("feed")}
+                error={savedError}
+              />
+            }
           />
-        )}
-        {tab === "profile" && (
-          <ProfileScreen
-            user={user}
-            savedCount={saved.length}
-            readCount={readIds.size}
-            readDates={readDates}
-            interests={interests}
-            onToggleInterest={handleToggleInterest}
-            onNavigateToSaved={() => setTab("saved")}
-            onNavigateToAbout={() => setTab("about")}
-            onLogout={onLogout}
-            onBack={() => setTab("feed")}
+          <Route
+            path={ROUTES.profile}
+            element={
+              <ProfileScreen
+                user={user}
+                savedCount={saved.length}
+                readCount={readIds.size}
+                readDates={readDates}
+                interests={interests}
+                onToggleInterest={handleToggleInterest}
+                onNavigateToSaved={() => goTab("saved")}
+                onNavigateToAbout={() => goTab("about")}
+                onLogout={onLogout}
+                onBack={() => goTab("feed")}
+              />
+            }
           />
-        )}
-        {tab === "settings" && (
-          <SettingsScreen
-            user={user}
-            interests={interests}
-            onToggleInterest={handleToggleInterest}
-            onUserUpdate={onUserUpdate}
-            onBack={() => setTab("feed")}
-            onNavigateToAbout={() => setTab("about")}
+          <Route
+            path={ROUTES.settings}
+            element={
+              <SettingsScreen
+                user={user}
+                interests={interests}
+                onToggleInterest={handleToggleInterest}
+                onUserUpdate={onUserUpdate}
+                onBack={() => goTab("feed")}
+                onNavigateToAbout={() => goTab("about")}
+              />
+            }
           />
-        )}
-        {tab === "about" && <AboutScreen onBack={() => setTab("feed")} />}
+          <Route path={ROUTES.about} element={<AboutScreen onBack={() => goTab("feed")} />} />
+          {(["/watch/:id", "/project/:id", "/article/:id"] as const).map((path) => (
+            <Route
+              key={path}
+              path={path}
+              element={<ContentRoute items={items} saved={saved} savedIds={savedIds} onSave={toggleSave} onSeen={markRead} onOpenItem={handleOpenReader} />}
+            />
+          ))}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </div>
-
-      {/* Reader overlay */}
-      {reader && (
-        <ReaderScreen
-          item={reader}
-          onBack={() => setReader(null)}
-          onSave={() => toggleSave(reader)}
-          isSaved={savedIds.has(reader.id)}
-          onOpenItem={handleOpenReader}
-        />
-      )}
     </div>
   );
 }
 
 
+function RequireAuth({ authed, children }: { authed: boolean; children: React.ReactElement }) {
+  const location = useLocation();
+  if (!authed) return <Navigate to={ROUTES.login} replace state={{ from: location }} />;
+  return children;
+}
+
+/** Already signed in: leave the login page for where the user was heading. */
+function LeaveLogin() {
+  const location = useLocation();
+  const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
+  return <Navigate to={from ? `${from.pathname}${from.search ?? ""}` : ROUTES.home} replace />;
+}
+
 export default function App() {
   const theme = useTheme();
-  const [screen, setScreen] = useState<AppScreen>(() => {
-    return api.getToken() ? "app" : "auth";
-  });
-  const [user, setUser] = useState<ApiUser | null>(() => {
-    return api.getUser();
-  });
+  const [user, setUser] = useState<ApiUser | null>(() => api.getUser());
   const [bootstrapping, setBootstrapping] = useState(() => !!api.getToken());
 
   useEffect(() => {
@@ -529,7 +661,6 @@ export default function App() {
       } else {
         api.logout();
         setUser(null);
-        setScreen("auth");
       }
       setBootstrapping(false);
     });
@@ -538,18 +669,14 @@ export default function App() {
   const handleAuthSuccess = (authUser: ApiUser) => {
     setUser(authUser);
     api.scheduleTokenRefresh();
-    setScreen("app");
-  };
-
-  const handleUserUpdate = (updatedUser: ApiUser) => {
-    setUser(updatedUser);
   };
 
   const handleLogout = () => {
     api.logout();
     setUser(null);
-    setScreen("auth");
   };
+
+  const authed = !!user && !!api.getToken();
 
   return (
     <div className="min-h-screen bg-background">
@@ -559,10 +686,17 @@ export default function App() {
           <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
         </div>
       ) : (
-        <>
-          {screen === "auth" && <AuthScreen onAuthSuccess={handleAuthSuccess} />}
-          {screen === "app" && <MainApp user={user} onUserUpdate={handleUserUpdate} onLogout={handleLogout} />}
-        </>
+        <Routes>
+          <Route path={ROUTES.login} element={authed ? <LeaveLogin /> : <AuthScreen onAuthSuccess={handleAuthSuccess} />} />
+          <Route
+            path="/*"
+            element={
+              <RequireAuth authed={authed}>
+                <MainApp user={user} onUserUpdate={setUser} onLogout={handleLogout} />
+              </RequireAuth>
+            }
+          />
+        </Routes>
       )}
     </div>
   );
