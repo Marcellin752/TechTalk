@@ -1,14 +1,28 @@
 import Fastify from 'fastify';
 import jwt from '@fastify/jwt';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import { sql } from 'drizzle-orm';
+import { db } from './db/db.js';
 import { config } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { contentRoutes } from './routes/content.routes.js';
 import { profileRoutes } from './routes/profile.routes.js';
+import { learningRoutes } from './routes/learning.routes.js';
+import { kairosRoutes } from './routes/kairos.routes.js';
+import { publicRoutes } from './routes/public.routes.js';
 import { initAutomationWorkers } from './services/automation/index.js';
 
-const fastify = Fastify({ logger: config.nodeEnv !== 'test' });
+// Behind a hosting proxy (Render, Vercel…) the socket address is the proxy's, so
+// without this every visitor shares one rate-limit bucket and `request.ip` is wrong.
+const fastify = Fastify({
+  logger:
+    config.nodeEnv === 'test'
+      ? false
+      : { redact: ['req.headers.authorization', 'req.headers.cookie'] },
+  trustProxy: config.nodeEnv === 'production',
+});
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -17,14 +31,14 @@ declare module 'fastify' {
   }
 }
 
-fastify.register(cors, { origin: config.corsOrigin });
+// @fastify/cors only allows GET, HEAD and POST by default; the API also uses PUT, PATCH and DELETE.
+fastify.register(cors, { origin: config.corsOrigin, methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] });
+// This is a JSON API, so the default policy is the strict one; the site sets its own CSP.
+fastify.register(helmet, { crossOriginResourcePolicy: { policy: 'cross-origin' } });
 fastify.register(rateLimit, { max: 100, timeWindow: '1 minute' });
 fastify.register(jwt, { secret: config.jwtSecret });
 
 fastify.addHook('onSend', async (_request, reply, payload) => {
-  reply.header('X-Content-Type-Options', 'nosniff');
-  reply.header('X-Frame-Options', 'DENY');
-  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   return payload;
 });
@@ -49,9 +63,33 @@ fastify.decorate('requireAdmin', async (request: any, reply: any) => {
 fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(contentRoutes, { prefix: '/api/content' });
 fastify.register(profileRoutes, { prefix: '/api/profile' });
+fastify.register(learningRoutes, { prefix: '/api/learning' });
+fastify.register(kairosRoutes, { prefix: '/api/kairos' });
+fastify.register(publicRoutes, { prefix: '/api/public' });
 
-fastify.get('/api/health', async () => {
-  return { status: 'OK', message: 'TechTalk API is running smoothly' };
+// One shape for every failure, and no stack traces or SQL leaking to the client.
+fastify.setErrorHandler((error: any, request, reply) => {
+  const status = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
+  if (status >= 500) request.log.error(error);
+  reply.status(status).send({
+    error: status >= 500 ? 'Internal Server Error' : error.name || 'Error',
+    message: status >= 500 ? 'Something went wrong on our side.' : error.message,
+  });
+});
+
+fastify.setNotFoundHandler((_request, reply) => {
+  reply.status(404).send({ error: 'Not Found', message: 'No such endpoint.' });
+});
+
+// Liveness for the platform; /api/ready also proves the database answers.
+fastify.get('/api/health', async () => ({ status: 'OK', message: 'TechTalk API is running smoothly' }));
+fastify.get('/api/ready', async (_request, reply) => {
+  try {
+    await db.execute(sql`select 1`);
+    return { status: 'ready' };
+  } catch {
+    return reply.status(503).send({ status: 'unavailable' });
+  }
 });
 
 const start = async () => {
@@ -71,5 +109,15 @@ const start = async () => {
     process.exit(1);
   }
 };
+
+// Let in-flight requests finish when the platform stops the container.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, () => {
+    fastify.log.info(`${signal} received, shutting down`);
+    const force = setTimeout(() => process.exit(1), 10_000);
+    force.unref();
+    fastify.close().then(() => process.exit(0), () => process.exit(1));
+  });
+}
 
 start();

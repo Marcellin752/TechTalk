@@ -1,7 +1,5 @@
 {
-  "id": "12aa3a94-272f-49c9-9f49-17f45904c907",
-  "prevId": "cf05989c-9f75-4315-beff-854a071d8518",
-  "version": "6",
+  "version": "7",
   "dialect": "postgresql",
   "tables": {
     "public.contents": {
@@ -65,12 +63,15 @@
       "uniqueConstraints": {
         "contents_url_unique": {
           "name": "contents_url_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "url"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
-      }
+      },
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
     "public.users": {
       "name": "users",
@@ -109,19 +110,28 @@
       "uniqueConstraints": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
-      }
+      },
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     }
   },
   "enums": {},
   "schemas": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
-  }
+    "tables": {},
+    "columns": {}
+  },
+  "id": "12aa3a94-272f-49c9-9f49-17f45904c907",
+  "prevId": "cf05989c-9f75-4315-beff-854a071d8518",
+  "sequences": {},
+  "policies": {},
+  "views": {},
+  "roles": {}
 }

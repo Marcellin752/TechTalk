@@ -1,7 +1,5 @@
 {
-  "id": "11adcf76-1e25-4891-a9ea-2d2983f8db74",
-  "prevId": "16cba133-967b-4752-a871-98d5959d05f2",
-  "version": "6",
+  "version": "7",
   "dialect": "postgresql",
   "tables": {
     "public.bookmarks": {
@@ -37,44 +35,60 @@
       },
       "indexes": {
         "bookmarks_user_content_unique_idx": {
-          "name": "bookmarks_user_content_unique_idx",
           "columns": [
-            "user_id",
-            "content_id"
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "content_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "with": {},
+          "name": "bookmarks_user_content_unique_idx",
+          "isUnique": true,
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "bookmarks_user_id_users_id_fk": {
           "name": "bookmarks_user_id_users_id_fk",
           "tableFrom": "bookmarks",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "bookmarks_content_id_contents_id_fk": {
           "name": "bookmarks_content_id_contents_id_fk",
           "tableFrom": "bookmarks",
-          "tableTo": "contents",
           "columnsFrom": [
             "content_id"
           ],
+          "tableTo": "contents",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
     "public.contents": {
       "name": "contents",
@@ -157,11 +171,19 @@
       },
       "indexes": {
         "contents_created_at_idx": {
-          "name": "contents_created_at_idx",
           "columns": [
-            "created_at"
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "with": {},
+          "name": "contents_created_at_idx",
+          "isUnique": false,
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -169,12 +191,15 @@
       "uniqueConstraints": {
         "contents_url_unique": {
           "name": "contents_url_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "url"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
-      }
+      },
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
     "public.reading_history": {
       "name": "reading_history",
@@ -209,44 +234,60 @@
       },
       "indexes": {
         "reading_history_user_content_idx": {
-          "name": "reading_history_user_content_idx",
           "columns": [
-            "user_id",
-            "content_id"
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "content_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "with": {},
+          "name": "reading_history_user_content_idx",
+          "isUnique": false,
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "reading_history_user_id_users_id_fk": {
           "name": "reading_history_user_id_users_id_fk",
           "tableFrom": "reading_history",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "reading_history_content_id_contents_id_fk": {
           "name": "reading_history_content_id_contents_id_fk",
           "tableFrom": "reading_history",
-          "tableTo": "contents",
           "columnsFrom": [
             "content_id"
           ],
+          "tableTo": "contents",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
     "public.users": {
       "name": "users",
@@ -316,33 +357,42 @@
       "uniqueConstraints": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ]
+          ],
+          "nullsNotDistinct": false
         },
         "users_google_id_unique": {
           "name": "users_google_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "google_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         },
         "users_github_id_unique": {
           "name": "users_github_id_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "github_id"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
-      }
+      },
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     }
   },
   "enums": {},
   "schemas": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
-  }
+    "tables": {},
+    "columns": {}
+  },
+  "id": "11adcf76-1e25-4891-a9ea-2d2983f8db74",
+  "prevId": "16cba133-967b-4752-a871-98d5959d05f2",
+  "sequences": {},
+  "policies": {},
+  "views": {},
+  "roles": {}
 }

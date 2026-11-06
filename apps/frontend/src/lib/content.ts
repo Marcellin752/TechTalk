@@ -33,7 +33,13 @@ export function mapBackendContentToItem(c: any): ContentItem {
   const readTime = c.type !== "video" ? `${Math.max(1, Math.round(wordCount / 180))} min` : undefined;
   
   let duration = undefined;
-  if (c.type === "video") {
+  if (c.type === "video" && c.meta?.durationSeconds) {
+    const t = Number(c.meta.durationSeconds);
+    const h = Math.floor(t / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const sec = String(t % 60).padStart(2, "0");
+    duration = h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+  } else if (c.type === "video") {
     const numericId = c.id.replace(/[^0-9]/g, '');
     const minutes = 3 + (parseInt(numericId.slice(0, 2) || '0', 10) % 15);
     const seconds = parseInt(numericId.slice(2, 4) || '0', 10) % 60;
@@ -73,7 +79,7 @@ export function mapBackendContentToItem(c: any): ContentItem {
     id: c.id,
     type: c.type,
     source: c.source as any,
-    title: decodeEntities(String(c.title ?? "")),
+    title: decodeEntities(String(c.title ?? "")).replace(/\s+/g, " ").trim(),
     url: c.url,
     summary: c.summary || "No description available.",
     image,
@@ -88,5 +94,6 @@ export function mapBackendContentToItem(c: any): ContentItem {
     embedCode: c.embedCode,
     meta: c.meta ?? undefined,
     reason: c.reason ?? null,
+    wildcard: !!c.wildcard,
   };
 }

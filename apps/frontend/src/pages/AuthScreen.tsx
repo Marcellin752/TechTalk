@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Github, Rss } from "lucide-react";
 import { toast } from "sonner";
 import { api, User as ApiUser } from "../services/api";
+import { useI18n } from "../lib/i18n";
 import { Field } from "../components/Field";
 import { GoogleIcon } from "../components/GoogleIcon";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -31,6 +32,7 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
+  const { t, lang } = useI18n();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -71,7 +73,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           shape: "rectangular",
           width,
           text: "continue_with",
-          locale: "en",
+          locale: lang,
         });
       };
 
@@ -84,7 +86,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       setupGis();
     } else {
       const script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client?hl=en";
+      script.src = `https://accounts.google.com/gsi/client?hl=${lang}`;
       script.async = true;
       script.defer = true;
       script.onload = setupGis;
@@ -104,10 +106,10 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       if (res.success && res.user) {
         onAuthSuccess(res.user);
       } else {
-        setError(res.error || "Google Sign-In failed");
+        setError(res.error || t("auth.googleFailed"));
       }
     } catch {
-      setError("An unexpected error occurred. Please try again.");
+      setError(t("auth.unexpected"));
     } finally {
       setGoogleLoading(false);
     }
@@ -126,11 +128,11 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     history.replaceState(null, "", window.location.pathname + window.location.search);
 
     if (unavailable) {
-      setError("GitHub sign-in is not configured on this server.");
+      setError(t("auth.ghUnavailable"));
       return;
     }
     if (ghError) {
-      setError(ghError === "cancelled" ? "GitHub sign-in cancelled." : "GitHub sign-in failed. Try again or use email.");
+      setError(ghError === "cancelled" ? t("auth.ghCancelled") : t("auth.ghFailed"));
       return;
     }
     if (token) {
@@ -139,7 +141,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         .adoptGithubToken(token)
         .then((res) => {
           if (res.success && res.user) onAuthSuccess(res.user);
-          else setError(res.error || "GitHub sign-in failed.");
+          else setError(res.error || t("auth.ghFailed"));
         })
         .finally(() => setGithubLoading(false));
     }
@@ -153,9 +155,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
   const handleGoogleClick = () => {
     if (!GOOGLE_CLIENT_ID || !window.google?.accounts?.id) {
-      toast.info(
-        "Google Sign-In is coming soon! Please use standard email Sign In / Sign Up for now."
-      );
+      toast.info(t("auth.googleSoon"));
       return;
     }
     setGoogleLoading(true);
@@ -164,7 +164,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
   const handleSubmit = async () => {
     if (!email || !password || (mode === "signup" && !name)) {
-      setError("Please fill out all fields.");
+      setError(t("auth.fillAll"));
       return;
     }
     setError(null);
@@ -175,7 +175,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         if (res.success && res.user) {
           onAuthSuccess(res.user);
         } else {
-          setError(res.error || "Login failed");
+          setError(res.error || t("auth.loginFailed"));
         }
       } else {
         const res = await api.register(name, email, password);
@@ -184,15 +184,15 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           if (loginRes.success && loginRes.user) {
             onAuthSuccess(loginRes.user);
           } else {
-            setError("Account created! Please sign in manually.");
+            setError(t("auth.created"));
             setMode("login");
           }
         } else {
-          setError(res.error || "Registration failed");
+          setError(res.error || t("auth.registerFailed"));
         }
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
+      setError(t("auth.unexpected"));
     } finally {
       setLoading(false);
     }
@@ -212,7 +212,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           <span className="text-[26px] font-bold tracking-tight text-foreground">TechTalk</span>
         </div>
         <p className="text-muted-foreground text-sm font-mono tracking-wide">
-          TikTok for tech — discover, scroll, learn.
+          {t("auth.tagline")}
         </p>
       </div>
 
@@ -232,7 +232,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {m === "login" ? "Sign In" : "Sign Up"}
+              {m === "login" ? t("auth.signIn") : t("auth.signUp")}
             </button>
           ))}
         </div>
@@ -245,22 +245,22 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
         <div className="space-y-4">
           {mode === "signup" && (
-            <Field label="Name" type="text" placeholder="Alex Kim" value={name} onChange={setName} />
+            <Field label={t("auth.name")} type="text" placeholder="Alex Kim" value={name} onChange={setName} />
           )}
-          <Field label="Email" type="email" placeholder="you@example.com" value={email} onChange={setEmail} />
-          <Field label="Password" type="password" placeholder="••••••••" value={password} onChange={setPassword} />
+          <Field label={t("auth.email")} type="email" placeholder="you@example.com" value={email} onChange={setEmail} />
+          <Field label={t("auth.password")} type="password" placeholder="••••••••" value={password} onChange={setPassword} />
 
           <button
             onClick={handleSubmit}
             disabled={loading}
             className="w-full bg-primary text-white py-3.5 rounded-xl font-semibold text-sm mt-2 hover:bg-primary/90 active:scale-[0.98] transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
           >
-            {loading ? "Please wait..." : mode === "login" ? "Sign In →" : "Create Account →"}
+            {loading ? t("auth.wait") : mode === "login" ? t("auth.signInGo") : t("auth.createGo")}
           </button>
 
           <div className="flex items-center gap-3 my-2">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground font-mono">or</span>
+            <span className="text-xs text-muted-foreground font-mono">{t("auth.or")}</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
@@ -273,7 +273,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
             >
               <GoogleIcon />
-              {googleLoading ? "Signing in..." : "Continue with Google"}
+              {googleLoading ? t("auth.signingIn") : t("auth.google")}
             </button>
           )}
 
@@ -283,7 +283,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
           >
             <Github size={17} />
-            {githubLoading ? "Signing in..." : "Continue with GitHub"}
+            {githubLoading ? t("auth.signingIn") : t("auth.github")}
           </button>
         </div>
       </div>

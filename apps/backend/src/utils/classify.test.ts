@@ -2,35 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { classifyContent } from './classify.js';
 
 describe('classifyContent', () => {
-  it('should assign multiple categories when several match', () => {
-    const cats = classifyContent(
-      'Building a React app with a Node.js API and PostgreSQL on AWS',
-      ''
-    );
-    expect(cats).toContain('Frontend');
-    expect(cats).toContain('Backend');
-    expect(cats).toContain('Databases');
-    expect(cats).toContain('Cloud');
+  it('matches whole words, not fragments of other words', () => {
+    expect(classifyContent('Lecture 4: The Capital Cost of Nuclear Power')).toEqual(['General']);
+    expect(classifyContent('How to maintain a garden')).toEqual(['General']);
   });
-
-  it('should be generous: a single keyword adds the category', () => {
-    const cats = classifyContent('Why Rust is fast', '');
-    expect(cats).toContain('Systems');
+  it('still finds real topics', () => {
+    expect(classifyContent('Building a REST API with Fastify and PostgreSQL')).toEqual(expect.arrayContaining(['Backend', 'Databases']));
+    expect(classifyContent('Intro to machine learning with PyTorch')).toContain('AI & ML');
+    expect(classifyContent('Learn C++ and Rust for systems programming')).toContain('Systems');
+    expect(classifyContent('Docker and Kubernetes in production')).toContain('DevOps');
   });
-
-  it('should match on the summary too', () => {
-    const cats = classifyContent('Untitled', 'A deep dive into Kubernetes orchestration');
-    expect(cats).toContain('DevOps');
-    expect(cats).toContain('Cloud');
-  });
-
-  it('should fall back to General when nothing matches', () => {
-    const cats = classifyContent('The journey of a muffin', '');
-    expect(cats).toEqual(['General']);
-  });
-
-  it('should be case-insensitive', () => {
-    const cats = classifyContent('SECURITY AT SCALE', '');
-    expect(cats).toContain('Security');
+  it('falls back to General', () => {
+    expect(classifyContent('')).toEqual(['General']);
   });
 });

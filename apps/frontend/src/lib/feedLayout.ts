@@ -1,5 +1,15 @@
 import { ContentItem } from "../types/content";
 
+/** Roughly one in every 20-30 items comes from outside the learner's domains. */
+export const WILDCARD_MIN = 20;
+export const WILDCARD_SPAN = 11; // so the gap is 20..30
+
+function hash(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 export type SectionKind = "videos" | "repos" | "articles" | "opportunity";
 
 export interface Section {
@@ -20,15 +30,36 @@ const PATTERN: Array<Exclude<SectionKind, "opportunity">> = ["videos", "videos",
  *  runs out is skipped, so a missing source never leaves a hole. With
  *  `keepPartial` off, only full rows are returned. */
 export function buildSections(items: ContentItem[], keepPartial = true): Section[] {
+  const regular = items.filter((i) => !i.wildcard);
   const queues: Record<SectionKind, ContentItem[]> = {
-    videos: items.filter((i) => i.type === "video"),
-    repos: items.filter((i) => i.type === "repo"),
-    articles: items.filter((i) => i.type !== "video" && i.type !== "repo" && i.type !== "opportunity"),
-    opportunity: items.filter((i) => i.type === "opportunity"),
+    videos: regular.filter((i) => i.type === "video"),
+    repos: regular.filter((i) => i.type === "repo"),
+    articles: regular.filter((i) => i.type === "article" || i.type === "social_post"),
+    opportunity: regular.filter((i) => i.type === "opportunity"),
   };
+  // Wildcards wait for a band of their own format, then take its last slot.
+  const regularIds = new Set(regular.map((i) => i.id));
+  const wild: Partial<Record<SectionKind, ContentItem[]>> = { videos: [], repos: [], articles: [] };
+  const seenWild = new Set<string>();
+  for (const w of items.filter((i) => i.wildcard && !regularIds.has(i.id))) {
+    if (seenWild.has(w.id)) continue; // the same pick can come back on a later page
+    seenWild.add(w.id);
+    const kind: SectionKind | null = w.type === "video" ? "videos" : w.type === "repo" ? "repos" : w.type === "article" ? "articles" : null;
+    if (kind) wild[kind]!.push(w);
+  }
+  let sinceWildcard = 0;
+  const gap = (w?: ContentItem) => WILDCARD_MIN + (w ? hash(w.id) % WILDCARD_SPAN : 0);
   const sections: Section[] = [];
   let sinceOpportunity = 0;
   const push = (kind: SectionKind, take: ContentItem[]) => {
+    if (kind !== "opportunity") {
+      sinceWildcard += take.length;
+      const candidate = wild[kind]?.[0];
+      if (candidate && sinceWildcard >= gap(candidate) && take.length === ROW_SIZE[kind]) {
+        take = [...take.slice(0, -1), wild[kind]!.shift()!]; // the band keeps its size
+        sinceWildcard = 0;
+      }
+    }
     sections.push({ kind, items: take });
     if (kind !== "opportunity") sinceOpportunity++;
     // After every OPPORTUNITY_EVERY bands, one full-width opportunity (if any is left).

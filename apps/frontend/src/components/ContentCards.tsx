@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bookmark, Sparkles, Play, Star, GitFork, Briefcase, GitPullRequest, ArrowUpRight, MapPin, Wallet } from "lucide-react";
+import { Bookmark, Shuffle, Sparkles, Play, Star, GitFork, Briefcase, GitPullRequest, ArrowUpRight, MapPin, Wallet } from "lucide-react";
 import { ContentItem } from "../types/content";
 
 /* Three card formats, one visual language. The feed mixes them in rows:
@@ -46,11 +46,12 @@ export function LanguageDot({ language }: { language?: string | null }) {
 }
 
 /** Why the "For you" feed picked this item, when it can say. */
-function Reason({ text }: { text?: string | null }) {
+function Reason({ text, wildcard }: { text?: string | null; wildcard?: boolean }) {
   if (!text) return null;
+  const Icon = wildcard ? Shuffle : Sparkles;
   return (
-    <span className="flex items-center gap-1 mt-1.5 text-[11.5px] text-primary leading-tight">
-      <Sparkles size={11} className="flex-shrink-0" />
+    <span className={`flex items-center gap-1 mt-1.5 text-[11.5px] leading-tight ${wildcard ? "text-sky-500" : "text-primary"}`}>
+      <Icon size={11} className="flex-shrink-0" />
       <span className="truncate">{text}</span>
     </span>
   );
@@ -107,9 +108,9 @@ export function VideoCard({ item, onOpen, onSave, isSaved }: CardProps) {
           </span>
         </span>
         <span className="block mt-2.5 pr-2">
-          <span className="block text-[14px] font-medium leading-snug line-clamp-2 text-foreground">{item.title}</span>
+          <span className="text-[14px] font-medium leading-snug line-clamp-2 text-foreground">{item.title}</span>
           <span className="block text-[12px] text-muted-foreground mt-1 truncate">{item.source} · {item.date}</span>
-          <Reason text={item.reason} />
+          <Reason text={item.reason} wildcard={item.wildcard} />
         </span>
       </button>
       <SaveButton onSave={onSave} isSaved={isSaved} />
@@ -140,7 +141,7 @@ export function RepoCard({ item, onOpen, onSave, isSaved, className = "" }: Card
             <span className="text-foreground font-semibold">{name}</span>
           </span>
         </span>
-        <span className="block text-[13px] text-foreground/70 leading-relaxed mt-3 line-clamp-3">{item.summary}</span>
+        <span className="text-[13px] text-foreground/70 leading-relaxed mt-3 line-clamp-3">{item.summary}</span>
         {m.topics && m.topics.length > 0 && (
           <span className="flex flex-wrap gap-1.5 mt-3">
             {m.topics.slice(0, 3).map((t) => (
@@ -150,7 +151,7 @@ export function RepoCard({ item, onOpen, onSave, isSaved, className = "" }: Card
             ))}
           </span>
         )}
-        <Reason text={item.reason} />
+        <Reason text={item.reason} wildcard={item.wildcard} />
         <span className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-auto pt-3.5 text-[12px] text-muted-foreground">
           <span className="inline-flex items-center gap-1 text-foreground font-medium">
             <Star size={13} className="fill-current text-primary" /> {compact(m.stars)}
@@ -184,10 +185,10 @@ export function ArticleCard({ item, onOpen, onSave, isSaved, className = "" }: C
           <span className="text-muted-foreground">{item.readTime} read</span>
           <span className="text-muted-foreground">· {item.date}</span>
         </span>
-        <span className="block text-[17px] font-bold tracking-tight leading-snug text-foreground mt-2 line-clamp-2 group-hover:text-primary transition-colors">
+        <span className="text-[17px] font-bold tracking-tight leading-snug text-foreground mt-2 line-clamp-2 group-hover:text-primary transition-colors">
           {item.title}
         </span>
-        <span className="block text-[13px] text-foreground/70 leading-relaxed mt-1.5 line-clamp-3">{item.summary}</span>
+        <span className="text-[13px] text-foreground/70 leading-relaxed mt-1.5 line-clamp-3">{item.summary}</span>
         {item.categories && item.categories.length > 0 && (
           <span className="flex flex-wrap gap-1.5 mt-2.5">
             {item.categories.slice(0, 2).map((c) => (
@@ -197,7 +198,7 @@ export function ArticleCard({ item, onOpen, onSave, isSaved, className = "" }: C
             ))}
           </span>
         )}
-        <Reason text={item.reason} />
+        <Reason text={item.reason} wildcard={item.wildcard} />
       </button>
       <SaveButton onSave={onSave} isSaved={isSaved} />
     </article>

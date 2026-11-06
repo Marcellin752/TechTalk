@@ -99,6 +99,34 @@
       "when": 1793978866045,
       "tag": "0013_eminent_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1793995071650,
+      "tag": "0014_fresh_baron_zemo",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1793997287172,
+      "tag": "0015_worried_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1793998266434,
+      "tag": "0016_optimal_scarlet_spider",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793998979022,
+      "tag": "0017_demonic_puff_adder",
+      "breakpoints": true
     }
   ]
 }

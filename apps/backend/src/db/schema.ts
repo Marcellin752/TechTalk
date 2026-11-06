@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, customType, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, customType, integer, boolean } from 'drizzle-orm/pg-core';
 
 /** Any JSON value (arrays included) with the same double-encoding protection. */
 const jsonbOf = <T>() =>
@@ -103,3 +103,97 @@ export const githubProfiles = pgTable('github_profiles', {
   topRepos: jsonbOf<GithubTopRepo[]>()('top_repos').notNull(),
   syncedAt: timestamp('synced_at').defaultNow().notNull(),
 });
+
+/** What the learner told us at the start; everything in their path derives from it. */
+export const learningProfiles = pgTable('learning_profiles', {
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).primaryKey(),
+  goal: varchar('goal', { length: 30 }).notNull(),
+  level: varchar('level', { length: 20 }).notNull(),
+  languages: text('languages').array().notNull(),
+  hoursPerWeek: integer('hours_per_week').notNull(),
+  style: varchar('style', { length: 20 }).notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export interface PathStage { index: number; title: string; objective: string; minutes: number }
+
+/** A generated, ordered learning path. Only one is active per user; older ones are kept. */
+export const learningPaths = pgTable('learning_paths', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  title: varchar('title', { length: 200 }).notNull(),
+  goal: varchar('goal', { length: 30 }).notNull(),
+  level: varchar('level', { length: 20 }).notNull(),
+  hoursPerWeek: integer('hours_per_week').notNull(),
+  totalMinutes: integer('total_minutes').notNull(),
+  stages: jsonbOf<PathStage[]>()('stages').notNull(),
+  active: boolean('active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userActiveIdx: index('learning_paths_user_active_idx').on(table.userId, table.active),
+}));
+
+/** One resource in a path, with the learner's progress on it. */
+export const learningSteps = pgTable('learning_steps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  pathId: uuid('path_id').references(() => learningPaths.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  contentId: uuid('content_id').references(() => contents.id, { onDelete: 'cascade' }).notNull(),
+  stage: integer('stage').notNull(),
+  position: integer('position').notNull(),
+  kind: varchar('kind', { length: 20 }).notNull(), // orient | learn | practice | project | read
+  minutes: integer('minutes').notNull(),
+  status: varchar('status', { length: 12 }).default('todo').notNull(), // todo | doing | done
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+}, (table) => ({
+  pathPositionIdx: index('learning_steps_path_position_idx').on(table.pathId, table.position),
+  pathContentUnique: uniqueIndex('learning_steps_path_content_unique').on(table.pathId, table.contentId),
+}));
+
+export interface KairosSource { n: number; id: string; type: string; title: string; url: string; source: string }
+
+/** A chat with Kairos. The history page lists these. */
+export const kairosConversations = pgTable('kairos_conversations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  title: varchar('title', { length: 120 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userUpdatedIdx: index('kairos_conversations_user_updated_idx').on(table.userId, table.updatedAt),
+}));
+
+export const kairosMessages = pgTable('kairos_messages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  conversationId: uuid('conversation_id').references(() => kairosConversations.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  role: varchar('role', { length: 12 }).notNull(), // user | assistant
+  content: text('content').notNull(),
+  sources: jsonbOf<KairosSource[]>()('sources'),
+  model: varchar('model', { length: 80 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  conversationIdx: index('kairos_messages_conversation_idx').on(table.conversationId, table.createdAt),
+  userDayIdx: index('kairos_messages_user_day_idx').on(table.userId, table.createdAt),
+}));
+
+/** What a learner chooses to show to others. Everything is private until they opt in. */
+export const profileSettings = pgTable('profile_settings', {
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).primaryKey(),
+  handle: varchar('handle', { length: 30 }).unique(),
+  isPublic: boolean('is_public').default(false).notNull(),
+  showProjects: boolean('show_projects').default(true).notNull(),
+  showInterests: boolean('show_interests').default(true).notNull(),
+  /** The learning path ("roadmap") is shown only when this is on, whatever else is public. */
+  pathPublic: boolean('path_public').default(false).notNull(),
+  interests: text('interests').array().default(sql`'{}'::text[]`).notNull(),
+  // Self-written profile details; they win over what GitHub says.
+  bio: varchar('bio', { length: 280 }),
+  location: varchar('location', { length: 80 }),
+  website: varchar('website', { length: 200 }),
+  avatarUrl: varchar('avatar_url', { length: 500 }),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  publicIdx: index('profile_settings_public_idx').on(table.isPublic, table.updatedAt),
+}));

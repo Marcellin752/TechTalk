@@ -4,6 +4,8 @@ import { fetchLiveYouTubeVideos } from './youtube.provider.js';
 import { fetchLiveRedditPosts } from './reddit.provider.js';
 import { fetchLiveGithubRepos } from './github.provider.js';
 import { fetchLiveOpportunities } from './opportunities.provider.js';
+import { fetchLiveLearning } from './learn/index.js';
+import { fetchLivePractice } from './practice/index.js';
 import { backfillMissingBodies } from './backfill.provider.js';
 
 /**
@@ -17,6 +19,8 @@ async function runAllAutomationProviders(): Promise<void> {
   await fetchLiveRedditPosts();
   await fetchLiveGithubRepos();
   await fetchLiveOpportunities();
+  await fetchLiveLearning();
+  await fetchLivePractice();
   await backfillMissingBodies();
   
   console.log('[Automation Engine] All sync tasks successfully finished.');

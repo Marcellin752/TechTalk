@@ -200,7 +200,7 @@ function NextRow({ v, onOpen }: { v: ContentItem; onOpen: () => void }) {
         <span className="absolute bottom-1 right-1 text-[10px] font-medium text-white bg-black/80 px-1 rounded">{v.duration}</span>
       </span>
       <span className="min-w-0">
-        <span className="block text-[13px] font-medium text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">{v.title}</span>
+        <span className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">{v.title}</span>
         <span className="block text-[11.5px] text-muted-foreground mt-1 truncate">{v.source}</span>
         <span className="block text-[11.5px] text-muted-foreground">{v.date}</span>
       </span>
@@ -218,7 +218,7 @@ function ProjectRow({ r, onOpen }: { r: ContentItem; onOpen: () => void }) {
           <span className="text-muted-foreground">{m.owner}/</span>
           <span className="font-semibold text-foreground">{r.title.split("/")[1] ?? r.title}</span>
         </span>
-        <span className="block text-[12px] text-foreground/70 line-clamp-2 mt-0.5">{r.summary}</span>
+        <span className="text-[12px] text-foreground/70 line-clamp-2 mt-0.5">{r.summary}</span>
         <span className="flex items-center gap-3 mt-1.5 text-[11.5px] text-muted-foreground">
           <span className="inline-flex items-center gap-1 text-foreground">
             <Star size={11} className="fill-current text-primary" /> {compact(m.stars)}

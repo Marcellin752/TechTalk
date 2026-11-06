@@ -3,14 +3,14 @@ import { desc, eq, and, ilike, or, arrayOverlaps, inArray, sql } from 'drizzle-o
 import { db } from '../db/db.js';
 import { contents, bookmarks, readingHistory } from '../db/schema.js';
 import { classifyContent } from '../utils/classify.js';
-import { loadRankSignals, rankContents } from '../services/ranking.js';
+import { loadRankSignals, rankContents, pickWildcards } from '../services/ranking.js';
 
 /** How many recent items of one format are scored when building a personalised page. */
 const FORYOU_POOL = 400;
 
 export async function handleGetContents(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string; sort?: string; interests?: string };
+    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string; sort?: string; interests?: string; learn?: string; platform?: string; difficulty?: string; kind?: string };
     const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(query.offset || '0', 10) || 0, 0);
 
@@ -38,8 +38,29 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
     if (type) {
       conditions.push(eq(contents.type, type));
     }
+    // Facts providers keep in `meta`: Learn and Practice pages narrow by these.
+    if (query.learn === '1') conditions.push(sql`${contents.meta}->>'learn' = 'true'`);
+    for (const key of ['platform', 'difficulty', 'kind'] as const) {
+      const value = (query[key] || '').trim();
+      if (value) conditions.push(sql`${contents.meta}->>${key} = ${value}`);
+    }
     if (categories.length > 0) {
       conditions.push(arrayOverlaps(contents.categories, categories));
+    }
+
+    // "Something different": quality items from outside the learner's domains, to widen the feed.
+    if (query.sort === 'wildcard') {
+      // Videos qualify only if they are lectures; filter in SQL so the pool is not just the newest shorts.
+      if (type === 'video') conditions.push(sql`${contents.meta}->>'learn' = 'true'`);
+      const userId = (request.user as { id: string }).id;
+      const interests = (query.interests || '').split(',').map((c) => c.trim()).filter(Boolean);
+      const [signals, pool] = await Promise.all([
+        loadRankSignals(userId, interests),
+        (conditions.length > 0 ? db.select().from(contents).where(and(...conditions)) : db.select().from(contents))
+          .orderBy(desc(contents.createdAt))
+          .limit(FORYOU_POOL),
+      ]);
+      return reply.status(200).send(pickWildcards(pool, signals, Math.min(limit, 10)));
     }
 
     // Personalised ordering ("For you"): score a pool of recent items against what

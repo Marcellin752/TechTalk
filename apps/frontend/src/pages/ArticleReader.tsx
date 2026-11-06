@@ -104,7 +104,7 @@ export function ArticleReader({ item, onBack, onSave, isSaved, onOpenItem }: Art
                 <div className="space-y-1">
                   {more.map((a) => (
                     <button key={a.id} onClick={() => onOpenItem(a)} className="block w-full text-left rounded-lg p-2.5 -mx-2.5 hover:bg-secondary transition-colors">
-                      <span className="block text-[13.5px] font-semibold text-foreground leading-snug line-clamp-2">{a.title}</span>
+                      <span className="text-[13.5px] font-semibold text-foreground leading-snug line-clamp-2">{a.title}</span>
                       <span className="block text-[11.5px] text-muted-foreground mt-1">
                         {a.source} · {a.readTime} read
                       </span>

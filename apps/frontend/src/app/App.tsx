@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Rss, Search, Bookmark, User, Settings, X } from "lucide-react";
+import { Menu, Rss, Search, User, Settings, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useTheme } from "../lib/theme";
 import { mapBackendContentToItem } from "../lib/content";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { api, User as ApiUser } from "../services/api";
+import { api, LearningPath, LearningProfile, User as ApiUser } from "../services/api";
 import { ContentItem, AppTab } from "../types/content";
 import { pathFor, ROUTES, TAB_PATHS, tabFor } from "../lib/routes";
 import { AuthScreen } from "../pages/AuthScreen";
@@ -13,6 +13,19 @@ import { FeedScreen, type FeedFilter, type FeedMode } from "../pages/FeedScreen"
 import { SavedScreen } from "../pages/SavedScreen";
 import { ProfileScreen } from "../pages/ProfileScreen";
 import { SettingsScreen } from "../pages/SettingsScreen";
+import { LearnScreen } from "../pages/LearnScreen";
+import { PathScreen } from "../pages/PathScreen";
+import { OnboardingScreen } from "../pages/OnboardingScreen";
+import { KairosScreen } from "../pages/KairosScreen";
+import { KairosFab } from "../components/KairosFab";
+import { PeopleScreen } from "../pages/PeopleScreen";
+import { PublicProfileScreen } from "../pages/PublicProfileScreen";
+import { LandingScreen } from "../pages/LandingScreen";
+import { PublicShell } from "../components/PublicShell";
+import { useI18n } from "../lib/i18n";
+import { useSeo } from "../lib/seo";
+import { PracticeScreen } from "../pages/PracticeScreen";
+import { BottomBar, SideMenu } from "../components/NavMenu";
 import { AboutScreen } from "../pages/AboutScreen";
 import { ReaderScreen } from "../pages/ReaderScreen";
 
@@ -27,13 +40,14 @@ function Spinner() {
   );
 }
 
-function NotFound({ message = "This page doesn't exist." }: { message?: string }) {
+function NotFound({ message }: { message?: string }) {
+  const { t } = useI18n();
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
       <div className="text-5xl font-bold text-foreground">404</div>
-      <p className="text-sm text-muted-foreground">{message}</p>
+      <p className="text-sm text-muted-foreground">{message ?? t("common.notFound")}</p>
       <Link to={ROUTES.home} className="mt-2 px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold">
-        Back to the feed
+        {t("common.backToFeed")}
       </Link>
     </div>
   );
@@ -109,6 +123,22 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   const [params, setParams] = useSearchParams();
   const tab = tabFor(location.pathname);
   const goTab = (t: AppTab) => navigate(TAB_PATHS[t]);
+  const [menuCollapsed, setMenuCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("teachtalk_menu_collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleMenu = () =>
+    setMenuCollapsed((v) => {
+      try {
+        localStorage.setItem("teachtalk_menu_collapsed", v ? "0" : "1");
+      } catch {
+        /* not remembered */
+      }
+      return !v;
+    });
   const [saved, setSaved] = useState<ContentItem[]>([]);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -202,6 +232,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
         ? prev.filter((i) => i !== interest)
         : [...prev, interest];
       localStorage.setItem("teachtalk_interests", JSON.stringify(next));
+      void api.saveProfileSettings({ interests: next }); // so a public profile can show them
       return next;
     });
   };
@@ -214,6 +245,41 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     if (next.toString() !== params.toString()) setParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, contentType, location.pathname]);
+
+  // The learner's profile and path: loaded once; a newcomer is sent to the questions first.
+  const [learning, setLearning] = useState<{ loaded: boolean; profile: LearningProfile | null; path: LearningPath | null }>({ loaded: false, profile: null, path: null });
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([api.getLearningProfile(), api.getLearningPath()])
+      .then(([profile, path]) => {
+        if (cancelled) return;
+        setLearning({ loaded: true, profile, path });
+        let skipped = false;
+        try {
+          skipped = localStorage.getItem("teachtalk_onboarding_skipped") === "1";
+        } catch {
+          /* treated as not skipped */
+        }
+        if (!profile && !skipped) navigate(ROUTES.onboarding, { replace: true });
+      })
+      .catch(() => !cancelled && setLearning((l) => ({ ...l, loaded: true })));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the server's copy of the learner's topics current (a public profile can show them).
+  useEffect(() => {
+    void api.saveProfileSettings({ interests });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Kairos is offered only when the server has a language model to power it.
+  const [kairosAvailable, setKairosAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    api.kairosStatus().then((s) => setKairosAvailable(s.available));
+  }, []);
 
   const savedIds = new Set(saved.map((i) => i.id));
 
@@ -238,8 +304,14 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     o.repo += repos.length;
     o.article += articles.length;
     o.opportunity += opportunities.length;
+    // A few picks from outside the learner's domains: fresh on every page, placed by the layout.
+    const [wildVideos, wildRepos, wildArticles] = await Promise.all(
+      (["video", "repo", "article"] as const).map((t) =>
+        api.getContents(t === "video" ? 3 : 1, 0, undefined, t, undefined, { sort: "wildcard", interests }).catch(() => []),
+      ),
+    );
     return {
-      items: [...videos, ...repos, ...articles, ...opportunities].map(mapBackendContentToItem),
+      items: [...videos, ...repos, ...articles, ...opportunities, ...wildVideos, ...wildRepos, ...wildArticles].map(mapBackendContentToItem),
       more: videos.length === MIXED_PAGE.video || repos.length === MIXED_PAGE.repo || articles.length === MIXED_PAGE.article,
     };
   };
@@ -421,19 +493,37 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     }
   };
 
+  const { t, lang } = useI18n();
   const headerTitle: Record<AppTab, string> = {
     feed: "TechTalk",
-    saved: "Saved",
-    profile: "Profile",
-    settings: "Settings",
-    about: "About",
+    learn: t("nav.learn"),
+    path: t("nav.path"),
+    kairos: "Kairos",
+    practice: t("nav.practice"),
+    people: t("nav.people"),
+    saved: t("nav.saved"),
+    profile: t("nav.profile"),
+    settings: t("nav.settings"),
+    about: t("nav.about"),
   };
+  // Signed-in pages are private: keep them out of search results. Public pages set their own metadata.
+  const publicPath = location.pathname.startsWith("/people") || location.pathname.startsWith("/u/");
+  useSeo(publicPath ? null : { title: headerTitle[tab], noindex: true, path: location.pathname }, lang);
 
   return (
     <div className="h-dvh bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
       <header className="z-40 bg-background/90 backdrop-blur-md border-b border-border flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-4 h-[57px] flex items-center justify-between">
+        <div className="px-4 h-[57px] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleMenu}
+            aria-label={menuCollapsed ? t("header.menuExpand") : t("header.menuCollapse")}
+            className="hidden lg:flex w-10 h-10 -ml-2 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex-shrink-0"
+          >
+            <Menu size={20} />
+          </button>
+          <div className="flex-1 min-w-0 flex items-center justify-between">
         {tab === "feed" ? (
           <div className="flex items-center gap-3 w-full">
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -448,8 +538,8 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
               <input
                 type="search"
                 inputMode="search"
-                placeholder="Search a name, a keyword, a language…"
-                aria-label="Search"
+                placeholder={t("header.search")}
+                aria-label={t("header.search")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Escape" && setSearchQuery("")}
@@ -458,7 +548,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  aria-label="Clear search"
+                  aria-label={t("common.clear")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted"
                 >
                   <X size={15} />
@@ -468,15 +558,8 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             <div className="flex items-center gap-1 flex-shrink-0">
               <ThemeToggle />
               <button
-                onClick={() => goTab("saved")}
-                className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-                aria-label="Saved"
-              >
-                <Bookmark size={18} />
-              </button>
-              <button
                 onClick={() => goTab("settings")}
-                className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                className="lg:hidden p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
                 aria-label="Settings"
               >
                 <Settings size={18} />
@@ -501,17 +584,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             <h1 className="text-[18px] font-bold text-foreground">{headerTitle[tab]}</h1>
             <div className="flex items-center gap-1">
               <ThemeToggle />
-              {tab !== "saved" && (
-                <button
-                  onClick={() => goTab("saved")}
-                  className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
-                    tab === "saved" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-label="Saved"
-                >
-                  <Bookmark size={18} />
-                </button>
-              )}
               <button
                 onClick={() => goTab("settings")}
                 className={`p-2 rounded-xl hover:bg-secondary transition-colors ${
@@ -543,11 +615,14 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             </div>
           </>
         )}
+          </div>
         </div>
       </header>
 
-      {/* Screen content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Menu + screen content */}
+      <div className="flex-1 flex min-h-0">
+        <SideMenu collapsed={menuCollapsed} />
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <Routes>
           <Route
             path={ROUTES.home}
@@ -567,9 +642,20 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 onFeedModeChange={setFeedMode}
                 onFilterChange={setContentType}
                 searchQuery={searchQuery}
+                learningPath={learning.path}
+                learningLoaded={learning.loaded}
+                hasLearningProfile={!!learning.profile}
+                onOpenPath={() => goTab("path")}
+                onStartOnboarding={() => navigate(ROUTES.onboarding)}
               />
             }
           />
+          <Route path={ROUTES.learn} element={<LearnScreen onOpen={handleOpenReader} />} />
+          <Route path={ROUTES.practice} element={<PracticeScreen />} />
+          <Route path={ROUTES.kairos} element={<KairosScreen available={kairosAvailable} />} />
+          <Route path={ROUTES.people} element={<PeopleScreen />} />
+          <Route path="/u/:handle" element={<PublicProfileScreen />} />
+          <Route path={ROUTES.path} element={<PathScreen path={learning.path} loaded={learning.loaded} onPath={(path) => setLearning((l) => ({ ...l, path }))} />} />
           <Route
             path={ROUTES.saved}
             element={
@@ -599,6 +685,11 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 onNavigateToAbout={() => goTab("about")}
                 onLogout={onLogout}
                 onBack={() => goTab("feed")}
+                onUserUpdate={onUserUpdate}
+                learningPath={learning.path}
+                learningLoaded={learning.loaded}
+                onOpenPath={() => goTab("path")}
+                onStartOnboarding={() => navigate(ROUTES.onboarding)}
               />
             }
           />
@@ -609,9 +700,10 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
                 user={user}
                 interests={interests}
                 onToggleInterest={handleToggleInterest}
+                feedMode={feedMode}
+                onFeedModeChange={setFeedMode}
                 onUserUpdate={onUserUpdate}
-                onBack={() => goTab("feed")}
-                onNavigateToAbout={() => goTab("about")}
+                onLogout={onLogout}
               />
             }
           />
@@ -625,11 +717,27 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
           ))}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </div>
       </div>
+      {kairosAvailable && tab !== "kairos" && <KairosFab />}
+      <BottomBar />
     </div>
   );
 }
 
+
+/** Pages anyone can open without signing in: the landing page, the directory and public profiles. */
+function PublicGate() {
+  const location = useLocation();
+  return (
+    <Routes>
+      <Route path="/" element={<LandingScreen />} />
+      <Route path="/people" element={<PublicShell><PeopleScreen /></PublicShell>} />
+      <Route path="/u/:handle" element={<PublicShell><PublicProfileScreen /></PublicShell>} />
+      <Route path="*" element={<Navigate to={ROUTES.login} replace state={{ from: location }} />} />
+    </Routes>
+  );
+}
 
 function RequireAuth({ authed, children }: { authed: boolean; children: React.ReactElement }) {
   const location = useLocation();
@@ -689,12 +797,16 @@ export default function App() {
         <Routes>
           <Route path={ROUTES.login} element={authed ? <LeaveLogin /> : <AuthScreen onAuthSuccess={handleAuthSuccess} />} />
           <Route
-            path="/*"
+            path={ROUTES.onboarding}
             element={
               <RequireAuth authed={authed}>
-                <MainApp user={user} onUserUpdate={setUser} onLogout={handleLogout} />
+                <OnboardingScreen />
               </RequireAuth>
             }
+          />
+          <Route
+            path="/*"
+            element={authed ? <MainApp user={user} onUserUpdate={setUser} onLogout={handleLogout} /> : <PublicGate />}
           />
         </Routes>
       )}

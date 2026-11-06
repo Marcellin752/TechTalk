@@ -9,8 +9,10 @@ describe("pathFor", () => {
     expect(pathFor({ id: "a", type: "social_post" })).toBe("/article/a");
   });
 
-  it("has no page for opportunities", () => {
-    expect(pathFor({ id: "a", type: "opportunity" })).toBeNull();
+  it("has no page of its own for external resources", () => {
+    for (const type of ["opportunity", "roadmap", "course", "doc", "paper", "exercise", "question"] as const) {
+      expect(pathFor({ id: "a", type })).toBeNull();
+    }
   });
 });
 
@@ -18,6 +20,12 @@ describe("tabFor", () => {
   it("maps addresses to header tabs, treating content pages as the feed", () => {
     expect(tabFor("/")).toBe("feed");
     expect(tabFor("/watch/x")).toBe("feed");
+    expect(tabFor("/learn")).toBe("learn");
+    expect(tabFor("/path")).toBe("path");
+    expect(tabFor("/practice")).toBe("practice");
+    expect(tabFor("/kairos")).toBe("kairos");
+    expect(tabFor("/people")).toBe("people");
+    expect(tabFor("/u/ada")).toBe("people");
     expect(tabFor("/saved")).toBe("saved");
     expect(tabFor("/profile")).toBe("profile");
     expect(tabFor("/settings")).toBe("settings");

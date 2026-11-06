@@ -1,0 +1,21 @@
+# TechTalk: the landing page, the people directory and public profiles are open to search
+# engines. Everything else needs an account, so there is nothing for a crawler to read.
+User-agent: *
+Allow: /$
+Allow: /people
+Allow: /u/
+Allow: /login
+Disallow: /watch/
+Disallow: /project/
+Disallow: /article/
+Disallow: /learn
+Disallow: /practice
+Disallow: /path
+Disallow: /kairos
+Disallow: /saved
+Disallow: /profile
+Disallow: /settings
+Disallow: /about
+Disallow: /onboarding
+
+Sitemap: https://t3chtalk.vercel.app/sitemap.xml

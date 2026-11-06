@@ -91,3 +91,35 @@ describe('rankContents', () => {
     expect(out[0].id).toBe(newer.id);
   });
 });
+
+describe('wildcards (something different)', async () => {
+  const { isOutsideDomains, pickWildcards } = await import('./ranking.js');
+  const sig = signals({ interests: ['Backend'], languages: [{ name: 'Python', share: 0.6 }], affinity: new Map([['Security', 2]]) });
+
+  it('flags only items unrelated to the learner, judging by whole words', () => {
+    expect(isOutsideDomains(item({ title: 'Build a REST API with Fastify' }), sig)).toBe(false); // their topic
+    expect(isOutsideDomains(item({ title: 'Learn Python fast' }), sig)).toBe(false); // their language
+    expect(isOutsideDomains(item({ type: 'repo', title: 'x/y', meta: { language: 'Python' } }), sig)).toBe(false);
+    // "capital" contains "api" but is not about APIs.
+    expect(isOutsideDomains(item({ title: 'The Capital Cost of Nuclear Power' }), sig)).toBe(true);
+    expect(isOutsideDomains(item({ title: 'A history of typography and print' }), sig)).toBe(true);
+  });
+
+  it('never claims "outside" when the learner follows nothing, or for opportunities', () => {
+    expect(isOutsideDomains(item({ title: 'Cooking' }), signals({ interests: [] }))).toBe(false);
+    expect(isOutsideDomains(item({ type: 'opportunity', title: 'Cooking' }), sig)).toBe(false);
+  });
+
+  it('returns only unrelated, unread, lecture-grade items, labelled, and varies with the draw', () => {
+    const pool = [
+      ...Array.from({ length: 12 }, (_, i) => item({ id: `w${i}`, title: `Poetry and code ${i}`, meta: { learn: true } })),
+      item({ id: 'short', title: 'a short about poetry' }), // a video that is not a lecture is never picked
+      item({ id: 'on', title: 'Fastify API tutorial', meta: { learn: true } }),
+    ];
+    const first = pickWildcards(pool, { ...sig, readIds: new Set(['w0']) }, 3, () => 0, NOW);
+    expect(first).toHaveLength(3);
+    expect(first.every((x) => x.wildcard && x.reason.startsWith('Something different') && !['on', 'w0', 'short'].includes(x.id))).toBe(true);
+    const other = pickWildcards(pool, sig, 3, () => 0.99, NOW).map((x) => x.id);
+    expect(other).not.toEqual(first.map((x) => x.id));
+  });
+});

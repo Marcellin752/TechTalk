@@ -8,7 +8,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undef
 
 /* One account, several ways in. Each row is either linked (with an Unlink
    action, disabled for the last remaining method) or offers to link. */
-export function LinkedAccounts() {
+export function LinkedAccounts({ bare = false }: { bare?: boolean }) {
   const [ids, setIds] = useState<Identities | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [pwOpen, setPwOpen] = useState(false);
@@ -112,8 +112,8 @@ export function LinkedAccounts() {
   );
 
   return (
-    <div className="mb-8">
-      <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">Connected accounts</h3>
+    <div className={bare ? "" : "mb-8"}>
+      {!bare && <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">Connected accounts</h3>}
       <div className="rounded-2xl border border-border overflow-hidden bg-card divide-y divide-border">
         {/* Email + password */}
         <div>
@@ -193,9 +193,9 @@ export function LinkedAccounts() {
           </span>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2">
-        Any linked method signs you into this same account. Keep at least one.
-      </p>
+      {!bare && (
+        <p className="text-[11px] text-muted-foreground mt-2">Any linked method signs you into this same account. Keep at least one.</p>
+      )}
     </div>
   );
 }

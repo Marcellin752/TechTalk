@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useI18n } from "../lib/i18n";
+import type { Keys } from "../locales/en";
 import { ArticleCard, CardFor, OpportunityBand, RepoCard } from "../components/ContentCards";
 import { buildSections, type SectionKind } from "../lib/feedLayout";
 import { ContentItem } from "../types/content";
+import type { LearningPath } from "../services/api";
+import { ContinueBand } from "../components/ContinueBand";
 
 export type FeedMode = "foryou" | "latest";
 export type FeedFilter = "all" | "article" | "video" | "repo" | "opportunity";
@@ -21,23 +25,28 @@ interface FeedScreenProps {
   onFeedModeChange: (m: FeedMode) => void;
   onFilterChange: (t: FeedFilter) => void;
   searchQuery?: string;
+  learningPath?: LearningPath | null;
+  learningLoaded?: boolean;
+  hasLearningProfile?: boolean;
+  onOpenPath?: () => void;
+  onStartOnboarding?: () => void;
 }
 
 const PULL_THRESHOLD = 72;
 
-const FILTERS: { id: FeedFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "video", label: "Videos" },
-  { id: "repo", label: "Projects" },
-  { id: "article", label: "Articles" },
-  { id: "opportunity", label: "Opportunities" },
+const FILTERS: { id: FeedFilter; label: Keys }[] = [
+  { id: "all", label: "feed.all" },
+  { id: "video", label: "feed.videos" },
+  { id: "repo", label: "feed.projects" },
+  { id: "article", label: "feed.articles" },
+  { id: "opportunity", label: "feed.opportunities" },
 ];
 
-const SECTION_TITLES: Record<SectionKind, string | null> = {
+const SECTION_TITLES: Record<SectionKind, Keys | null> = {
   videos: null,
   opportunity: null,
-  repos: "Projects worth exploring",
-  articles: "Worth a read",
+  repos: "feed.projectsTitle",
+  articles: "feed.readTitle",
 };
 
 const ROW_GRID: Record<SectionKind, string> = {
@@ -62,7 +71,13 @@ export function FeedScreen({
   onFeedModeChange,
   onFilterChange,
   searchQuery = "",
+  learningPath = null,
+  learningLoaded = false,
+  hasLearningProfile = false,
+  onOpenPath,
+  onStartOnboarding,
 }: FeedScreenProps) {
+  const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const pullStartY = useRef<number | null>(null);
@@ -127,11 +142,15 @@ export function FeedScreen({
           />
         </div>
 
+        {!searchQuery.trim() && learningLoaded && (
+          <ContinueBand path={learningPath} hasProfile={hasLearningProfile} onOpenPath={onOpenPath} onStart={onStartOnboarding} />
+        )}
+
         {/* Filter bar */}
         <div className="flex items-center gap-2 mb-4 overflow-x-auto no-scrollbar">
           {!searchQuery.trim() && (
             <div role="radiogroup" aria-label="Feed order" className="flex flex-shrink-0 rounded-lg border border-border bg-secondary p-0.5 mr-2">
-              {([["foryou", "For you"], ["latest", "Latest"]] as const).map(([id, label]) => (
+              {([["foryou", "feed.forYou"], ["latest", "feed.latest"]] as const).map(([id, label]) => (
                 <button
                   key={id}
                   role="radio"
@@ -141,7 +160,7 @@ export function FeedScreen({
                     feedMode === id ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -156,7 +175,7 @@ export function FeedScreen({
                   : "bg-secondary text-foreground hover:bg-muted"
               }`}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
@@ -190,7 +209,7 @@ export function FeedScreen({
                 className={section.kind === "videos" ? "rounded-2xl bg-secondary/60 p-3 sm:p-4" : undefined}
               >
                 {SECTION_TITLES[section.kind] && (
-                  <h2 className="text-[15px] font-semibold text-foreground mb-3.5">{SECTION_TITLES[section.kind]}</h2>
+                  <h2 className="text-[15px] font-semibold text-foreground mb-3.5">{t(SECTION_TITLES[section.kind]!)}</h2>
                 )}
                 <div className={`grid ${ROW_GRID[section.kind]}`}>
                   {section.items.map((item) =>
@@ -220,7 +239,7 @@ export function FeedScreen({
           <div className="py-8 flex flex-col items-center gap-3">
             <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
             <span className="text-xs text-muted-foreground font-mono tracking-wide">
-              Loading technical feed...
+              {t("common.loading")}
             </span>
           </div>
         )}
@@ -232,14 +251,14 @@ export function FeedScreen({
               onClick={onRetry}
               className="px-4 py-2 rounded-xl bg-secondary border border-border text-foreground hover:bg-muted transition-colors"
             >
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         )}
 
         {!loading && !error && items.length === 0 && (
           <div className="py-12 text-center text-muted-foreground text-sm font-mono">
-            No technical talks found. Check back later!
+            {t("feed.empty")}
           </div>
         )}
       </div>

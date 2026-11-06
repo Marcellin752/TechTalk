@@ -1,7 +1,12 @@
 import { useState } from "react";
-import { ArrowLeft, User, Info, LogOut, Bookmark, ChevronRight, Github, Sparkles } from "lucide-react";
-import { User as ApiUser } from "../services/api";
-import { LinkedAccounts } from "../components/LinkedAccounts";
+import { ArrowLeft, User, Info, LogOut, Bookmark, ChevronRight, Github, Globe, MapPin, Pencil, Sparkles } from "lucide-react";
+import { User as ApiUser, LearningPath } from "../services/api";
+import { useI18n } from "../lib/i18n";
+import { EditProfileDialog } from "../components/EditProfileDialog";
+import { api, ProfileSettings } from "../services/api";
+import { useEffect } from "react";
+import { LearningSummary } from "../components/LearningSummary";
+import { ActivityHistory } from "../components/ActivityHistory";
 import { DeveloperHeader, LanguageBar, LinkGithubPrompt, ProjectsGrid, useGithubProfile } from "../components/DeveloperProfile";
 
 interface ProfileScreenProps {
@@ -15,6 +20,11 @@ interface ProfileScreenProps {
   onNavigateToAbout: () => void;
   onLogout: () => void;
   onBack: () => void;
+  onUserUpdate?: (user: ApiUser) => void;
+  learningPath?: LearningPath | null;
+  learningLoaded?: boolean;
+  onOpenPath?: () => void;
+  onStartOnboarding?: () => void;
 }
 
 function computeStreak(readDates: string[]): number {
@@ -48,6 +58,11 @@ export function ProfileScreen({
   onNavigateToAbout,
   onLogout,
   onBack,
+  onUserUpdate = () => undefined,
+  learningPath = null,
+  learningLoaded = true,
+  onOpenPath = () => undefined,
+  onStartOnboarding = () => undefined,
 }: ProfileScreenProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
@@ -56,9 +71,9 @@ export function ProfileScreen({
 
   const streak = computeStreak(readDates);
   const stats = [
-    { label: "Saved", value: savedCount.toString() },
-    { label: "Read", value: readCount.toString() },
-    { label: "Streak", value: streak > 0 ? `${streak}d` : "—" },
+    { label: "profile.stats.saved" as const, value: savedCount.toString() },
+    { label: "profile.stats.read" as const, value: readCount.toString() },
+    { label: "profile.stats.streak" as const, value: streak > 0 ? `${streak}d` : "—" },
   ];
 
   const menuItems = [
@@ -66,9 +81,17 @@ export function ProfileScreen({
     { label: "About TechTalk", icon: <Info size={14} />, action: onNavigateToAbout },
   ];
 
+  const { t } = useI18n();
   const { state: gh, failed: ghFailed, syncing, sync } = useGithubProfile();
   const profile = gh?.profile ?? null;
-  const avatar = user?.picture || profile?.avatarUrl || null;
+  const [details, setDetails] = useState<ProfileSettings | null>(null);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    api.getProfileSettings().then((r) => setDetails(r.settings)).catch(() => undefined);
+  }, []);
+  // What the learner wrote wins over what GitHub or Google say.
+  const avatar = details?.avatarUrl || user?.picture || profile?.avatarUrl || null;
+  const bio = details?.bio || profile?.bio || null;
   const topLanguages = profile?.languages.slice(0, 3) ?? [];
 
   return (
@@ -92,7 +115,7 @@ export function ProfileScreen({
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight truncate">{profile?.name || user?.name || "Tech Enthusiast"}</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight truncate">{user?.name || profile?.name || "Tech Enthusiast"}</h2>
                   {profile ? (
                     <a href={profile.htmlUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary font-mono mt-0.5">
                       <Github size={13} /> @{profile.login}
@@ -100,11 +123,26 @@ export function ProfileScreen({
                   ) : (
                     <p className="text-sm text-muted-foreground font-mono mt-0.5 truncate">{user?.email}</p>
                   )}
-                  {profile?.bio && <p className="text-sm text-foreground/80 leading-relaxed mt-2">{profile.bio}</p>}
+                  {bio && <p className="text-sm text-foreground/80 leading-relaxed mt-2">{bio}</p>}
+                  {(details?.location || details?.website) && (
+                    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground mt-2">
+                      {details?.location && <span className="inline-flex items-center gap-1.5"><MapPin size={13} /> {details.location}</span>}
+                      {details?.website && (
+                        <a href={details.website} target="_blank" rel="noopener noreferrer nofollow me" className="inline-flex items-center gap-1.5 hover:text-primary truncate max-w-full">
+                          <Globe size={13} /> {details.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                        </a>
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
+              <button onClick={() => setEditing(true)} className="mt-4 inline-flex items-center gap-2 px-4 h-9 rounded-xl border border-border text-[13px] font-medium text-foreground hover:bg-secondary">
+                <Pencil size={14} /> {t("profile.edit")}
+              </button>
               {profile && <DeveloperHeader profile={profile} syncing={syncing} onSync={sync} />}
             </section>
+
+            <LearningSummary path={learningPath} loaded={learningLoaded} onOpen={onOpenPath} onStart={onStartOnboarding} />
 
             {gh === null && !ghFailed && <div className="h-40 rounded-2xl bg-secondary animate-pulse" />}
             {ghFailed && <p className="text-sm text-muted-foreground">Couldn't load your developer profile. Try again later.</p>}
@@ -121,15 +159,17 @@ export function ProfileScreen({
             {profile && (
               <>
                 <section>
-                  <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">Languages</h3>
+                  <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">{t("profile.languages")}</h3>
                   <LanguageBar languages={profile.languages} />
                 </section>
                 <section>
-                  <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">Projects</h3>
+                  <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-3">{t("profile.projects")}</h3>
                   <ProjectsGrid repos={profile.topRepos} />
                 </section>
               </>
             )}
+
+            <ActivityHistory />
           </div>
 
           {/* Side column: your activity, your feed, your account */}
@@ -138,14 +178,14 @@ export function ProfileScreen({
               {stats.map((s) => (
                 <div key={s.label} className="bg-secondary border border-border rounded-2xl p-4 text-center">
                   <div className="text-2xl font-bold text-foreground">{s.value}</div>
-                  <div className="text-[11px] text-muted-foreground font-mono mt-1 uppercase tracking-wide">{s.label}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono mt-1 uppercase tracking-wide">{t(s.label)}</div>
                 </div>
               ))}
             </div>
 
             <section className="rounded-2xl border border-border bg-card p-4">
               <h3 className="text-[11px] font-mono text-muted-foreground uppercase tracking-[0.15em] mb-2.5 flex items-center gap-1.5">
-                <Sparkles size={12} className="text-primary" /> What shapes your feed
+                <Sparkles size={12} className="text-primary" /> {t("profile.shapes")}
               </h3>
               <ul className="text-[13px] text-foreground/80 space-y-1.5 leading-snug">
                 <li>
@@ -200,8 +240,6 @@ export function ProfileScreen({
               )}
             </div>
 
-            <LinkedAccounts />
-
             <div>
               <div className="rounded-2xl border border-border overflow-hidden bg-card">
                 {menuItems.map((item, idx) => (
@@ -231,6 +269,20 @@ export function ProfileScreen({
             </div>
           </div>
         </div>
+
+        {editing && (
+          <EditProfileDialog
+            user={user}
+            settings={details}
+            githubAvatar={profile?.avatarUrl ?? null}
+            githubBio={profile?.bio ?? null}
+            onClose={() => setEditing(false)}
+            onSaved={(settings, nextUser) => {
+              setDetails(settings);
+              if (nextUser) onUserUpdate(nextUser);
+            }}
+          />
+        )}
 
         {/* Sign out confirmation dialog */}
         {confirmingLogout && (
