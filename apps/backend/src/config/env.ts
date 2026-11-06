@@ -71,15 +71,4 @@ export const config = {
     redditClientId: process.env.REDDIT_CLIENT_ID,
     redditClientSecret: process.env.REDDIT_CLIENT_SECRET,
   },
-  // Object storage for student uploads. The defaults match docker-compose.yml
-  // (Minikio on the host); production must set every one of these.
-  storage: {
-    endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
-    region: process.env.S3_REGION || 'us-east-1',
-    bucket: process.env.S3_BUCKET || 'techtalk-documents',
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || 'teachtalk',
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || 'techtalk_secret',
-    maxUploadBytes: parseInt(process.env.MAX_UPLOAD_MB || '25', 10) * 1024 * 1024,
-    signedUrlTtlSeconds: parseInt(process.env.SIGNED_URL_TTL_SECONDS || '300', 10),
-  },
 };

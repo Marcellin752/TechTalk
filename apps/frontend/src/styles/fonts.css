@@ -1,20 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 
 :root {
-  --font-sans: "Manrope", system-ui, sans-serif;
-  --font-display: "Sora", "Manrope", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
 body {
   font-family: var(--font-sans);
-}
-
-.font-display,
-h1,
-h2,
-.tt-logo {
-  font-family: var(--font-display);
 }
 
 .font-mono,

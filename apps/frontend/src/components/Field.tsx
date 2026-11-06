@@ -15,7 +15,7 @@ export function Field({
 }: FieldProps) {
   return (
     <div>
-      <label className="mb-2 block text-xs font-medium text-muted-foreground">
+      <label className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest mb-2 block">
         {label}
       </label>
       <input
@@ -23,7 +23,7 @@ export function Field({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="tt-field w-full px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground"
+        className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary transition-all"
       />
     </div>
   );

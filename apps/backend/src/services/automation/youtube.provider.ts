@@ -116,7 +116,7 @@ async function insertVideos(videos: VideoItem[]): Promise<number> {
       url: `https://www.youtube.com/watch?v=${v.videoId}`,
       source: v.channelTitle,
       type: 'video',
-      summary: v.description || 'Aucune description.',
+      summary: v.description || 'No description available.',
       categories: classifyContent(v.title, v.description),
       image: v.thumbnail,
       embedCode: `<iframe width="560" height="315" src="https://www.youtube.com/embed/${v.videoId}" frameborder="0" allowfullscreen></iframe>`,

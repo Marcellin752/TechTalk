@@ -10,26 +10,16 @@ const mocks = vi.hoisted(() => ({
   offsetFn: vi.fn(),
   insertFn: vi.fn(),
   valuesFn: vi.fn(),
-  deleteFn: vi.fn(),
 }));
 
 vi.mock('../db/db.js', () => ({
   db: {
     select: mocks.selectFn,
     insert: mocks.insertFn,
-    delete: mocks.deleteFn,
   },
 }));
 
-import {
-  handleGetContents,
-  handleMarkRead,
-  handleMarkReadBatch,
-  handleGetReading,
-  handleGetLikes,
-  handleCreateLike,
-  handleDeleteLike,
-} from './content.controller.js';
+import { handleGetContents, handleMarkRead, handleMarkReadBatch, handleGetReading } from './content.controller.js';
 
 function buildChain() {
   mocks.offsetFn.mockResolvedValue([{ id: '1', title: 'TypeScript Guide' }]);
@@ -215,97 +205,5 @@ describe('reading history', () => {
     expect(reply.statusCode).toBe(200);
     expect(reply.body.readIds).toEqual(['c-1', 'c-2']);
     expect(reply.body.readDates).toEqual(['2026-08-10', '2026-08-09']);
-  });
-});
-
-describe('likes', () => {
-  const CONTENT_ID = '11111111-1111-1111-1111-111111111111';
-
-  function makeUserRequest(body?: any, params?: any) {
-    return { user: { id: 'u-1' }, body: body ?? {}, params: params ?? {}, log: { error: vi.fn() } };
-  }
-
-  // handleCreateLike looks the content up with a .where().limit() chain.
-  function mockContentLookup(rows: unknown[]) {
-    mocks.selectFn.mockReturnValue({ from: mocks.fromFn });
-    mocks.fromFn.mockReturnValue({ where: mocks.whereFn });
-    mocks.whereFn.mockReturnValue({ limit: mocks.limitFn });
-    mocks.limitFn.mockResolvedValueOnce(rows);
-  }
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should list the content ids the user liked', async () => {
-    mocks.selectFn.mockReturnValue({ from: mocks.fromFn });
-    mocks.fromFn.mockReturnValue({ where: mocks.whereFn });
-    mocks.whereFn.mockResolvedValueOnce([{ contentId: CONTENT_ID }]);
-    const reply = makeReply();
-
-    await handleGetLikes(makeUserRequest() as any, reply);
-
-    expect(reply.statusCode).toBe(200);
-    expect(reply.body.likedIds).toEqual([CONTENT_ID]);
-  });
-
-  it('should reject a like without a contentId', async () => {
-    const reply = makeReply();
-
-    await handleCreateLike(makeUserRequest() as any, reply);
-
-    expect(reply.statusCode).toBe(400);
-  });
-
-  it('should reject a malformed contentId before Postgres sees it', async () => {
-    const reply = makeReply();
-
-    await handleCreateLike(makeUserRequest({ contentId: 'not-a-uuid' }) as any, reply);
-
-    expect(reply.statusCode).toBe(400);
-    expect(mocks.insertFn).not.toHaveBeenCalled();
-  });
-
-  it('should return 404 when liking a missing content', async () => {
-    mockContentLookup([]);
-    const reply = makeReply();
-
-    await handleCreateLike(makeUserRequest({ contentId: CONTENT_ID }) as any, reply);
-
-    expect(reply.statusCode).toBe(404);
-  });
-
-  it('should insert the like and swallow the duplicate conflict', async () => {
-    const onConflictDoNothing = vi.fn().mockResolvedValue({});
-    mockContentLookup([{ id: CONTENT_ID }]);
-    mocks.valuesFn.mockReturnValue({ onConflictDoNothing });
-    mocks.insertFn.mockReturnValue({ values: mocks.valuesFn });
-    const reply = makeReply();
-
-    await handleCreateLike(makeUserRequest({ contentId: CONTENT_ID }) as any, reply);
-
-    expect(reply.statusCode).toBe(201);
-    expect(mocks.valuesFn).toHaveBeenCalledWith({ userId: 'u-1', contentId: CONTENT_ID });
-    expect(onConflictDoNothing).toHaveBeenCalled();
-  });
-
-  it('should remove the like for the current user', async () => {
-    const whereDelete = vi.fn().mockResolvedValue({});
-    mocks.deleteFn.mockReturnValue({ where: whereDelete });
-    const reply = makeReply();
-
-    await handleDeleteLike(makeUserRequest({}, { contentId: CONTENT_ID }) as any, reply);
-
-    expect(reply.statusCode).toBe(200);
-    expect(whereDelete).toHaveBeenCalled();
-  });
-
-  it('should reject a malformed delete parameter', async () => {
-    const reply = makeReply();
-
-    await handleDeleteLike(makeUserRequest({}, { contentId: 'nope' }) as any, reply);
-
-    expect(reply.statusCode).toBe(400);
-    expect(mocks.deleteFn).not.toHaveBeenCalled();
   });
 });

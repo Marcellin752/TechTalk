@@ -94,7 +94,6 @@ fastify.get('/api/ready', async (_request, reply) => {
 
 const start = async () => {
   try {
-    const fastify = await createApp();
     await fastify.ready();
     await fastify.listen({ port: config.port, host: '0.0.0.0' });
 

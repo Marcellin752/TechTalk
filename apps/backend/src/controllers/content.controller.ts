@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { desc, eq, and, ilike, or, arrayOverlaps, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
-import { contents, bookmarks, likes, readingHistory } from '../db/schema.js';
+import { contents, bookmarks, readingHistory } from '../db/schema.js';
 import { classifyContent } from '../utils/classify.js';
 import { loadRankSignals, rankContents, pickWildcards } from '../services/ranking.js';
 
@@ -293,68 +293,5 @@ export async function handleGetReading(request: FastifyRequest, reply: FastifyRe
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error while fetching reading history.' });
-  }
-}
-
-export async function handleGetLikes(request: FastifyRequest, reply: FastifyReply) {
-  try {
-    const userId = (request.user as any).id;
-
-    const rows = await db
-      .select({ contentId: likes.contentId })
-      .from(likes)
-      .where(eq(likes.userId, userId));
-
-    return reply.status(200).send({ likedIds: rows.map((r) => r.contentId) });
-  } catch (error) {
-    request.log.error(error);
-    return reply.status(500).send({ error: 'Internal server error while fetching likes.' });
-  }
-}
-
-export async function handleCreateLike(request: FastifyRequest, reply: FastifyReply) {
-  try {
-    const userId = (request.user as any).id;
-    const { contentId } = request.body as { contentId?: string };
-
-    if (!contentId) {
-      return reply.status(400).send({ error: 'Field (contentId) is required.' });
-    }
-    if (!UUID_RE.test(contentId)) {
-      return reply.status(400).send({ error: 'Field (contentId) must be a valid content identifier.' });
-    }
-
-    const [content] = await db.select({ id: contents.id }).from(contents).where(eq(contents.id, contentId)).limit(1);
-    if (!content) {
-      return reply.status(404).send({ error: 'Content not found.' });
-    }
-
-    await db.insert(likes).values({ userId, contentId }).onConflictDoNothing({ target: [likes.userId, likes.contentId] });
-
-    return reply.status(201).send({ message: 'Content liked successfully!' });
-  } catch (error) {
-    request.log.error(error);
-    return reply.status(500).send({ error: 'Internal server error while creating like.' });
-  }
-}
-
-export async function handleDeleteLike(request: FastifyRequest, reply: FastifyReply) {
-  try {
-    const userId = (request.user as any).id;
-    const { contentId } = request.params as { contentId?: string };
-
-    if (!contentId) {
-      return reply.status(400).send({ error: 'Parameter contentId is required.' });
-    }
-    if (!UUID_RE.test(contentId)) {
-      return reply.status(400).send({ error: 'Parameter contentId must be a valid content identifier.' });
-    }
-
-    await db.delete(likes).where(and(eq(likes.userId, userId), eq(likes.contentId, contentId)));
-
-    return reply.status(200).send({ message: 'Like removed successfully!' });
-  } catch (error) {
-    request.log.error(error);
-    return reply.status(500).send({ error: 'Internal server error while removing like.' });
   }
 }

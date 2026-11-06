@@ -27,16 +27,10 @@ export const users = pgTable('users', {
   githubId: varchar('github_id', { length: 64 }).unique(),
   githubLogin: varchar('github_login', { length: 100 }), // public handle, shown on the profile
   picture: varchar('picture', { length: 500 }), // avatar URL (Google profile picture)
-  // §14 asks for a username: the public handle a profile is addressed by, so a
-  // student's link never carries their email. Null until onboarding sets it.
-  username: varchar('username', { length: 40 }).unique(),
   role: varchar('role', { length: 20 }).default('user').notNull(), // 'user' or 'admin'
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// §8 asks for one Content abstraction every provider normalises into. The
-// columns below are what recommendation and deduplication need on top of a
-// link: who made it, when it was really published, and the provider's own id.
 export const contents = pgTable('contents', {
   id: uuid('id').defaultRandom().primaryKey(),
   title: varchar('title', { length: 255 }).notNull(),
@@ -53,11 +47,6 @@ export const contents = pgTable('contents', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   createdAtIdx: index('contents_created_at_idx').on(table.createdAt),
-  typeIdx: index('contents_type_idx').on(table.type),
-  sourceIdx: index('contents_source_idx').on(table.source),
-  // A provider re-listing the same item must not create a second row, even
-  // when it hands over a URL that differs by a tracking parameter.
-  sourceExternalIdx: uniqueIndex('contents_source_external_idx').on(table.source, table.externalId),
 }));
 
 export const comments = pgTable('comments', {
@@ -77,17 +66,6 @@ export const bookmarks = pgTable('bookmarks', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   userContentUniqueIdx: uniqueIndex('bookmarks_user_content_unique_idx').on(table.userId, table.contentId),
-}));
-
-// A bookmark means "read it later"; a like is the user affirming the content
-// itself. Both are per-user, idempotent, and survive a session change.
-export const likes = pgTable('likes', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  contentId: uuid('content_id').references(() => contents.id, { onDelete: 'cascade' }).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => ({
-  userContentUniqueIdx: uniqueIndex('likes_user_content_unique_idx').on(table.userId, table.contentId),
 }));
 
 export const readingHistory = pgTable('reading_history', {

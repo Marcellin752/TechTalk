@@ -24,7 +24,7 @@ export async function fetchLiveDevToArticles(): Promise<void> {
         url: article.url,
         source: 'Dev.to',
         type: 'article',
-        summary: article.description || 'Aucune description.',
+        summary: article.description || 'No description available.',
         body: article.body_html ? sanitizeHtmlContent(article.body_html) : null,
         categories: classifyContent(article.title, article.description),
         image: article.social_image || article.cover_image || null,

@@ -8,8 +8,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      # 5433 on the host: a system PostgreSQL already owns 5432 on this machine.
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - teachtalk_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,39 +17,5 @@ services:
       timeout: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    container_name: teachtalk-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: teachtalk
-      MINIO_ROOT_PASSWORD: teachtalk_secret
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - teachtalk_s3data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "mc ready local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # Creates the bucket on first start so the backend never has to bootstrap it.
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 teachtalk teachtalk_secret &&
-      mc mb --ignore-existing local/techtalk-documents &&
-      mc anonymous set none local/techtalk-documents &&
-      echo 'bucket teachtalk-documents ready'
-      "
-
 volumes:
   teachtalk_pgdata:
-  teachtalk_s3data:

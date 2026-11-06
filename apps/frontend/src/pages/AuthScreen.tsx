@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Github, Rss } from "lucide-react";
 import { toast } from "sonner";
-import { Github } from "lucide-react";
 import { api, User as ApiUser } from "../services/api";
 import { useI18n } from "../lib/i18n";
 import { Field } from "../components/Field";
@@ -100,45 +99,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // §49 OAuth: the GitHub callback returns to /login with the session in the URL
-  // fragment. Adopt it, then scrub the fragment so the token is not left in
-  // history or visible in the address bar.
-  useEffect(() => {
-    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
-    if (!hash) return;
-    const params = new URLSearchParams(hash);
-    const token = params.get("gh_token");
-    const error = params.get("gh_error");
-    const unavailable = params.get("gh_unavailable");
-
-    if (!token && !error && !unavailable) return;
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-
-    if (unavailable) {
-      setError("La connexion GitHub n'est pas configurée sur ce serveur.");
-      return;
-    }
-    if (error) {
-      setError(
-        error === "cancelled"
-          ? "Connexion GitHub annulée."
-          : "La connexion GitHub a échoué. Réessayez ou utilisez l'e-mail."
-      );
-      return;
-    }
-    if (token) {
-      setGithubLoading(true);
-      api
-        .adoptGithubToken(token)
-        .then((res) => {
-          if (res.success && res.user) onAuthSuccess(res.user);
-          else setError(res.error || "La connexion GitHub a échoué.");
-        })
-        .finally(() => setGithubLoading(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleGoogleCredential = async (response: { credential: string }) => {
     setGoogleLoading(true);
     try {
@@ -200,11 +160,6 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     }
     setGoogleLoading(true);
     window.google.accounts.id.prompt();
-  };
-
-  const handleGithubClick = () => {
-    setGithubLoading(true);
-    window.location.assign(api.githubStartUrl());
   };
 
   const handleSubmit = async () => {
@@ -281,30 +236,12 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             </button>
           ))}
         </div>
-        <p className="mt-4 text-sm text-muted-foreground">Le contenu tech, réuni.</p>
-      </div>
 
-      <div className="relative w-full max-w-sm">
-        <div className="tt-card p-6 sm:p-8">
-          {/* Mode toggle */}
-          <div className="mb-8 flex gap-1 rounded-full border border-border bg-surface-2 p-1">
-            {(["login", "signup"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => {
-                  setMode(m);
-                  setError(null);
-                }}
-                className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-all ${
-                  mode === m
-                    ? "bg-surface-3 text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {m === "login" ? "Se connecter" : "S’inscrire"}
-              </button>
-            ))}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl mb-4 font-mono">
+            {error}
           </div>
+        )}
 
         <div className="space-y-4">
           {mode === "signup" && (
@@ -331,9 +268,9 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             <div ref={googleBtnRef} className="w-full h-12" />
           ) : (
             <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="tt-btn tt-btn-brand mt-2 w-full px-5 py-3 text-sm"
+              onClick={handleGoogleClick}
+              disabled={googleLoading}
+              className="w-full border border-border bg-secondary text-foreground py-3 rounded-xl font-medium text-sm hover:bg-muted transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50"
             >
               <GoogleIcon />
               {googleLoading ? t("auth.signingIn") : t("auth.google")}

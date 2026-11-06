@@ -45,14 +45,6 @@ export interface RepoMeta {
   languages?: string[];
 }
 
-/** A taxonomy tag (§9) as the feed and the tag endpoints return it. */
-export interface ContentTag {
-  id: string;
-  slug: string;
-  name: string;
-  kind: "topic" | "skill" | "language" | "tool";
-}
-
 export interface ContentItem {
   id: string;
   type: ContentType;
@@ -69,10 +61,6 @@ export interface ContentItem {
   body: string;
   bodyHtml?: string;
   date: string;
-  publishedAt: string;
-  likes: number;
-  comments: number;
-  views: number;
   embedCode?: string | null;
   meta?: RepoMeta;
   /** Why the personalised feed chose this item, when it can tell. */

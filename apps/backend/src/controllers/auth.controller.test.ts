@@ -38,7 +38,7 @@ vi.mock('../db/db.js', () => ({
   },
 }));
 
-import { handleGoogleAuth, handleGetMe, handleRefresh, handleGithubStart, handleGithubCallback } from './auth.controller.js';
+import { handleGoogleAuth, handleGetMe, handleRefresh } from './auth.controller.js';
 
 function makeReply() {
   const reply: any = {
@@ -322,55 +322,5 @@ describe('handleRefresh', () => {
 
     expect(reply.statusCode).toBe(401);
     expect(reply.body.error).toContain('User no longer exists');
-  });
-});
-
-describe('GitHub OAuth', () => {
-  // In this test config, corsOrigin is undefined and no github credentials are
-  // set, which is exactly what lets us assert the guard rails without any fetch.
-  function makeRedirectRequest(query: any) {
-    return {
-      query,
-      headers: {},
-      host: 'localhost:5001',
-      log: { error: vi.fn() },
-    };
-  }
-  function makeRedirectReply() {
-    const reply: any = {
-      redirectedTo: null,
-      redirect(url: string) {
-        reply.redirectedTo = url;
-        return reply;
-      },
-    };
-    return reply;
-  }
-
-  beforeEach(() => vi.clearAllMocks());
-
-  it('start bounces to the login screen when GitHub is not configured', async () => {
-    const reply = makeRedirectReply();
-    await handleGithubStart(makeRedirectRequest({}) as any, reply);
-    expect(reply.redirectedTo).toContain('/login#gh_unavailable=1');
-  });
-
-  it('callback rejects a missing code/state before doing any work', async () => {
-    const reply = makeRedirectReply();
-    await handleGithubCallback(makeRedirectRequest({}) as any, reply);
-    expect(reply.redirectedTo).toContain('/login#gh_error=state');
-    expect(mocks.selectFn).not.toHaveBeenCalled();
-  });
-
-  it('callback rejects a forged state (CSRF guard)', async () => {
-    const reply = makeRedirectReply();
-    await handleGithubCallback(makeRedirectRequest({ code: 'abc', state: 'nonce.deadbeef' }) as any, reply);
-    expect(reply.redirectedTo).toContain('/login#gh_error=state');
-  });
-
-  it('callback maps a provider error (user denied) to a friendly reason', async () => {
-    const reply = makeRedirectReply();
-    await handleGithubCallback(makeRedirectRequest({ error: 'access_denied' }) as any, reply);
-    expect(reply.redirectedTo).toContain('/login#gh_error=cancelled');
   });
 });

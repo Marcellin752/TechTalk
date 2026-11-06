@@ -510,7 +510,6 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   const publicPath = location.pathname.startsWith("/people") || location.pathname.startsWith("/u/");
   useSeo(publicPath ? null : { title: headerTitle[tab], noindex: true, path: location.pathname }, lang);
 
-function BootSpinner() {
   return (
     <div className="h-dvh bg-background flex flex-col max-w-screen overflow-hidden">
       {/* Header */}
@@ -726,21 +725,6 @@ function BootSpinner() {
   );
 }
 
-function RequireAuth({ children }: { children: React.ReactElement }) {
-  if (!api.getToken()) return <Navigate to="/login" replace />;
-  return children;
-}
-
-/* Campus pages were written before routing; they expect an onBack callback. */
-function useGoBack() {
-  const navigate = useNavigate();
-  return () => navigate("/feed");
-}
-
-const CampusRoute = () => <CampusScreen onBack={useGoBack()} />;
-const AnnalsRoute = () => <AnnalsScreen onBack={useGoBack()} />;
-const CampusLifeRoute = () => <CampusLifeScreen onBack={useGoBack()} />;
-const AboutRoute = () => <AboutScreen onBack={useGoBack()} />;
 
 /** Pages anyone can open without signing in: the landing page, the directory and public profiles. */
 function PublicGate() {

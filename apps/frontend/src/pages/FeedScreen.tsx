@@ -84,43 +84,42 @@ export function FeedScreen({
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const shouldObserve = !loading && !error && hasMore && items.length > 0;
+
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || !shouldObserve) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && cursor) load(cursor, false);
+        if (entries[0].isIntersecting) onLoadMore();
       },
-      { rootMargin: "500px" }
+      { rootMargin: "400px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [shouldObserve, load, cursor]);
+  }, [shouldObserve, onLoadMore, items.length, contentType]);
 
-  const openItem = (item: ContentItem, surface: "feed" | "shorts") => {
-    trackInteraction({ contentId: item.id, type: "click", surface });
-    markRead(item);
-    navigate(`/content/${item.id}`, { state: { item } });
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    pullStartY.current = e.touches[0].clientY;
   };
 
-  const shareItem = async (item: ContentItem, surface: "feed" | "shorts") => {
-    trackInteraction({ contentId: item.id, type: "share", surface });
-    const link = `${window.location.origin}/content/${item.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: item.title, url: link });
-      } else {
-        await navigator.clipboard.writeText(link);
-        toast.success("Lien copié dans le presse-papiers !");
-      }
-    } catch {
-      /* partage annulé */
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    if (pullStartY.current === null) return;
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    const delta = e.touches[0].clientY - pullStartY.current;
+    if (delta > 0 && !loading && !error) {
+      setPullDistance(Math.min(delta * 0.5, PULL_THRESHOLD + 40));
     }
   };
 
-  const skipItem = (item: ContentItem) => {
-    trackInteraction({ contentId: item.id, type: "skip", surface: "feed" });
-    setItems((prev) => prev.filter((i) => i.id !== item.id));
+  const handleTouchEnd = () => {
+    pullStartY.current = null;
+    if (pullDistance >= PULL_THRESHOLD && !loading && !error) {
+      onRetry();
+    }
+    setPullDistance(0);
   };
 
   const refreshing = pullDistance >= PULL_THRESHOLD;
@@ -236,56 +235,8 @@ export function FeedScreen({
           </div>
         )}
 
-        {!loading && !error && items.length === 0 && <EmptyState tab={tab} mode={mode} />}
-
-        {mode === "flux" && (
-          <div className="space-y-4 tt-stagger">
-            {items.map((item) => (
-              <FeedCard
-                key={item.id}
-                item={item}
-                isSaved={savedIds.has(item.id)}
-                isLiked={likedIds.has(item.id)}
-                onOpen={() => openItem(item, "feed")}
-                onSave={() => saveItem(item)}
-                onLike={() => likeItem(item)}
-                onShare={() => shareItem(item, "feed")}
-                onSkip={tab === "pour-toi" ? () => skipItem(item) : undefined}
-              />
-            ))}
-          </div>
-        )}
-
-        {mode === "videos" && (
-          <div className="tt-stagger grid grid-cols-1 gap-x-4 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((item) => (
-              <div key={item.id}>
-                <VideoTile item={item} onOpen={() => openItem(item, "feed")} />
-                <div className="mt-2.5 flex gap-2.5">
-                  <span className="tt-brand-tile mt-0.5 h-8 w-8 flex-shrink-0 rounded-full text-[10px] font-bold">
-                    {item.author.slice(0, 2).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-bold leading-snug line-clamp-2 cursor-pointer hover:text-primary">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span>{item.author}</span>
-                      <span>·</span>
-                      <span>{formatCount(item.views)} vues</span>
-                      <span>·</span>
-                      <span>{item.date}</span>
-                      <SourceBadge source={item.source} />
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {shouldObserve && (
-          <div ref={sentinelRef} className="py-6 flex justify-center">
+        {loading && (
+          <div className="py-8 flex flex-col items-center gap-3">
             <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
             <span className="text-xs text-muted-foreground font-mono tracking-wide">
               {t("common.loading")}
@@ -311,119 +262,6 @@ export function FeedScreen({
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function FeedBar({
-  tab,
-  mode,
-  length,
-  onTab,
-  onMode,
-  onLength,
-}: {
-  tab: "pour-toi" | "abonnements";
-  mode: FeedMode;
-  length: LengthFilter;
-  onTab: (tab: "pour-toi" | "abonnements") => void;
-  onMode: (mode: FeedMode) => void;
-  onLength: (length: LengthFilter) => void;
-}) {
-  return (
-    <div className="mb-5">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border pb-3">
-        <div className="flex items-center gap-5">
-          {(["pour-toi", "abonnements"] as const).map((id) => {
-            const active = tab === id;
-            return (
-              <button key={id} onClick={() => onTab(id)} className="tt-btn relative px-1 pb-2 text-[15px]">
-                <span className={active ? "text-foreground font-bold" : "text-muted-foreground font-medium"}>
-                  {id === "pour-toi" && <Sparkles size={13} className="inline -mt-0.5 mr-1 text-muted-foreground" />}
-                  {id === "pour-toi" ? "Pour toi" : "Abonnements"}
-                </span>
-                {active && (
-                  <span
-                    className="absolute bottom-[-13px] left-0 right-0 h-[3px] rounded-full"
-                    style={{ background: "var(--primary)" }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="ml-auto flex items-center gap-1 rounded-full border border-border bg-surface-2 p-1">
-          {MODES.map(({ id, label, icon: Icon }) => {
-            const active = mode === id;
-            return (
-              <button
-                key={id}
-                onClick={() => onMode(id)}
-                title={label}
-                className={`tt-btn gap-1.5 px-3 py-1.5 text-[12px] ${
-                  active ? "bg-surface-3 text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon size={14} />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {mode === "videos" && (
-        <div className="mt-4 flex items-center gap-2">
-          {(
-            [
-              { id: "long" as const, label: "Format long" },
-              { id: "short" as const, label: "Format court" },
-            ]
-          ).map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => onLength(id)}
-              className={`tt-chip transition-colors ${
-                length === id ? "tt-chip-active font-semibold" : "text-muted-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ShortsSkeleton() {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="tt-skeleton h-[70vh] w-[min(430px,90vw)] rounded-2xl" />
-    </div>
-  );
-}
-
-function EmptyState({ tab, mode }: { tab: "pour-toi" | "abonnements"; mode: FeedMode }) {
-  return (
-    <div className="py-16 text-center space-y-4">
-      <div className="flex justify-center">
-        <span className="tt-glass tt-btn w-14 h-14">
-          {tab === "abonnements" ? (
-            <Sparkles size={22} className="text-muted-foreground" />
-          ) : (
-            <Inbox size={22} className="text-muted-foreground" />
-          )}
-        </span>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        {tab === "abonnements"
-          ? "Aucun contenu dans vos centres d'intérêt. Modifiez vos intérêts dans votre profil."
-          : mode === "shorts"
-            ? "Pas encore de vidéos lisibles en Shorts."
-            : "Aucun contenu pour le moment. Revenez plus tard !"}
-      </p>
     </div>
   );
 }

@@ -27,26 +27,25 @@ interface ProfileScreenProps {
   onStartOnboarding?: () => void;
 }
 
-const SECTIONS: { id: Section; label: string; icon: typeof UserIcon }[] = [
-  { id: "profil", label: "Mon profil", icon: UserIcon },
-  { id: "favoris", label: "Mes favoris", icon: Bookmark },
-  { id: "historique", label: "Historique", icon: History },
-  { id: "abonnements", label: "Abonnements", icon: Sparkles },
-  { id: "parametres", label: "Paramètres", icon: Settings },
-];
+function computeStreak(readDates: string[]): number {
+  const days = new Set(readDates);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let cursor = new Date(today);
 
-export function ProfileScreen() {
-  const [params, setParams] = useSearchParams();
-  const navigate = useNavigate();
-  const theme = useTheme();
-  const { user, setUser, logout, saved, toggleSave, readIds, readDates, interestTags, interestSlugs, toggleInterest } = useAppStore();
+  // If nothing read today, streak can still count from yesterday.
+  if (!days.has(cursor.toISOString().slice(0, 10))) {
+    cursor.setTime(cursor.getTime() - dayMs);
+  }
 
-  const section = (params.get("tab") as Section) || "profil";
-  const [pool, setPool] = useState<ContentItem[]>([]);
-  const [editingName, setEditingName] = useState(false);
-  const [name, setName] = useState(user?.name || "");
-  const [saving, setSaving] = useState(false);
-  const [catalog, setCatalog] = useState<TagRef[]>([]);
+  let streak = 0;
+  while (days.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setTime(cursor.getTime() - dayMs);
+  }
+  return streak;
+}
 
 export function ProfileScreen({
   user,
@@ -68,7 +67,7 @@ export function ProfileScreen({
   const [isEditing, setIsEditing] = useState(false);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
 
-  const topicGroups = useMemo(() => groupTagsByKind(catalog), [catalog]);
+  const allAvailableInterests = ["AI & ML", "Frontend", "Systems", "Security", "DevOps", "Backend", "Databases", "Cloud"];
 
   const streak = computeStreak(readDates);
   const stats = [
@@ -77,46 +76,10 @@ export function ProfileScreen({
     { label: "profile.stats.streak" as const, value: streak > 0 ? `${streak}d` : "—" },
   ];
 
-  const history = pool.filter((i) => readIds.has(i.id));
-  const videos = pool.filter((i) => i.type === "video");
-  const readVideos = history.filter((i) => i.type === "video");
-
-  const saveName = async () => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      toast.error("Le nom ne peut pas être vide.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await api.updateProfile(trimmed);
-      if (res.success && res.user) {
-        setUser(res.user);
-        toast.success("Profil mis à jour !");
-        setEditingName(false);
-      } else {
-        toast.error(res.error || "Échec de la mise à jour.");
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const setSection = (s: Section) => {
-    const next = new URLSearchParams(params);
-    if (s === "profil") next.delete("tab");
-    else next.set("tab", s);
-    setParams(next);
-  };
-
-  const openItem = (item: ContentItem) => navigate(`/content/${item.id}`, { state: { item } });
-
-  const initials = (user?.name || "?")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
+  const menuItems = [
+    { label: "My Saved Items", icon: <Bookmark size={14} />, action: onNavigateToSaved },
+    { label: "About TechTalk", icon: <Info size={14} />, action: onNavigateToAbout },
+  ];
 
   const { t } = useI18n();
   const { state: gh, failed: ghFailed, syncing, sync } = useGithubProfile();
@@ -321,84 +284,40 @@ export function ProfileScreen({
           />
         )}
 
-          {/* ---------------- Abonnements (intérêts) ---------------- */}
-          {section === "abonnements" && (
-            <section>
-              <h2 className="text-sm font-bold mb-1">Vos centres d'intérêt</h2>
-              <p className="text-[13px] text-muted-foreground mb-4">
-                {interestTags.length > 0
-                  ? `${interestTags.length} sujet${interestTags.length > 1 ? "s" : "" } suivi${interestTags.length > 1 ? "s" : ""}. Ils personnalisent l'onglet « Abonnements » du flux et le classement « Pour toi ».`
-                  : "Aucun sujet suivi. Choisissez-en quelques-uns pour personnaliser votre flux."}
-              </p>
-              <div className="tt-card space-y-5 p-5">
-                {catalog.length === 0 && (
-                  <p className="text-[13px] text-muted-foreground">Les sujets sont momentanément indisponibles.</p>
-                )}
-                {topicGroups.map((group) => (
-                  <div key={group.kind}>
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{group.label}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {group.tags.map((tag) => {
-                        const active = interestSlugs.includes(tag.slug);
-                        return (
-                          <button
-                            key={tag.id}
-                            onClick={() => toggleInterest(tag)}
-                            className={`tt-chip transition-all ${
-                              active ? "text-primary ring-1 ring-primary/50 bg-primary/10" : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {tag.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+        {/* Sign out confirmation dialog */}
+        {confirmingLogout && (
+          <div
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-6"
+            onClick={() => setConfirmingLogout(false)}
+          >
+            <div
+              className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+                <LogOut size={20} className="text-red-400" />
               </div>
-            </section>
-          )}
-
-          {/* ---------------- Paramètres ---------------- */}
-          {section === "parametres" && (
-            <section className="space-y-4 max-w-md">
-              <h2 className="text-sm font-bold">Paramètres</h2>
-              <div className="tt-card divide-y divide-border/60">
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-[13px] font-semibold">Apparence</p>
-                    <p className="text-[11px] text-muted-foreground">Thème clair ou sombre</p>
-                  </div>
-                  <button onClick={toggleTheme} className="tt-btn tt-btn-ghost gap-2 px-4 py-2 text-[12px]">
-                    {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-                    {theme === "dark" ? "Clair" : "Sombre"}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-[13px] font-semibold">Rôle</p>
-                    <p className="text-[11px] text-muted-foreground">{user?.role === "admin" ? "Administrateur" : "Membre"}</p>
-                  </div>
-                  <span className="tt-chip">{user?.role || "user"}</span>
-                </div>
-                <Link to="/about" className="flex items-center justify-between px-5 py-4 hover:bg-surface-2 transition-colors">
-                  <span className="flex items-center gap-2.5 text-[13px] font-semibold">
-                    <Info size={14} className="text-muted-foreground" /> À propos de TechTalk
-                  </span>
-                  <span className="text-muted-foreground">→</span>
-                </Link>
+              <h3 className="text-base font-semibold text-foreground mb-1">Sign out?</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                You'll need to sign in again to access your feed and saved items.
+              </p>
+              <div className="flex gap-3">
                 <button
-                  onClick={logout}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2 transition-colors text-left"
+                  onClick={() => setConfirmingLogout(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-secondary border border-border text-foreground text-sm font-medium hover:bg-muted transition-colors"
                 >
-                  <span className="flex items-center gap-2.5 text-[13px] font-semibold text-destructive">
-                    <LogOut size={14} /> Se déconnecter
-                  </span>
+                  Cancel
+                </button>
+                <button
+                  onClick={onLogout}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+                >
+                  Sign Out
                 </button>
               </div>
-            </section>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
