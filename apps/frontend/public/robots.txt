@@ -5,6 +5,7 @@ Allow: /$
 Allow: /people
 Allow: /u/
 Allow: /login
+Disallow: /design
 Disallow: /watch/
 Disallow: /project/
 Disallow: /article/

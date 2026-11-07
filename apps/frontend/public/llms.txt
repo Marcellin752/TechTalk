@@ -1,0 +1,23 @@
+# TechTalk
+
+> TechTalk is a learning platform for people who want to get into programming, data, AI and tech careers. It turns free, high-quality resources (courses, roadmaps, docs, papers, exercises, videos, open-source projects, opportunities) into a personalised feed and a step-by-step learning path, with an AI mentor called Kairos.
+
+Site: https://t3chtalk.vercel.app
+
+## What is public
+- [/](https://t3chtalk.vercel.app/): landing page
+- [/people](https://t3chtalk.vercel.app/people): directory of learners who chose to make their profile public
+- /u/{handle}: a public profile (projects, interests, and the learning path only if its owner made it public)
+- [/design](https://t3chtalk.vercel.app/design): the live design system (colours, type, components)
+- [/design-tokens.json](https://t3chtalk.vercel.app/design-tokens.json): the same design as data, light and dark values
+
+Everything else needs an account.
+
+## Design in one paragraph
+Clean white or near-black surfaces, rounded cards with a visible 1px border, one warm orange accent (#e8430f light, #f04f23 dark), Inter for text and JetBrains Mono for small uppercase labels, light and dark themes, a left menu on computers and a bottom bar on phones, a round Kairos button floating at the bottom right. Full guide: docs/DESIGN.md in the repository.
+
+## Main areas (signed in)
+Home (a full-screen vertical feed of short videos, projects and reads), Explore (the filterable feed), Learn, My path (a roadmap map with checkpoints), Practice, Calendar, Campus (for partner schools: revision sessions, past exams, people), Kairos (AI mentor), People, Saved, Profile, Settings.
+
+## Languages
+English and French.

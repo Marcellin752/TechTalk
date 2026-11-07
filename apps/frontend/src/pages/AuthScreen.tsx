@@ -122,6 +122,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     if (!hash) return;
     const params = new URLSearchParams(hash);
     const token = params.get("gh_token");
+    const refresh = params.get("gh_refresh") ?? undefined;
     const ghError = params.get("gh_error");
     const unavailable = params.get("gh_unavailable");
     if (!token && !ghError && !unavailable) return;
@@ -138,7 +139,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     if (token) {
       setGithubLoading(true);
       api
-        .adoptGithubToken(token)
+        .adoptGithubToken(token, refresh)
         .then((res) => {
           if (res.success && res.user) onAuthSuccess(res.user);
           else setError(res.error || t("auth.ghFailed"));
@@ -245,10 +246,10 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
         <div className="space-y-4">
           {mode === "signup" && (
-            <Field label={t("auth.name")} type="text" placeholder="Alex Kim" value={name} onChange={setName} />
+            <Field label={t("auth.name")} type="text" placeholder="Alex Kim" value={name} onChange={setName} autoComplete="name" />
           )}
-          <Field label={t("auth.email")} type="email" placeholder="you@example.com" value={email} onChange={setEmail} />
-          <Field label={t("auth.password")} type="password" placeholder="••••••••" value={password} onChange={setPassword} />
+          <Field label={t("auth.email")} type="email" placeholder="you@example.com" value={email} onChange={setEmail} autoComplete="email" />
+          <Field label={t("auth.password")} type="password" placeholder="••••••••" value={password} onChange={setPassword} autoComplete={mode === "login" ? "current-password" : "new-password"} />
 
           <button
             onClick={handleSubmit}

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { handleGetIdentities, handleLinkGoogle, handleLinkGithubStart, handleUnlink, handleSetPassword } from '../controllers/identity.controller.js';
-import { handleRegister, handleLogin, handleGoogleAuth, handleGithubStart, handleGithubCallback, handleUpdateProfile, handleGetMe, handleRefresh } from '../controllers/auth.controller.js';
+import { handleRegister, handleLogin, handleGoogleAuth, handleGithubStart, handleGithubCallback, handleUpdateProfile, handleGetMe, handleRefresh, handleLogout } from '../controllers/auth.controller.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
   const authRateLimit = { rateLimit: { max: 20, timeWindow: '1 minute' } };
@@ -16,6 +16,8 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.get('/github/callback', handleGithubCallback);
 
   fastify.post('/refresh', { config: authRateLimit }, handleRefresh);
+
+  fastify.post('/logout', { config: authRateLimit }, handleLogout);
 
   fastify.patch('/profile', { preHandler: [fastify.authenticate] }, handleUpdateProfile);
 

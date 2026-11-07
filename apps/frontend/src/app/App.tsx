@@ -15,6 +15,11 @@ import { ProfileScreen } from "../pages/ProfileScreen";
 import { SettingsScreen } from "../pages/SettingsScreen";
 import { LearnScreen } from "../pages/LearnScreen";
 import { PathScreen } from "../pages/PathScreen";
+import { CalendarScreen } from "../pages/CalendarScreen";
+import { AdminScreen } from "../pages/AdminScreen";
+import { CampusScreen } from "../pages/CampusScreen";
+import { DesignScreen } from "../pages/DesignScreen";
+import { ReelsScreen } from "../pages/ReelsScreen";
 import { OnboardingScreen } from "../pages/OnboardingScreen";
 import { KairosScreen } from "../pages/KairosScreen";
 import { KairosFab } from "../components/KairosFab";
@@ -238,7 +243,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   };
 
   useEffect(() => {
-    if (location.pathname !== ROUTES.home) return;
+    if (location.pathname !== ROUTES.explore) return;
     const next = new URLSearchParams();
     if (searchQuery.trim()) next.set("q", searchQuery.trim());
     if (contentType !== "all") next.set("type", contentType);
@@ -260,7 +265,8 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
         } catch {
           /* treated as not skipped */
         }
-        if (!profile && !skipped) navigate(ROUTES.onboarding, { replace: true });
+        // Only welcome people who land on the home page; a deep link (an admin page, a shared profile) is left alone.
+        if (!profile && !skipped && window.location.pathname === ROUTES.home) navigate(ROUTES.onboarding, { replace: true });
       })
       .catch(() => !cancelled && setLearning((l) => ({ ...l, loaded: true })));
     return () => {
@@ -496,11 +502,15 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
   const { t, lang } = useI18n();
   const headerTitle: Record<AppTab, string> = {
     feed: "TechTalk",
+    explore: t("nav.explore"),
     learn: t("nav.learn"),
     path: t("nav.path"),
     kairos: "Kairos",
     practice: t("nav.practice"),
     people: t("nav.people"),
+    calendar: t("nav.calendar"),
+    campus: t("nav.campus"),
+    admin: t("nav.admin"),
     saved: t("nav.saved"),
     profile: t("nav.profile"),
     settings: t("nav.settings"),
@@ -524,7 +534,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
             <Menu size={20} />
           </button>
           <div className="flex-1 min-w-0 flex items-center justify-between">
-        {tab === "feed" ? (
+        {tab === "explore" || (tab === "feed" && location.pathname !== ROUTES.home) ? (
           <div className="flex items-center gap-3 w-full">
             <div className="flex items-center gap-2 flex-shrink-0">
               <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
@@ -621,11 +631,15 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
 
       {/* Menu + screen content */}
       <div className="flex-1 flex min-h-0">
-        <SideMenu collapsed={menuCollapsed} />
+        <SideMenu collapsed={menuCollapsed} isAdmin={user?.role === "admin"} />
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <Routes>
           <Route
             path={ROUTES.home}
+            element={<ReelsScreen interests={interests} onOpen={handleOpenReader} onSave={toggleSave} savedIds={savedIds} kairosAvailable={kairosAvailable} />}
+          />
+          <Route
+            path={ROUTES.explore}
             element={
               <FeedScreen
                 items={items}
@@ -654,8 +668,12 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
           <Route path={ROUTES.practice} element={<PracticeScreen />} />
           <Route path={ROUTES.kairos} element={<KairosScreen available={kairosAvailable} />} />
           <Route path={ROUTES.people} element={<PeopleScreen />} />
+          <Route path={ROUTES.calendar} element={<CalendarScreen />} />
+          <Route path={ROUTES.campus} element={<CampusScreen />} />
+          <Route path={ROUTES.admin} element={<AdminScreen user={user} />} />
+          <Route path="/design" element={<DesignScreen />} />
           <Route path="/u/:handle" element={<PublicProfileScreen />} />
-          <Route path={ROUTES.path} element={<PathScreen path={learning.path} loaded={learning.loaded} onPath={(path) => setLearning((l) => ({ ...l, path }))} />} />
+          <Route path={ROUTES.path} element={<PathScreen path={learning.path} loaded={learning.loaded} onPath={(path) => setLearning((l) => ({ ...l, path }))} profile={learning.profile} onProfile={(profile) => setLearning((l) => ({ ...l, profile }))} />} />
           <Route
             path={ROUTES.saved}
             element={
@@ -719,7 +737,8 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
         </Routes>
         </div>
       </div>
-      {kairosAvailable && tab !== "kairos" && <KairosFab />}
+      {/* On the vertical feed Kairos is in the side rail ("Ask"), so the floating button would sit on top of it. */}
+      {kairosAvailable && tab !== "kairos" && location.pathname !== ROUTES.home && <KairosFab />}
       <BottomBar />
     </div>
   );
@@ -734,6 +753,7 @@ function PublicGate() {
       <Route path="/" element={<LandingScreen />} />
       <Route path="/people" element={<PublicShell><PeopleScreen /></PublicShell>} />
       <Route path="/u/:handle" element={<PublicShell><PublicProfileScreen /></PublicShell>} />
+      <Route path="/design" element={<PublicShell><DesignScreen /></PublicShell>} />
       <Route path="*" element={<Navigate to={ROUTES.login} replace state={{ from: location }} />} />
     </Routes>
   );

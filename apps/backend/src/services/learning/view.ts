@@ -1,4 +1,4 @@
-import type { PathStage } from '../../db/schema.js';
+import type { PathSettings, PathStage } from '../../db/schema.js';
 
 export interface StepRow {
   id: string;
@@ -29,6 +29,9 @@ export interface PathRow {
   totalMinutes: number;
   stages: PathStage[];
   createdAt: Date;
+  kind?: string;
+  active?: boolean;
+  settings?: PathSettings | null;
 }
 
 /** Groups steps into stages and computes progress: what is done, what is next, how long is left. */
@@ -54,6 +57,10 @@ export function assemblePathView(path: PathRow, steps: StepRow[]) {
     level: path.level,
     hoursPerWeek: path.hoursPerWeek,
     createdAt: path.createdAt,
+    kind: path.kind ?? 'personal',
+    active: path.active ?? true,
+    schoolYear: path.settings?.schoolYear ?? null,
+    programmeDraft: path.settings?.programmeDraft ?? false,
     stages,
     currentStage,
     next,

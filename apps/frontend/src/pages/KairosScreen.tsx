@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { History, MessageSquarePlus, Trash2 } from "lucide-react";
+import { History } from "lucide-react";
 import { toast } from "sonner";
 import { api, KairosConversation } from "../services/api";
 import { KairosAvatar, KairosChat } from "../components/KairosChat";
+import { KairosHistory } from "../components/KairosHistory";
 import { KairosPortrait } from "../components/KairosArt";
 import { dateLocale, useI18n, type Lang, type T } from "../lib/i18n";
 
@@ -57,35 +58,23 @@ export function KairosScreen({ available }: { available: boolean | null }) {
     );
   }
 
+  const rename = async (id: string, title: string) => {
+    const ok = await api.kairosRename(id, title);
+    if (!ok) return toast.error(t("admin.error")), false;
+    setList((l) => (l ?? []).map((c) => (c.id === id ? { ...c, title } : c)));
+    return true;
+  };
+
   const sidebar = (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="p-3 flex items-center gap-2">
-        <button onClick={() => open(null)} className="flex-1 inline-flex items-center justify-center gap-2 h-10 rounded-xl bg-primary text-white text-sm font-semibold shadow-md shadow-primary/25">
-          <MessageSquarePlus size={16} /> {t("kairos.new")}
-        </button>
-      </div>
-      <div className="px-3 pb-1 text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{t("kairos.history")}</div>
-      <ul className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
-        {list === null && [0, 1, 2].map((i) => <li key={i} className="h-11 rounded-lg bg-secondary animate-pulse m-1" />)}
-        {list?.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-muted-foreground">{t("kairos.noChats")}</li>}
-        {list?.map((c) => (
-          <li key={c.id} className="group relative">
-            <button onClick={() => open(c.id)} className={`w-full text-left rounded-lg px-3 py-2 pr-9 transition-colors ${c.id === conversationId ? "bg-secondary" : "hover:bg-secondary/60"}`}>
-              <span className="block text-[13.5px] text-foreground truncate">{c.title}</span>
-              <span className="block text-[11px] text-muted-foreground">{ago(c.updatedAt, t, lang)}</span>
-            </button>
-            <button onClick={() => remove(c.id)} aria-label={`Delete "${c.title}"`} className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-destructive hover:bg-background">
-              <Trash2 size={14} />
-            </button>
-          </li>
-        ))}
-      </ul>
-      {list && list.length > 0 && (
-        <button onClick={clearAll} className="m-3 mt-0 text-[12px] text-muted-foreground hover:text-destructive text-left">
-          {t("kairos.deleteAll")}
-        </button>
-      )}
-    </div>
+    <KairosHistory
+      list={list}
+      activeId={conversationId}
+      onOpen={(id) => open(id)}
+      onNew={() => open(null)}
+      onRename={rename}
+      onDelete={(id) => remove(id)}
+      onClearAll={clearAll}
+    />
   );
 
   return (

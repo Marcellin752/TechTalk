@@ -19,6 +19,8 @@ export interface Slot {
   /** Matched against title (strong), summary, categories and tags. "$lang" expands to the learner's languages. */
   terms: string[];
   count: number;
+  /** A resource must match at least one of these, whatever else it matches (a project's main topics). */
+  must?: string[];
 }
 
 export interface StageTemplate {

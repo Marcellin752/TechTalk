@@ -127,6 +127,41 @@
       "when": 1793998979022,
       "tag": "0017_demonic_puff_adder",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794007201622,
+      "tag": "0018_free_virginia_dare",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794008224818,
+      "tag": "0019_sparkling_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794008595955,
+      "tag": "0020_slim_klaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794008947474,
+      "tag": "0021_windy_roughhouse",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794044934119,
+      "tag": "0022_condemned_white_queen",
+      "breakpoints": true
     }
   ]
 }

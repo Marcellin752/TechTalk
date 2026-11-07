@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, ExternalLink } from "lucide-react";
+import { ArrowUp, Copy, ExternalLink, ThumbsDown, ThumbsUp } from "lucide-react";
+import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 import { api, KairosMessage } from "../services/api";
 import { Markdown } from "./Markdown";
 import { useI18n } from "../lib/i18n";
@@ -21,12 +23,16 @@ interface Props {
 /** One conversation: its messages, the box to write in, and the call to Kairos. */
 export function KairosChat({ conversationId, onConversation, compact = false }: Props) {
   const { t, lang } = useI18n();
+  const { pathname } = useLocation();
   const suggestions = [t("kairos.s1"), t("kairos.s2"), t("kairos.s3"), t("kairos.s4")];
   const [messages, setMessages] = useState<KairosMessage[]>([]);
-  const [draft, setDraft] = useState("");
+  // Arriving with ?ask=… (from a card in the feed) puts the question in the box, ready to send.
+  const [draft, setDraft] = useState(() => (conversationId ? "" : (new URLSearchParams(window.location.search).get("ask") ?? "").slice(0, 1500)));
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  /** Follow-up questions Kairos proposed for its latest answer. */
+  const [followUps, setFollowUps] = useState<string[]>([]);
   const idRef = useRef<string | null>(conversationId);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -62,11 +68,12 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
       const message = text.trim();
       if (!message || sending) return;
       setError(null);
+      setFollowUps([]);
       setDraft("");
       setSending(true);
       const optimistic: KairosMessage = { id: `local-${Date.now()}`, role: "user", content: message, createdAt: new Date().toISOString() };
       setMessages((m) => [...m, optimistic]);
-      const res = await api.kairosChat(message, idRef.current ?? undefined, lang);
+      const res = await api.kairosChat(message, idRef.current ?? undefined, lang, pathname);
       setSending(false);
       if (!res.success || !res.message) {
         setMessages((m) => m.filter((x) => x.id !== optimistic.id));
@@ -79,10 +86,29 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
         onConversation(res.conversationId, res.title);
       }
       setMessages((m) => [...m, res.message!]);
+      setFollowUps(res.suggestions ?? []);
       inputRef.current?.focus();
     },
-    [sending, onConversation],
+    [sending, onConversation, lang, pathname],
   );
+
+  const rate = async (m: KairosMessage, value: 1 | -1) => {
+    const next = m.feedback === value ? 0 : value;
+    setMessages((all) => all.map((x) => (x.id === m.id ? { ...x, feedback: next === 0 ? null : next } : x)));
+    if (!(await api.kairosFeedback(m.id, next))) {
+      setMessages((all) => all.map((x) => (x.id === m.id ? { ...x, feedback: m.feedback ?? null } : x)));
+      toast.error(t("kairos.rateFailed"));
+    }
+  };
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("kairos.copied"));
+    } catch {
+      toast.error(t("kairos.rateFailed"));
+    }
+  };
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
   return (
     <div className="relative flex flex-col h-full min-h-0">
@@ -130,6 +156,20 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {!m.id.startsWith("local-") && (
+                    <div className="mt-1.5 flex items-center gap-0.5 text-muted-foreground">
+                      <button onClick={() => rate(m, 1)} aria-pressed={m.feedback === 1} aria-label={t("kairos.helpful")} title={t("kairos.helpful")} className={`w-7 h-7 rounded-md flex items-center justify-center hover:bg-secondary hover:text-foreground ${m.feedback === 1 ? "text-primary" : ""}`}><ThumbsUp size={14} /></button>
+                      <button onClick={() => rate(m, -1)} aria-pressed={m.feedback === -1} aria-label={t("kairos.notHelpful")} title={t("kairos.notHelpful")} className={`w-7 h-7 rounded-md flex items-center justify-center hover:bg-secondary hover:text-foreground ${m.feedback === -1 ? "text-destructive" : ""}`}><ThumbsDown size={14} /></button>
+                      <button onClick={() => copy(m.content)} aria-label={t("kairos.copy")} title={t("kairos.copy")} className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-secondary hover:text-foreground"><Copy size={14} /></button>
+                    </div>
+                  )}
+                  {m.id === lastAssistantId && followUps.length > 0 && !sending && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {followUps.map((f) => (
+                        <button key={f} onClick={() => send(f)} className="px-3 py-1.5 rounded-full border border-border bg-card hover:border-primary/50 hover:bg-primary/5 text-[12.5px] text-foreground text-left transition-colors">{f}</button>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Check, ChevronDown, Circle, Clock, Loader2, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowUpRight, Check, ChevronDown, Circle, Clock, List, Loader2, Map as MapIcon, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
-import { api, LearningPath, PathStep, StepStatus } from "../services/api";
+import { api, LearningPath, LearningProfile, PathStep, PathSummary, StepStatus } from "../services/api";
+import { PathSwitcher } from "../components/PathSwitcher";
+import { NewPathDialog } from "../components/NewPathDialog";
+import { Modal } from "../components/Modal";
+import { SchoolCard } from "../components/SchoolCard";
+import { RoadmapMap } from "../components/RoadmapMap";
 import { KIND_LABEL_KEYS, formatMinutes, typeLabel } from "../lib/learning";
 import { useI18n } from "../lib/i18n";
 import { pathFor, ROUTES } from "../lib/routes";
@@ -12,6 +17,8 @@ interface PathScreenProps {
   path: LearningPath | null;
   loaded: boolean;
   onPath: (path: LearningPath | null) => void;
+  profile?: LearningProfile | null;
+  onProfile?: (profile: LearningProfile) => void;
 }
 
 function StepRow({ step, onStatus, onOpen }: { step: PathStep; onStatus: (s: StepStatus) => void; onOpen: () => void }) {
@@ -59,20 +66,88 @@ function StepRow({ step, onStatus, onOpen }: { step: PathStep; onStatus: (s: Ste
   );
 }
 
-export function PathScreen({ path, loaded, onPath }: PathScreenProps) {
+export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile = null, onProfile }: PathScreenProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState(false);
+  const [paths, setPaths] = useState<PathSummary[] | null>(null);
+  const [max, setMax] = useState(6);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fetched, setFetched] = useState<LearningPath | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [view, setView] = useState<"map" | "list">(() => {
+    try {
+      return localStorage.getItem("teachtalk_path_view") === "list" ? "list" : "map";
+    } catch {
+      return "map";
+    }
+  });
+  const chooseView = (v: "map" | "list") => {
+    setView(v);
+    try {
+      localStorage.setItem("teachtalk_path_view", v);
+    } catch {
+      /* remembered only when storage works */
+    }
+  };
+
+  // The path on screen: the main one comes from the app; the others are fetched when chosen.
+  const path = selectedId && primary && selectedId === primary.id ? primary : fetched && fetched.id === selectedId ? fetched : null;
+
+  const refreshList = useCallback(async () => {
+    try {
+      const r = await api.getPaths();
+      setPaths(r.paths);
+      setMax(r.max);
+      return r.paths;
+    } catch {
+      setPaths((cur) => cur ?? []);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    void refreshList().then((list) => {
+      if (!list) return;
+      const wanted = params.get("p");
+      setSelectedId((cur) => cur ?? (list.find((x) => x.id === wanted)?.id ?? list.find((x) => x.active)?.id ?? list[0]?.id ?? null));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
+  useEffect(() => {
+    if (!selectedId || (primary && selectedId === primary.id) || fetched?.id === selectedId) return;
+    let cancelled = false;
+    api.getPathById(selectedId).then((v) => !cancelled && v && setFetched(v));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, primary, fetched?.id]);
+
+  const select = (id: string) => {
+    setSelectedId(id);
+    setParams(id === paths?.find((x) => x.active)?.id ? {} : { p: id }, { replace: true });
+  };
+
+  /** A path changed: keep the app's main path and the switcher in step. */
+  const setCurrent = (v: LearningPath) => {
+    if (v.active) onPrimary(v);
+    else setFetched(v);
+    void refreshList();
+  };
 
   // The current stage opens by itself.
   useEffect(() => {
     if (path?.currentStage != null) setOpen((o) => (path.currentStage! in o ? o : { ...o, [path.currentStage!]: true }));
-  }, [path?.currentStage]);
+  }, [path?.currentStage, path?.id]);
 
   const update = async (step: PathStep, status: StepStatus) => {
     const res = await api.setStepStatus(step.id, status);
-    if (res.success && res.path) onPath(res.path);
+    if (res.success && res.path) setCurrent(res.path);
     else toast.error(res.error || t("path.saveError"));
   };
 
@@ -85,16 +160,45 @@ export function PathScreen({ path, loaded, onPath }: PathScreenProps) {
   };
 
   const rebuild = async () => {
+    if (!selectedId) return;
     setBusy(true);
-    const res = await api.regenerateLearningPath();
+    const res = await api.rebuildPath(selectedId);
     setBusy(false);
     if (res.success && res.path) {
-      onPath(res.path);
+      setCurrent(res.path);
       toast.success(t("path.rebuilt"));
     } else toast.error(res.error || t("path.saveError"));
   };
 
-  if (!loaded) {
+  const makeMain = async () => {
+    if (!selectedId) return;
+    const r = await api.updatePath(selectedId, { active: true });
+    if (!r.success) return void toast.error(r.error || t("path.saveError"));
+    setPaths(r.paths);
+    const v = await api.getPathById(selectedId);
+    if (v) onPrimary(v);
+    toast.success(t("paths.nowMain"));
+  };
+
+  const remove = async () => {
+    if (!selectedId || !paths) return;
+    const target = paths.find((x) => x.id === selectedId);
+    if (!window.confirm(t("paths.deleteConfirm", { name: target?.title ?? "" }))) return;
+    const r = await api.deletePath(selectedId);
+    if (!r.success) return void toast.error(r.error || t("path.saveError"));
+    setPaths(r.paths);
+    setFetched(null);
+    const next = r.paths.find((x) => x.active) ?? r.paths[0] ?? null;
+    setSelectedId(next?.id ?? null);
+    setParams({}, { replace: true });
+    if (next?.active) {
+      const v = await api.getPathById(next.id);
+      onPrimary(v);
+    } else if (!next) onPrimary(null);
+    toast.success(t("paths.deleted"));
+  };
+
+  if (!loaded || (primary == null && paths === null)) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="animate-spin text-primary" />
@@ -102,7 +206,7 @@ export function PathScreen({ path, loaded, onPath }: PathScreenProps) {
     );
   }
 
-  if (!path) {
+  if (!path && paths && paths.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 px-6">
         <h1 className="text-2xl font-bold text-foreground">{t("path.empty.title")}</h1>
@@ -114,19 +218,45 @@ export function PathScreen({ path, loaded, onPath }: PathScreenProps) {
     );
   }
 
+  if (!path) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary" />
+      </div>
+    );
+  }
+
   const p = path.progress;
-  const next = path.next;
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-16">
+        {paths && paths.length > 0 && (
+          <div className="mb-5">
+            <PathSwitcher
+              paths={paths}
+              selectedId={selectedId}
+              max={max}
+              onSelect={select}
+              onNew={() => setCreating(true)}
+              onRename={() => setRenaming(true)}
+              onMakeMain={makeMain}
+              onRebuild={rebuild}
+              onDelete={remove}
+            />
+          </div>
+        )}
+
         {/* Summary */}
         <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <p className="text-[11px] font-mono uppercase tracking-[0.15em] text-primary">{t("path.eyebrow")}</p>
+          <p className="text-[11px] font-mono uppercase tracking-[0.15em] text-primary">{path.kind === "school" ? t("paths.kind.school") : path.kind === "custom" ? t("paths.kind.custom") : t("path.eyebrow")}{path.active ? ` · ${t("paths.main")}` : ""}</p>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground mt-1">{path.title}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {t("path.summary", { stages: path.stages.length, time: formatMinutes(p.minutesTotal), weeks: p.weeksTotal, hours: path.hoursPerWeek })}
           </p>
+          {path.kind === "school" && path.programmeDraft && (
+            <p className="mt-3 text-[12.5px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 leading-relaxed">{t("paths.draftNote")}</p>
+          )}
 
           <div className="mt-5">
             <div className="flex items-baseline justify-between text-sm">
@@ -140,24 +270,40 @@ export function PathScreen({ path, loaded, onPath }: PathScreenProps) {
             </div>
           </div>
 
-          {next && (
-            <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl bg-primary/10 border border-primary/30 p-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-mono uppercase tracking-wide text-primary">{next.status === "doing" ? t("path.resume") : t("path.next")}</p>
-                <p className="text-[15px] font-semibold text-foreground leading-snug truncate">{next.content.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {typeLabel(t, next.content.type)} · {next.content.source} · {formatMinutes(next.minutes)}
-                </p>
-              </div>
-              <button onClick={() => openStep(next)} className="inline-flex items-center justify-center gap-2 px-5 h-10 rounded-xl bg-primary text-white text-sm font-semibold shadow-md shadow-primary/25 flex-shrink-0">
-                <Play size={14} className="fill-white" /> {next.status === "doing" ? t("path.resumeBtn") : t("path.start")}
-              </button>
-            </div>
-          )}
         </section>
 
+        <SchoolCard
+          profile={profile}
+          onUpdated={(p, schoolPath, list) => {
+            onProfile?.(p);
+            setPaths(list);
+            if (schoolPath) {
+              setSelectedId(schoolPath.id);
+              setCurrent(schoolPath);
+            }
+          }}
+        />
+
+        {/* The path, as a map of nodes or as a list */}
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-semibold text-foreground">{t("path.stagesTitle")}</h2>
+          <div role="radiogroup" aria-label={t("path.view")} className="flex rounded-lg border border-border bg-secondary p-0.5">
+            {([["map", MapIcon, "path.view.map"], ["list", List, "path.view.list"]] as const).map(([id, Icon, label]) => (
+              <button key={id} role="radio" aria-checked={view === id} onClick={() => chooseView(id)} className={`inline-flex items-center gap-1.5 px-3 h-7 rounded-md text-[13px] font-medium transition-colors ${view === id ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}>
+                <Icon size={14} /> {t(label)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {view === "map" && (
+          <div className="mt-4">
+            <RoadmapMap path={path} onStatus={update} onOpen={openStep} />
+          </div>
+        )}
+
         {/* Stages */}
-        <ol className="mt-8 space-y-4">
+        <ol className={`mt-4 space-y-4 ${view === "map" ? "hidden" : ""}`}>
           {path.stages.map((stage) => {
             const isCurrent = path.currentStage === stage.index;
             const expanded = !!open[stage.index];
@@ -173,6 +319,9 @@ export function PathScreen({ path, loaded, onPath }: PathScreenProps) {
                     <div className="min-w-0 flex-1">
                       <h2 className="text-[16px] font-semibold text-foreground">{stage.title}</h2>
                       <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">{stage.objective}</p>
+                      {stage.topics && stage.topics.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">{stage.topics.map((tp) => <span key={tp} className="px-2 h-5 inline-flex items-center rounded-full bg-primary/10 text-primary text-[11px] font-mono">{tp}</span>)}</div>
+                      )}
                       <p className="text-[12px] text-muted-foreground mt-2">
                         {t("path.doneOf", { done: stage.done, total: stage.total })} · {formatMinutes(stage.minutes)}
                       </p>
@@ -201,6 +350,43 @@ export function PathScreen({ path, loaded, onPath }: PathScreenProps) {
           </button>
         </div>
       </div>
+
+      {creating && paths && (
+        <NewPathDialog
+          profile={profile}
+          paths={paths}
+          onClose={() => setCreating(false)}
+          onCreated={(created) => {
+            setSelectedId(created.id);
+            setCurrent(created);
+          }}
+        />
+      )}
+      {renaming && <RenameDialog current={path.title} onClose={() => setRenaming(false)} onSave={async (title) => {
+        const r = await api.updatePath(path.id, { title });
+        if (!r.success) return void toast.error(r.error || t("path.saveError"));
+        setPaths(r.paths);
+        const renamed = { ...path, title };
+        if (path.active) onPrimary(renamed);
+        else setFetched(renamed);
+        setRenaming(false);
+      }} />}
     </div>
+  );
+}
+
+function RenameDialog({ current, onClose, onSave }: { current: string; onClose: () => void; onSave: (title: string) => void }) {
+  const { t } = useI18n();
+  const [title, setTitle] = useState(current);
+  return (
+    <Modal title={t("paths.rename")} onClose={onClose}>
+      <div className="px-5 py-4">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && title.trim().length >= 2 && onSave(title.trim())} maxLength={80} aria-label={t("paths.name")} className="w-full rounded-xl bg-secondary border border-border px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary" autoFocus />
+      </div>
+      <div className="flex justify-end gap-2 px-5 pb-5">
+        <button onClick={onClose} className="px-4 h-10 rounded-xl border border-border text-sm text-foreground hover:bg-secondary">{t("common.cancel")}</button>
+        <button onClick={() => onSave(title.trim())} disabled={title.trim().length < 2} className="px-5 h-10 rounded-xl bg-primary text-white text-sm font-semibold disabled:opacity-60">{t("common.save")}</button>
+      </div>
+    </Modal>
   );
 }

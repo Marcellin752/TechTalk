@@ -19,6 +19,8 @@ vi.mock('google-auth-library', () => ({
 
 // Queue-driven fake db: every awaited query chain resolves to the next result.
 const queue = vi.hoisted(() => ({ results: [] as unknown[], updates: [] as unknown[] }));
+vi.mock('../services/session.js', () => ({ revokeAllRefreshTokens: vi.fn() }));
+
 vi.mock('../db/db.js', () => {
   const chain: any = new Proxy(function () {}, {
     get(_t, prop) {

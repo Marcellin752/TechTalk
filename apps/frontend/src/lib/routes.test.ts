@@ -20,6 +20,7 @@ describe("tabFor", () => {
   it("maps addresses to header tabs, treating content pages as the feed", () => {
     expect(tabFor("/")).toBe("feed");
     expect(tabFor("/watch/x")).toBe("feed");
+    expect(tabFor("/explore")).toBe("explore");
     expect(tabFor("/learn")).toBe("learn");
     expect(tabFor("/path")).toBe("path");
     expect(tabFor("/practice")).toBe("practice");

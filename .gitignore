@@ -9,3 +9,7 @@ dist/
 !.env.example
 **/*~
 **/**/*~
+# Editor auto-save copies (can contain secrets)
+\#*#
+.#*
+*~

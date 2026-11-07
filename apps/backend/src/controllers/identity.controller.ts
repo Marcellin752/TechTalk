@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
 import { OAuth2Client } from 'google-auth-library';
+import { revokeAllRefreshTokens } from '../services/session.js';
 import { db } from '../db/db.js';
 import { users } from '../db/schema.js';
 import { config } from '../config/env.js';
@@ -148,6 +149,8 @@ export async function handleSetPassword(request: FastifyRequest, reply: FastifyR
     }
     const hash = await bcrypt.hash(newPassword as string, 10);
     await db.update(users).set({ password: hash }).where(eq(users.id, user.id));
+    // A new password signs every other device out.
+    await revokeAllRefreshTokens(user.id);
     const fresh = await loadUser(user.id);
     return reply.status(200).send(describe(fresh!));
   } catch (error) {

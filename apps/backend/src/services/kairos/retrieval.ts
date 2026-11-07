@@ -1,6 +1,6 @@
-import { and, asc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from '../../db/db.js';
-import { contents, learningPaths, learningProfiles, learningSteps, githubProfiles, users } from '../../db/schema.js';
+import { calendarEvents, contents, learningPaths, learningProfiles, learningSteps, githubProfiles, users } from '../../db/schema.js';
 import type { CatalogHit, LearnerContext } from './prompt.js';
 
 /* What Kairos knows about the question (matching catalogue items) and about the
@@ -73,6 +73,16 @@ export async function searchCatalog(question: string): Promise<CatalogHit[]> {
   return rankRows(rows, keywords).map((r, i) => ({ n: i + 1, id: r.id, type: r.type, title: r.title, url: r.url, source: r.source, summary: r.summary ?? '' }));
 }
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** "Mon 2030-01-07 17:00 UTC, in 2 days": the weekday and the distance stop the model guessing "today". */
+export function describeWhen(at: Date, now: Date): string {
+  const day = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const diff = Math.round((day(at) - day(now)) / 86_400_000);
+  const rel = diff === 0 ? 'today' : diff === 1 ? 'tomorrow' : `in ${diff} days`;
+  return `${DAYS[at.getUTCDay()]} ${at.toISOString().slice(0, 16).replace('T', ' ')} UTC, ${rel}`;
+}
+
 export async function loadLearnerContext(userId: string): Promise<LearnerContext> {
   const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
   const [profile] = await db.select().from(learningProfiles).where(eq(learningProfiles.userId, userId)).limit(1);
@@ -85,8 +95,18 @@ export async function loadLearnerContext(userId: string): Promise<LearnerContext
     hoursPerWeek: profile?.hoursPerWeek,
     style: profile?.style,
     githubLanguages: gh?.languages?.slice(0, 4).map((l) => l.name),
+    school: profile?.school ? { name: profile.school, year: profile.schoolYear, topics: profile.schoolTopics ?? [] } : null,
     path: null,
   };
+
+  const now = new Date();
+  const soon = await db
+    .select({ title: calendarEvents.title, kind: calendarEvents.kind, startsAt: calendarEvents.startsAt })
+    .from(calendarEvents)
+    .where(and(eq(calendarEvents.userId, userId), eq(calendarEvents.done, false), gte(calendarEvents.startsAt, now), lt(calendarEvents.startsAt, new Date(now.getTime() + 7 * 86_400_000))))
+    .orderBy(asc(calendarEvents.startsAt))
+    .limit(5);
+  ctx.upcoming = soon.map((e) => ({ title: e.title, kind: e.kind, when: describeWhen(e.startsAt, now) }));
 
   const [path] = await db.select().from(learningPaths).where(and(eq(learningPaths.userId, userId), eq(learningPaths.active, true))).limit(1);
   if (path) {

@@ -38,7 +38,15 @@ vi.mock('../db/db.js', () => ({
   },
 }));
 
-import { handleGoogleAuth, handleGetMe, handleRefresh } from './auth.controller.js';
+const session = vi.hoisted(() => ({
+  issueSession: vi.fn(async (app: any) => ({ token: app.jwt.sign({}), refreshToken: 'refresh-token' })),
+  rotateRefreshToken: vi.fn(),
+  revokeRefreshToken: vi.fn(),
+  revokeAllRefreshTokens: vi.fn(),
+}));
+vi.mock('../services/session.js', () => session);
+
+import { handleGoogleAuth, handleGetMe, handleRefresh, handleLogout } from './auth.controller.js';
 
 function makeReply() {
   const reply: any = {
@@ -59,6 +67,7 @@ function makeReply() {
 function makeRequest() {
   return {
     body: { credential: 'mock-google-credential' },
+    headers: { 'user-agent': 'vitest' },
     log: { error: vi.fn() },
     server: {
       jwt: {
@@ -240,87 +249,54 @@ describe('handleRefresh', () => {
     vi.clearAllMocks();
   });
 
-  function makeRefreshRequest(payload: any, header = 'Bearer some-token') {
-    return {
-      headers: { authorization: header },
-      jwtVerify: vi.fn().mockResolvedValue(payload),
-      log: { error: vi.fn() },
-      server: {
-        jwt: {
-          sign: vi.fn().mockReturnValue('fresh-signed-jwt-token'),
-        },
-      },
-    };
-  }
+  const makeReq = (body: unknown): any => ({ body, headers: { 'user-agent': 'vitest' }, log: { error: vi.fn() }, server: {} });
+  const goodToken = 'a'.repeat(64);
 
-  it('should reject a request without a Bearer token', async () => {
+  it('rejects a request without a refresh token', async () => {
     const reply = makeReply();
-    const request: any = { headers: {}, log: { error: vi.fn() } };
-
-    await handleRefresh(request, reply);
-
+    await handleRefresh(makeReq({}), reply);
     expect(reply.statusCode).toBe(401);
-    expect(reply.body.error).toContain('Missing token');
+    expect(reply.body.error).toContain('Missing refresh token');
+    expect(session.rotateRefreshToken).not.toHaveBeenCalled();
   });
 
-  it('should reject a forged or tampered token', async () => {
-    const request: any = makeRefreshRequest(null);
-    request.jwtVerify.mockRejectedValueOnce(new Error('invalid signature'));
+  it('rejects an unknown or spent refresh token', async () => {
+    session.rotateRefreshToken.mockResolvedValueOnce({ ok: false, reason: 'reused' });
     const reply = makeReply();
-
-    await handleRefresh(request, reply);
-
+    await handleRefresh(makeReq({ refreshToken: goodToken }), reply);
     expect(reply.statusCode).toBe(401);
-    expect(reply.body.error).toContain('Invalid or forged token');
+    expect(reply.body.error).toContain('Invalid session');
   });
 
-  it('should reject a token expired beyond the 30-day grace period', async () => {
-    const expiredLongAgo = Math.floor(Date.now() / 1000) - 31 * 24 * 60 * 60;
-    const request: any = makeRefreshRequest({ id: 'u-1', exp: expiredLongAgo });
+  it('tells the client when the session has run out', async () => {
+    session.rotateRefreshToken.mockResolvedValueOnce({ ok: false, reason: 'expired' });
     const reply = makeReply();
-
-    await handleRefresh(request, reply);
-
+    await handleRefresh(makeReq({ refreshToken: goodToken }), reply);
     expect(reply.statusCode).toBe(401);
     expect(reply.body.error).toContain('Session expired');
   });
 
-  it('should re-issue a token for a recently expired session', async () => {
-    const expiredRecently = Math.floor(Date.now() / 1000) - 60 * 60;
-    const request: any = makeRefreshRequest({ id: 'u-1', exp: expiredRecently });
-
-    mocks.limitFn.mockResolvedValueOnce([
-      { id: 'u-1', name: 'Alex Kim', email: 'alex@example.com', role: 'user', picture: null },
-    ]);
-    mocks.whereFn.mockReturnValue({ limit: mocks.limitFn });
-    mocks.fromFn.mockReturnValue({ where: mocks.whereFn });
-    mocks.selectFn.mockReturnValue({ from: mocks.fromFn });
-
+  it('hands back a new pair and the user, without the password hash', async () => {
+    session.rotateRefreshToken.mockResolvedValueOnce({
+      ok: true,
+      token: 'new-access',
+      refreshToken: 'new-refresh',
+      user: { id: 'u-1', name: 'Alex Kim', email: 'alex@example.com', role: 'user', picture: null, password: 'hash' },
+    });
     const reply = makeReply();
-
-    await handleRefresh(request, reply);
-
+    await handleRefresh(makeReq({ refreshToken: goodToken }), reply);
     expect(reply.statusCode).toBe(200);
-    expect(reply.body.token).toBe('fresh-signed-jwt-token');
-    expect(reply.body.user.email).toBe('alex@example.com');
-    expect(request.server.jwt.sign).toHaveBeenCalledWith(
-      { id: 'u-1', email: 'alex@example.com', role: 'user' },
-      expect.anything()
-    );
+    expect(reply.body.token).toBe('new-access');
+    expect(reply.body.refreshToken).toBe('new-refresh');
+    expect(reply.body.user).toEqual({ id: 'u-1', name: 'Alex Kim', email: 'alex@example.com', role: 'user', picture: null });
   });
+});
 
-  it('should return 401 when the user no longer exists', async () => {
-    const request: any = makeRefreshRequest({ id: 'u-gone', exp: undefined });
-    mocks.limitFn.mockResolvedValueOnce([]);
-    mocks.whereFn.mockReturnValue({ limit: mocks.limitFn });
-    mocks.fromFn.mockReturnValue({ where: mocks.whereFn });
-    mocks.selectFn.mockReturnValue({ from: mocks.fromFn });
-
+describe('handleLogout', () => {
+  it('revokes the refresh token and answers 204', async () => {
     const reply = makeReply();
-
-    await handleRefresh(request, reply);
-
-    expect(reply.statusCode).toBe(401);
-    expect(reply.body.error).toContain('User no longer exists');
+    await handleLogout({ body: { refreshToken: 'x'.repeat(40) }, log: { error: vi.fn() } } as any, reply);
+    expect(session.revokeRefreshToken).toHaveBeenCalledWith('x'.repeat(40));
+    expect(reply.statusCode).toBe(204);
   });
 });

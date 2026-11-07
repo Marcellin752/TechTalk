@@ -11,6 +11,10 @@ import { contentRoutes } from './routes/content.routes.js';
 import { profileRoutes } from './routes/profile.routes.js';
 import { learningRoutes } from './routes/learning.routes.js';
 import { kairosRoutes } from './routes/kairos.routes.js';
+import { calendarRoutes } from './routes/calendar.routes.js';
+import { adminRoutes } from './routes/admin.routes.js';
+import { partnerRoutes } from './routes/partner.routes.js';
+import { campusRoutes } from './routes/campus.routes.js';
 import { publicRoutes } from './routes/public.routes.js';
 import { initAutomationWorkers } from './services/automation/index.js';
 
@@ -35,7 +39,9 @@ declare module 'fastify' {
 fastify.register(cors, { origin: config.corsOrigin, methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] });
 // This is a JSON API, so the default policy is the strict one; the site sets its own CSP.
 fastify.register(helmet, { crossOriginResourcePolicy: { policy: 'cross-origin' } });
-fastify.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+// Generous on purpose: one page load makes a dozen calls and a campus shares one address.
+// The routes that matter (sign-in, Kairos, sync) set much stricter limits of their own.
+fastify.register(rateLimit, { max: 300, timeWindow: '1 minute' });
 fastify.register(jwt, { secret: config.jwtSecret });
 
 fastify.addHook('onSend', async (_request, reply, payload) => {
@@ -65,6 +71,10 @@ fastify.register(contentRoutes, { prefix: '/api/content' });
 fastify.register(profileRoutes, { prefix: '/api/profile' });
 fastify.register(learningRoutes, { prefix: '/api/learning' });
 fastify.register(kairosRoutes, { prefix: '/api/kairos' });
+fastify.register(calendarRoutes, { prefix: '/api/calendar' });
+fastify.register(adminRoutes, { prefix: '/api/admin' });
+fastify.register(partnerRoutes, { prefix: '/api/partner' });
+fastify.register(campusRoutes, { prefix: '/api/campus' });
 fastify.register(publicRoutes, { prefix: '/api/public' });
 
 // One shape for every failure, and no stack traces or SQL leaking to the client.

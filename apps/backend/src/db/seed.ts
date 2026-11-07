@@ -12,7 +12,8 @@ import bcrypt from 'bcrypt';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { config } from '../config/env.js';
 import { db } from './db.js';
-import { contents, githubProfiles, learningPaths, learningProfiles, learningSteps, profileSettings, users } from './schema.js';
+import { contents, githubProfiles, learningPaths, learningProfiles, learningSteps, profileSettings, schools, users } from './schema.js';
+import { presetCurriculum } from '../services/schools.js';
 import { generatePath, type CatalogItem, type LearnerProfile } from '../services/learning/generator.js';
 
 const SLOT_TYPES = ['roadmap', 'course', 'video', 'doc', 'exercise', 'repo', 'paper', 'question', 'opportunity'];
@@ -155,8 +156,24 @@ async function seedDemo(demo: Demo, catalog: CatalogItem[]) {
   console.log(`• ${demo.handle}: public profile, ${steps.length}-step path (${demo.pathPublic ? 'public' : 'private'}).`);
 }
 
+/** Epitech is the first school on the platform. Its curriculum is a starting point it can replace through the API. */
+async function seedSchools() {
+  const curriculum = presetCurriculum('epitech')!;
+  const [existing] = await db.select({ id: schools.id }).from(schools).where(eq(schools.slug, 'epitech')).limit(1);
+  if (existing) {
+    // An older install has the short topic list only: give it the programme, but never overwrite one that is there.
+    const [row] = await db.select({ curriculum: schools.curriculum }).from(schools).where(eq(schools.id, existing.id)).limit(1);
+    if (row?.curriculum.programme) return void console.log('• School: Epitech already there (programme untouched).');
+    await db.update(schools).set({ curriculum }).where(eq(schools.id, existing.id));
+    return void console.log('• School: Epitech updated with its starter programme (draft).');
+  }
+  await db.insert(schools).values({ slug: 'epitech', name: 'Epitech', curriculum });
+  console.log('• School: Epitech created. Generate its API key in Admin > Schools.');
+}
+
 async function main() {
   await seedAdmin();
+  await seedSchools();
   const catalog = await loadCatalog();
   for (const demo of DEMOS) await seedDemo(demo, catalog);
   console.log('Seed done.');

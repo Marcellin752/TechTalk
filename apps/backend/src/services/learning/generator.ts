@@ -8,6 +8,8 @@ export interface CatalogItem {
   source: string;
   categories: string[] | null;
   meta: Record<string, any> | null;
+  /** How learners who agreed to share fared with it (only present for well-covered items). */
+  signal?: { done: number; started: number } | null;
 }
 
 export interface LearnerProfile {
@@ -16,11 +18,15 @@ export interface LearnerProfile {
   languages: string[];
   hoursPerWeek: number;
   style: Style;
+  /** Optional: what the learner studies at school. */
+  school?: string | null;
+  schoolYear?: number | null;
+  schoolTopics?: string[];
 }
 
 export type StepKind = 'orient' | 'learn' | 'practice' | 'project' | 'read';
 export interface GeneratedStep { contentId: string; kind: StepKind; minutes: number }
-export interface GeneratedStage { index: number; title: string; objective: string; minutes: number; steps: GeneratedStep[] }
+export interface GeneratedStage { index: number; title: string; objective: string; minutes: number; steps: GeneratedStep[]; topics?: string[]; kind?: string }
 export interface GeneratedPath { title: string; totalMinutes: number; stages: GeneratedStage[] }
 
 const KIND: Record<string, StepKind> = {
@@ -63,6 +69,7 @@ export function hasTerm(text: string, term: string): boolean {
 
 export { looksEnglish } from '../automation/store.js';
 import { looksEnglish } from '../automation/store.js';
+import type { ProgrammeProject, ProgrammeYear } from '../../db/schema.js';
 
 function expandTerms(terms: string[], languages: string[]): string[] {
   return [...new Set(terms.flatMap((t) => (t === '$lang' ? languages.map((l) => l.toLowerCase()) : [t.toLowerCase()])))];
@@ -84,7 +91,24 @@ export function scoreItem(item: CatalogItem, slot: Slot, profile: LearnerProfile
     if (hasTerm(summary, t)) score += 1;
   }
 
+  // Resources about what the learner studies at school rank higher, but only among
+  // items that already fit the slot: it breaks ties, it does not let off-topic items in.
+  // Some slots name main topics: matching only a side topic ("strings") is not enough.
+  // A one-letter topic ("c") is found in too many sentences: it has to be in the title or the tags.
+  if (slot.must?.length && !slot.must.some((m) => hasTerm(title, m) || hasTerm(tags, m) || (m.length > 2 && hasTerm(summary, m)))) return 0;
+
+  // Learners who agreed to share: a resource most of them finish ranks higher, one most abandon lower.
+  let crowd = 0;
+  if (item.signal && item.signal.started >= 5) crowd = (item.signal.done / item.signal.started - 0.5) * 2;
+  let schoolBonus = 0;
+  for (const topic of profile.schoolTopics ?? []) {
+    if (hasTerm(title, topic)) schoolBonus += 1.5;
+    else if (hasTerm(tags, topic)) schoolBonus += 0.75;
+  }
+
   if (slot.type === 'exercise') {
+    // An exercise must be about the slot's subject: difficulty alone is not a reason to pick it.
+    if (slot.terms.length > 0 && score === 0) return 0;
     const diff = String(m.difficulty ?? '');
     const preferred = PREFERRED_DIFFICULTY[profile.level];
     if (!preferred.includes(diff)) return 0; // never hand a beginner a "hard" problem
@@ -95,12 +119,13 @@ export function scoreItem(item: CatalogItem, slot: Slot, profile: LearnerProfile
     // Mix platforms inside a stage.
     score -= 1.5 * chosenInStage.filter((c) => c.type === 'exercise' && c.meta?.platform === m.platform).length;
     score += Math.log10(Number(m.solved ?? 0) + 1) / 4;
-    return Math.max(score, 0.1);
+    return Math.max(score + schoolBonus + crowd, 0.1);
   }
 
   if (slot.terms.length === 0) score = 1; // an open slot: any item qualifies, ranked by the bonuses below
   else if (score < 2) return 0; // a mention in the summary alone is not enough: the title or tags must be about it
   if (score === 0) return 0;
+  score += schoolBonus + crowd;
   // A single resource should not swallow most of a stage.
   if (estimateMinutes(item) > stageBudget * 0.6) score -= 2.5;
   if (item.type === 'course' && profile.level === 'beginner' && m.level === 'beginner') score += 2;
@@ -125,10 +150,25 @@ function slotCount(slot: Slot, style: Style): number {
 
 interface Pick { item: CatalogItem; slotIndex: number; rank: number }
 
+/** Not a lesson: talk shows, interviews, news, and subjects that have nothing to do with learning to build software. */
+const NOT_A_LESSON = /\b(the cs50 show|podcast|interview|episode|reaction|trailer|vlog|livestream|live stream|q&a|news|day in the life|trading|forex|crypto(?:currency)?|stock market|invest(?:ing|ment)?)\b/i;
+
+/** Whether a catalogue item belongs in a learning path for this learner at all. */
+export function suitableForPath(item: CatalogItem, profile: { level: LearnerProfile['level'] }): boolean {
+  if (!looksEnglish(item.title)) return false;
+  const levelIndex = LEVELS.indexOf(profile.level);
+  if (['video', 'course', 'doc'].includes(item.type) && NOT_A_LESSON.test(item.title)) return false;
+  // Research papers are for people who already have the grounding to read them.
+  if (item.type === 'paper' && levelIndex < 2) return false;
+  // A job offer is not a step of learning. A beginner-friendly issue to contribute to is, once the basics are there.
+  if (item.type === 'opportunity' && (item.meta?.kind !== 'issue' || levelIndex < 1)) return false;
+  return true;
+}
+
 function fillStage(stage: StageTemplate, catalog: CatalogItem[], profile: LearnerProfile, languages: string[], used: Set<string>, budget: number): Pick[] {
   const picks: Pick[] = [];
   stage.slots.forEach((slot, slotIndex) => {
-    const pool = catalog.filter((c) => c.type === slot.type && !used.has(c.id) && looksEnglish(c.title));
+    const pool = catalog.filter((c) => c.type === slot.type && !used.has(c.id) && suitableForPath(c, profile));
     const chosen: CatalogItem[] = [];
     for (let n = 0; n < slotCount(slot, profile.style); n++) {
       let best: CatalogItem | null = null;
@@ -178,28 +218,64 @@ function orderSteps(picks: Pick[], style: Style): Pick[] {
   });
 }
 
-/** Builds a complete path: the stages a learner at this level needs, in order, each filled
- *  with the best resources in the catalogue and sized to the time they can give. */
-export function generatePath(profile: LearnerProfile, catalog: CatalogItem[]): GeneratedPath {
-  const levelIndex = LEVELS.indexOf(profile.level);
-  const languages = profile.languages.length ? profile.languages : DEFAULT_LANGUAGES[profile.goal];
-  const templates = TEMPLATES[profile.goal].filter((s) => levelIndex >= s.from && levelIndex <= s.to);
-  const totalBudget = WEEKS[profile.level] * profile.hoursPerWeek * 60;
+/** Fills each stage template with the best catalogue resources within its share of the time. */
+function compose(templates: Array<StageTemplate & { topics?: string[]; kind?: string }>, catalog: CatalogItem[], totalBudget: number, profile: LearnerProfile, languages: string[]): GeneratedStage[] {
   const weightSum = templates.reduce((n, s) => n + s.weight, 0) || 1;
   const used = new Set<string>();
-
   const stages: GeneratedStage[] = [];
   for (const tpl of templates) {
     const budget = (totalBudget * tpl.weight) / weightSum;
     const picks = orderSteps(fitBudget(fillStage(tpl, catalog, profile, languages, used, budget), budget), profile.style);
     if (picks.length === 0) continue;
     const steps = picks.map((p) => ({ contentId: p.item.id, kind: KIND[p.item.type]!, minutes: estimateMinutes(p.item) }));
-    stages.push({ index: stages.length, title: tpl.title, objective: tpl.objective, minutes: steps.reduce((n, s) => n + s.minutes, 0), steps });
+    stages.push({
+      index: stages.length, title: tpl.title, objective: tpl.objective, minutes: steps.reduce((n, s) => n + s.minutes, 0), steps,
+      ...(tpl.topics ? { topics: tpl.topics } : {}), ...(tpl.kind ? { kind: tpl.kind } : {}),
+    });
   }
+  return stages;
+}
+/** Builds a complete path: the stages a learner at this level needs, in order, each filled
+ *  with the best resources in the catalogue and sized to the time they can give. */
+export function generatePath(profile: LearnerProfile, catalog: CatalogItem[]): GeneratedPath {
+  const levelIndex = LEVELS.indexOf(profile.level);
+  const languages = profile.languages.length ? profile.languages : DEFAULT_LANGUAGES[profile.goal];
+  const templates = TEMPLATES[profile.goal].filter((s) => levelIndex >= s.from && levelIndex <= s.to);
+  const stages = compose(templates, catalog, WEEKS[profile.level] * profile.hoursPerWeek * 60, profile, languages);
 
   const levelName = { beginner: 'from zero', basics: 'from the basics', intermediate: 'going deeper', advanced: 'advanced' }[profile.level];
   return {
     title: `${GOAL_TITLES[profile.goal]}, ${levelName}`,
+    totalMinutes: stages.reduce((n, s) => n + s.minutes, 0),
+    stages,
+  };
+}
+
+/** One programme project as a stage: a lesson, a reading, a course, practice and an example, all about its topics. */
+export function projectTemplate(project: ProgrammeProject): StageTemplate & { topics: string[]; kind?: string } {
+  const hours = project.hours ?? 30;
+  return {
+    title: project.name,
+    objective: project.summary ?? `Get ready for ${project.name}.`,
+    // Resources are the help around the work, not the work: a third of its time, within bounds.
+    weight: Math.min(600, Math.max(90, Math.round(hours * 60 * 0.35))),
+    from: 0,
+    to: 3,
+    topics: project.topics,
+    ...(project.kind ? { kind: project.kind } : {}),
+    // The first topics are the project's main ones: every resource must be about at least one of them.
+    slots: (['video', 'doc', 'course', 'exercise', 'repo'] as const).map((type) => ({ type, terms: project.topics, must: project.topics.slice(0, 2), count: type === 'exercise' ? 2 : 1 })),
+  };
+}
+
+/** A path that follows a school's programme for one year: a stage per project, resources chosen for what it teaches. */
+export function generateSchoolPath(profile: LearnerProfile, schoolName: string, year: ProgrammeYear, catalog: CatalogItem[]): GeneratedPath {
+  const languages = profile.languages.length ? profile.languages : [];
+  const templates = year.projects.map(projectTemplate);
+  // Each stage's weight is already its budget in minutes, so the total is their sum.
+  const stages = compose(templates, catalog, templates.reduce((n, t) => n + t.weight, 0), profile, languages);
+  return {
+    title: `${schoolName}, year ${year.year}`,
     totalMinutes: stages.reduce((n, s) => n + s.minutes, 0),
     stages,
   };

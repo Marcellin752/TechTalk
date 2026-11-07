@@ -4,7 +4,7 @@ import { db } from '../db/db.js';
 import { kairosConversations, kairosMessages } from '../db/schema.js';
 import { config } from '../config/env.js';
 import { generate, LlmUnavailableError, providerChain, type ChatMessage } from '../services/kairos/llm.js';
-import { buildSystemPrompt, mentorNote, usedSources, wrapLearnerMessage } from '../services/kairos/prompt.js';
+import { buildSystemPrompt, mentorNote, pageName, splitSuggestions, usedSources, wrapLearnerMessage } from '../services/kairos/prompt.js';
 import { loadLearnerContext, searchCatalog } from '../services/kairos/retrieval.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,7 +27,7 @@ export async function handleKairosStatus(_request: FastifyRequest, reply: Fastif
 export async function handleKairosChat(request: FastifyRequest, reply: FastifyReply) {
   try {
     const uid = userId(request);
-    const body = (request.body ?? {}) as { message?: unknown; conversationId?: unknown; lang?: unknown };
+    const body = (request.body ?? {}) as { message?: unknown; conversationId?: unknown; lang?: unknown; page?: unknown };
     const uiLang = body.lang === 'fr' || body.lang === 'en' ? body.lang : undefined;
     const message = typeof body.message === 'string' ? body.message.trim() : '';
     if (!message) return reply.status(400).send({ error: 'Write a message first.' });
@@ -69,7 +69,8 @@ export async function handleKairosChat(request: FastifyRequest, reply: FastifyRe
     }
 
     const [learner, hits] = await Promise.all([loadLearnerContext(uid), searchCatalog(message)]);
-    const system = buildSystemPrompt(learner, hits, new Date(), uiLang);
+    learner.page = pageName(body.page);
+    const system = buildSystemPrompt(learner, hits, new Date(), uiLang, message);
     const note = mentorNote(message, history);
     const messages: ChatMessage[] = [...history, { role: 'user', content: `${wrapLearnerMessage(message)}${note ? `\n${note}` : ''}` }];
 
@@ -85,18 +86,20 @@ export async function handleKairosChat(request: FastifyRequest, reply: FastifyRe
       throw err;
     }
 
-    const sources = usedSources(result.text, hits);
+    const answer = splitSuggestions(result.text);
+    const sources = usedSources(answer.text, hits);
     await db.insert(kairosMessages).values({ conversationId: conversationId!, userId: uid, role: 'user', content: message });
     const [reply_] = await db
       .insert(kairosMessages)
-      .values({ conversationId: conversationId!, userId: uid, role: 'assistant', content: result.text, sources: sql`${JSON.stringify(sources)}::text::jsonb` as never, model: `${result.provider}:${result.model}` })
+      .values({ conversationId: conversationId!, userId: uid, role: 'assistant', content: answer.text, sources: sql`${JSON.stringify(sources)}::text::jsonb` as never, model: `${result.provider}:${result.model}` })
       .returning();
     await db.update(kairosConversations).set({ updatedAt: new Date() }).where(eq(kairosConversations.id, conversationId!));
 
     return reply.status(200).send({
       conversationId,
       title: isNew ? titleFrom(message) : undefined,
-      message: { id: reply_!.id, role: 'assistant', content: result.text, sources, createdAt: reply_!.createdAt },
+      message: { id: reply_!.id, role: 'assistant', content: answer.text, sources, feedback: null, createdAt: reply_!.createdAt },
+      suggestions: answer.suggestions,
     });
   } catch (error) {
     request.log.error(error);
@@ -126,7 +129,7 @@ export async function handleGetConversation(request: FastifyRequest, reply: Fast
     const [convo] = await db.select().from(kairosConversations).where(and(eq(kairosConversations.id, id), eq(kairosConversations.userId, userId(request)))).limit(1);
     if (!convo) return reply.status(404).send({ error: 'Conversation not found.' });
     const messages = await db
-      .select({ id: kairosMessages.id, role: kairosMessages.role, content: kairosMessages.content, sources: kairosMessages.sources, createdAt: kairosMessages.createdAt })
+      .select({ id: kairosMessages.id, role: kairosMessages.role, content: kairosMessages.content, sources: kairosMessages.sources, feedback: kairosMessages.feedback, createdAt: kairosMessages.createdAt })
       .from(kairosMessages)
       .where(eq(kairosMessages.conversationId, id))
       .orderBy(asc(kairosMessages.createdAt));
@@ -153,6 +156,43 @@ export async function handleClearConversations(request: FastifyRequest, reply: F
   try {
     await db.delete(kairosConversations).where(eq(kairosConversations.userId, userId(request)));
     return reply.status(204).send();
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/** Thumbs up or down on an answer; 0 takes the rating back. */
+export async function handleMessageFeedback(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { id } = request.params as { id?: string };
+    const value = ((request.body ?? {}) as { value?: unknown }).value;
+    if (!id || !UUID_RE.test(id)) return reply.status(400).send({ error: 'Invalid message id.' });
+    if (value !== 1 && value !== -1 && value !== 0) return reply.status(400).send({ error: 'Value must be 1, -1 or 0.' });
+    const updated = await db
+      .update(kairosMessages)
+      .set({ feedback: value === 0 ? null : value })
+      .where(and(eq(kairosMessages.id, id), eq(kairosMessages.userId, userId(request)), eq(kairosMessages.role, 'assistant')))
+      .returning({ id: kairosMessages.id });
+    if (updated.length === 0) return reply.status(404).send({ error: 'Message not found.' });
+    return reply.status(204).send();
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/** Gives a conversation a name of the learner's choosing. */
+export async function handleRenameConversation(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { id } = request.params as { id?: string };
+    if (!id || !UUID_RE.test(id)) return reply.status(400).send({ error: 'Invalid conversation id.' });
+    const raw = ((request.body ?? {}) as { title?: unknown }).title;
+    const title = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+    if (title.length < 1 || title.length > 120) return reply.status(400).send({ error: 'The name must be 1 to 120 characters.' });
+    const updated = await db.update(kairosConversations).set({ title }).where(and(eq(kairosConversations.id, id), eq(kairosConversations.userId, userId(request)))).returning({ id: kairosConversations.id });
+    if (updated.length === 0) return reply.status(404).send({ error: 'Conversation not found.' });
+    return reply.status(200).send({ id, title });
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error.' });

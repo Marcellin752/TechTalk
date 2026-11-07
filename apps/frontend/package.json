@@ -6,6 +6,8 @@
   "scripts": {
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "design:tokens": "node scripts/design-tokens.mjs",
+    "design:screens": "node scripts/screenshots.mjs",
     "test": "vitest run",
     "dev": "vite"
   },
@@ -50,6 +52,7 @@
     "react-resizable-panels": "2.1.7",
     "react-router-dom": "^7.18.5",
     "recharts": "2.15.2",
+    "simple-icons": "^16.36.0",
     "sonner": "2.0.3",
     "tailwind-merge": "3.2.0",
     "tw-animate-css": "1.3.8",
@@ -60,6 +63,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "4.7.0",
+    "playwright-core": "^1.65.0",
     "tailwindcss": "4.1.12",
     "typescript": "^7.0.2",
     "vite": "^6.4.5",

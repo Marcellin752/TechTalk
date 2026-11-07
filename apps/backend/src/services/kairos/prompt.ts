@@ -11,6 +11,11 @@ export interface LearnerContext {
   style?: string;
   githubLanguages?: string[];
   path?: { title: string; percent: number; stage?: string; nextStep?: string; stepsDone: number; stepsTotal: number } | null;
+  school?: { name: string; year?: number | null; topics: string[] } | null;
+  /** Calendar entries in the next week, soonest first. */
+  upcoming?: Array<{ title: string; kind: string; when: string }>;
+  /** Where in the app the learner is asking from, e.g. "Calendar". */
+  page?: string;
 }
 
 export interface CatalogHit { n: number; id: string; type: string; title: string; url: string; source: string; summary: string }
@@ -50,8 +55,23 @@ You are Kairos, the AI learning mentor inside TechTalk, a platform where people 
 - Exercises, katas and homework: when asked for "the solution", your FIRST reply must not contain a complete working solution. Give the key idea and a skeleton with the hard part left as a TODO comment or pseudocode, then ask what they have tried. Escalate one level per turn (hint, approach, partial code). Give the full solution only if they ask again after trying or are clearly stuck, and then explain every line. A function with a finished body counts as a full solution.
 - When they are wrong, say so kindly and say why. Correct misconceptions explicitly.
 - If a question is vague, ask one clarifying question instead of guessing at length.
+- When they study at a school, tie answers to what they are covering there. Use the calendar entries to help them plan ("you have an exam on Friday, so…"), but only mention entries listed under LEARNER.
 - Connect answers to their path when it helps ("this is exactly what your next step covers"), without forcing it.
 - About their path, you know only what is written under LEARNER: the title, the percentage, the current stage and the next step. Never invent, name or describe other steps or stages. For the full list, point them to "My path".
+
+# THE APP (what the learner sees)
+Use exactly these names when you point to a place, and never claim a feature that is not listed here.
+- Navigation: a left menu on computers (a bottom bar on phones) with Home, Learn, My path, Practice, Calendar, Kairos (you), People; under "You": Saved, Profile, Settings, About. A round Kairos button floats at the bottom right on every page. The moon icon at the top right switches light and dark theme.
+- Look: clean white or dark surfaces, rounded cards, one warm orange accent for buttons and progress.
+- Home: a "For you" feed (or "Latest") of videos, projects, articles and opportunities, with filter chips; now and then an item labelled "Something different" from outside their interests.
+- Learn / Practice: catalogues of courses, roadmaps, docs, papers (Learn) and exercises and questions (Practice).
+- My path: a summary card with a progress bar and a "Next up" button, a card for their school ("Add my school" / "Edit"), then numbered stages that open to show steps; each step has a circle to mark it done.
+- Calendar: a bar on top with the month arrows, "Today", "Add event", "Plan my sessions" and "Export (.ics)"; a month grid; the selected day's agenda under the grid. "Plan my sessions" lays the rest of their path over the weeks they choose.
+- Campus (only when their school has joined TechTalk): three tabs. "Revisions": study sessions students organise (join with one tap; joined ones appear in the Calendar). "Past exams": a library of links to past exams, corrections and notes for their school, with votes and a report button. "People": an opt-in directory of students from the same school, with suggestions by shared topics. Never invent campus content; if they have no school linked, point them to "Add my school" on My path.
+- Profile: their public profile, projects and path summary. Settings: language, theme, name, linked accounts (email, Google, GitHub), public-profile choices.
+
+# SUGGESTED FOLLOW-UPS
+After your answer, you may add ONE last line that starts with ">>> " followed by up to three short questions the learner could ask next, separated by " | " (each under 60 characters, in their language). Skip the line when nothing useful comes to mind. Never put anything after it.
 
 # USING THE CATALOG
 - <catalog> lists TechTalk resources retrieved for this very question, numbered [1], [2]…
@@ -102,6 +122,13 @@ function learnerBlock(l: LearnerContext): string {
   if (l.githubLanguages?.length) lines.push(`- Languages they already use (GitHub): ${l.githubLanguages.join(', ')}`);
   if (l.hoursPerWeek) lines.push(`- Time per week: ${l.hoursPerWeek} h`);
   if (l.style) lines.push(`- Prefers: ${l.style}`);
+  if (l.school) {
+    lines.push(`- School: ${sanitizeForPrompt(l.school.name, 80)}${l.school.year ? `, year ${l.school.year}` : ''}${l.school.topics.length ? `; studying right now: ${l.school.topics.map((t) => sanitizeForPrompt(t, 40)).join(', ')}` : ''}`);
+  }
+  if (l.upcoming?.length) {
+    lines.push(`- Coming up in their calendar: ${l.upcoming.map((e) => `${sanitizeForPrompt(e.title, 60)} (${e.kind}, ${e.when})`).join('; ')}`);
+  }
+  if (l.page) lines.push(`- They are asking from the "${l.page}" page.`);
   if (l.path) {
     const p = l.path;
     lines.push(`- Learning path: "${p.title}", ${p.percent}% done (${p.stepsDone}/${p.stepsTotal} steps)${p.stage ? `, now in "${p.stage}"` : ''}${p.nextStep ? `, next step: "${p.nextStep}"` : ''}`);
@@ -116,7 +143,29 @@ function catalogBlock(hits: CatalogHit[]): string {
   return hits.map((h) => `[${h.n}] (${h.type}, ${h.source}) ${sanitizeForPrompt(h.title, 120)}: ${sanitizeForPrompt(h.summary, 160)}`).join('\n');
 }
 
-export function buildSystemPrompt(learner: LearnerContext, hits: CatalogHit[], today = new Date(), uiLang?: string): string {
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const FR_WORDS = new Set('le la les un une des du de et est sont pour avec dans sur par pas que qui quoi comment pourquoi je tu il elle nous vous ils mon ma mes ton ta tes ce cette ces au aux où salut bonjour merci peux veux voudrais besoin aide'.split(' '));
+const EN_WORDS = new Set('the a an and is are for with in on of to how what why when where who i you he she we they my me your this that these those can could would should hi hello thanks please need help do does it at from'.split(' '));
+
+/** "fr" or "en" when the message clearly is one of them; undefined when it is too short or mixed. */
+export function detectLanguage(text: string): 'fr' | 'en' | undefined {
+  const words = text.toLowerCase().replace(/[^\p{L}\s'’-]/gu, ' ').split(/[\s'’-]+/).filter(Boolean);
+  let fr = 0;
+  let en = 0;
+  for (const w of words) {
+    if (FR_WORDS.has(w)) fr++;
+    if (EN_WORDS.has(w)) en++;
+  }
+  if (/[éèêàçùôâîû]/i.test(text)) fr += 1;
+  if (fr + en < 2) return undefined;
+  if (fr >= en * 2) return 'fr';
+  if (en >= fr * 2) return 'en';
+  return undefined;
+}
+
+export function buildSystemPrompt(learner: LearnerContext, hits: CatalogHit[], today = new Date(), uiLang?: string, message?: string): string {
+  const answerLang = message ? detectLanguage(message) : undefined;
   return `${BEHAVIOUR}
 
 # LEARNER
@@ -127,7 +176,7 @@ ${learnerBlock(learner)}
 ${catalogBlock(hits)}
 </catalog>
 
-Today is ${today.toISOString().slice(0, 10)}.${uiLang === 'fr' || uiLang === 'en' ? `\nThe learner's app is set to ${uiLang === 'fr' ? 'French' : 'English'}: use it when their message is too short or ambiguous to tell the language.` : ''}`;
+Today is ${today.toISOString().slice(0, 10)} (${WEEKDAYS[today.getUTCDay()]}).${answerLang ? `\nThe learner's latest message is in ${answerLang === 'fr' ? 'French' : 'English'}: answer in ${answerLang === 'fr' ? 'French' : 'English'}.` : ''}${!answerLang && (uiLang === 'fr' || uiLang === 'en') ? `\nThe learner's app is set to ${uiLang === 'fr' ? 'French' : 'English'}: use it when their message is too short or ambiguous to tell the language.` : ''}`;
 }
 
 /** The learner's last message, wrapped so it is clearly data. */
@@ -156,4 +205,33 @@ export function mentorNote(message: string, history: Array<{ role: string; conte
     return '<mentor_note>The learner is asking for the solution again or has shown an attempt. You may now give the full solution, but explain each part and ask what they would change.</mentor_note>';
   }
   return '<mentor_note>The learner is asking for a solution. Follow the exercise rule: do NOT write a complete working solution in this reply. Give the idea in one or two sentences and a skeleton in which the key step is a TODO comment or "...". End by asking what they have tried.</mentor_note>';
+}
+
+const PAGE_NAMES: Record<string, string> = {
+  '/': 'Home', '/learn': 'Learn', '/path': 'My path', '/practice': 'Practice', '/calendar': 'Calendar', '/campus': 'Campus', '/kairos': 'Kairos',
+  '/people': 'People', '/saved': 'Saved', '/profile': 'Profile', '/settings': 'Settings', '/about': 'About', '/onboarding': 'Setup',
+};
+
+/** The page name for a route the client reports; unknown routes are ignored. */
+export function pageName(path: unknown): string | undefined {
+  if (typeof path !== 'string') return undefined;
+  const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, '') || '/';
+  if (PAGE_NAMES[clean]) return PAGE_NAMES[clean];
+  if (/^\/(watch|project|article)\//.test(clean)) return 'a content page';
+  if (clean.startsWith('/u/')) return "someone's public profile";
+  return undefined;
+}
+
+export interface Answer { text: string; suggestions: string[] }
+
+/** Splits the model's reply into the answer and its optional ">>> a | b | c" follow-ups. */
+export function splitSuggestions(raw: string): Answer {
+  const match = raw.match(/(?:^|\n)\s*>>>\s*([^\n]+)\s*$/);
+  if (!match) return { text: raw.trim(), suggestions: [] };
+  const suggestions = match[1]!
+    .split('|')
+    .map((s) => s.replace(/^["'“”\s]+|["'“”\s]+$/g, '').trim())
+    .filter((s) => s.length >= 3 && s.length <= 80)
+    .slice(0, 3);
+  return { text: raw.slice(0, match.index).trim(), suggestions };
 }

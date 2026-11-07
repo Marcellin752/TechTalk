@@ -3,6 +3,7 @@ import type { AppTab, ContentItem } from "../types/content";
 /** Every address the app answers to, in one place. */
 export const ROUTES = {
   home: "/",
+  explore: "/explore",
   login: "/login",
   learn: "/learn",
   path: "/path",
@@ -10,6 +11,9 @@ export const ROUTES = {
   practice: "/practice",
   kairos: "/kairos",
   people: "/people",
+  calendar: "/calendar",
+  campus: "/campus",
+  admin: "/admin",
   saved: "/saved",
   profile: "/profile",
   settings: "/settings",
@@ -18,11 +22,15 @@ export const ROUTES = {
 
 export const TAB_PATHS: Record<AppTab, string> = {
   feed: ROUTES.home,
+  explore: ROUTES.explore,
   learn: ROUTES.learn,
   path: ROUTES.path,
   practice: ROUTES.practice,
   kairos: ROUTES.kairos,
   people: ROUTES.people,
+  calendar: ROUTES.calendar,
+  campus: ROUTES.campus,
+  admin: ROUTES.admin,
   saved: ROUTES.saved,
   profile: ROUTES.profile,
   settings: ROUTES.settings,
@@ -41,11 +49,15 @@ export function pathFor(item: Pick<ContentItem, "id" | "type">): string | null {
 
 /** Which header/tab a pathname belongs to. Content pages count as the feed. */
 export function tabFor(pathname: string): AppTab {
+  if (pathname.startsWith(ROUTES.explore)) return "explore";
   if (pathname.startsWith(ROUTES.learn)) return "learn";
   if (pathname.startsWith(ROUTES.path)) return "path";
   if (pathname.startsWith(ROUTES.practice)) return "practice";
   if (pathname.startsWith(ROUTES.kairos)) return "kairos";
   if (pathname.startsWith(ROUTES.people) || pathname.startsWith("/u/")) return "people";
+  if (pathname.startsWith(ROUTES.calendar)) return "calendar";
+  if (pathname.startsWith(ROUTES.campus)) return "campus";
+  if (pathname.startsWith(ROUTES.admin)) return "admin";
   if (pathname.startsWith(ROUTES.saved)) return "saved";
   if (pathname.startsWith(ROUTES.profile)) return "profile";
   if (pathname.startsWith(ROUTES.settings)) return "settings";

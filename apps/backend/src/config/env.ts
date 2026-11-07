@@ -38,7 +38,8 @@ export const config = {
   // Optional first administrator, created or updated by `npm run db:seed`.
   adminEmail: process.env.ADMIN_EMAIL,
   adminPassword: process.env.ADMIN_PASSWORD,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
+  // Access tokens are short; the refresh token (30 days, rotating) keeps people signed in.
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
   googleClientId: process.env.GOOGLE_CLIENT_ID,
   githubClientId: process.env.GITHUB_CLIENT_ID,
   githubClientSecret: process.env.GITHUB_CLIENT_SECRET,

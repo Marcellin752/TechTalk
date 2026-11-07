@@ -5,6 +5,7 @@ import { fetchMdn } from './mdn.js';
 import { fetchArxiv } from './arxiv.js';
 import { fetchLearningVideos } from './youtube-learn.js';
 import { fetchDatacamp } from './datacamp.js';
+import { fetchFoundations } from './foundations.js';
 
 const EVERY_MS = 12 * 60 * 60 * 1000;
 
@@ -16,6 +17,7 @@ export async function fetchLiveLearning(force = false): Promise<void> {
     fetchRoadmaps().then((n) => `roadmaps ${n}`),
     fetchCurricula().then((r) => `courses ${r.courses}, fCC articles ${r.articles}`),
     fetchMdn().then((n) => `MDN ${n}`),
+    fetchFoundations().then((n) => `foundations ${n}`),
     fetchDatacamp().then((n) => `DataCamp ${n}`),
     fetchLearningVideos().then((n) => `videos ${n}`),
     fetchArxiv().then((n) => `papers ${n}`), // slowest (rate limited), runs alongside the others

@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { NavLink } from "react-router-dom";
-import { BookOpen, Bookmark, Code2, Home, Info, Route, Settings, User, Users } from "lucide-react";
+import { BookOpen, Bookmark, CalendarDays, Code2, Compass, GraduationCap, Home, Info, Route, Settings, ShieldCheck, User, Users } from "lucide-react";
 import { KairosIcon } from "./KairosArt";
 import { ROUTES } from "../lib/routes";
 import { useI18n } from "../lib/i18n";
@@ -19,9 +19,12 @@ interface Item {
 
 const MAIN: Item[] = [
   { to: ROUTES.home, label: "nav.home", icon: Home, end: true },
+  { to: ROUTES.explore, label: "nav.explore", icon: Compass },
   { to: ROUTES.learn, label: "nav.learn", icon: BookOpen },
   { to: ROUTES.path, label: "nav.path", icon: Route },
   { to: ROUTES.practice, label: "nav.practice", icon: Code2 },
+  { to: ROUTES.calendar, label: "nav.calendar", icon: CalendarDays },
+  { to: ROUTES.campus, label: "nav.campus", icon: GraduationCap },
   { to: ROUTES.kairos, label: "nav.kairos", icon: KairosIcon, badge: "AI" },
   { to: ROUTES.people, label: "nav.people", icon: Users },
 ];
@@ -31,7 +34,8 @@ const YOU: Item[] = [
   { to: ROUTES.settings, label: "nav.settings", icon: Settings },
   { to: ROUTES.about, label: "nav.about", icon: Info },
 ];
-const BOTTOM: Item[] = [MAIN[0]!, MAIN[1]!, MAIN[2]!, MAIN[3]!, YOU[1]!]; // Kairos has its floating button on phones
+const ADMIN: Item = { to: ROUTES.admin, label: "nav.admin", icon: ShieldCheck };
+const BOTTOM: Item[] = [MAIN[0]!, MAIN[2]!, MAIN[3]!, MAIN[4]!, MAIN[5]!, YOU[1]!]; // Explore opens from the Home screen on phones; Kairos has its floating button
 
 function Row({ item, mini }: { item: Item; mini: boolean }) {
   const { t } = useI18n();
@@ -58,7 +62,7 @@ function Row({ item, mini }: { item: Item; mini: boolean }) {
   );
 }
 
-export function SideMenu({ collapsed }: { collapsed: boolean }) {
+export function SideMenu({ collapsed, isAdmin = false }: { collapsed: boolean; isAdmin?: boolean }) {
   const { t } = useI18n();
   return (
     <nav aria-label={t("nav.main")} className={`hidden lg:flex flex-col flex-shrink-0 border-r border-border bg-background overflow-y-auto ${collapsed ? "w-[72px] px-1 py-3 gap-1" : "w-56 p-3 gap-0.5"}`}>
@@ -70,6 +74,7 @@ export function SideMenu({ collapsed }: { collapsed: boolean }) {
       {YOU.map((i) => (
         <Row key={i.to} item={i} mini={collapsed} />
       ))}
+      {isAdmin && <Row item={ADMIN} mini={collapsed} />}
     </nav>
   );
 }
@@ -77,7 +82,7 @@ export function SideMenu({ collapsed }: { collapsed: boolean }) {
 export function BottomBar() {
   const { t } = useI18n();
   return (
-    <nav aria-label={t("nav.main")} className="lg:hidden flex-shrink-0 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+    <nav aria-label={t("nav.main")} className="lg:hidden flex-shrink-0 grid grid-cols-6 border-t border-border bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       {BOTTOM.map((i) => (
         <NavLink
           key={i.to}

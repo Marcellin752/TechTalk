@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { Expand, Plus, X } from "lucide-react";
+import { Clock, Expand, Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { KairosAvatar, KairosChat } from "./KairosChat";
+import { KairosHistory } from "./KairosHistory";
+import { api, KairosConversation } from "../services/api";
+import { toast } from "sonner";
 import { KairosFace } from "./KairosArt";
 import { ROUTES } from "../lib/routes";
 import { useI18n } from "../lib/i18n";
@@ -20,6 +23,19 @@ export function KairosFab() {
   const [bubble, setBubble] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [chatKey, setChatKey] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [list, setList] = useState<KairosConversation[] | null>(null);
+
+  const loadList = () => api.kairosConversations().then(setList).catch(() => setList([]));
+  const openHistory = () => {
+    setHistoryOpen((v) => !v);
+    if (!historyOpen) void loadList();
+  };
+  const openConversation = (id: string | null) => {
+    setConversationId(id);
+    setChatKey((k) => k + 1);
+    setHistoryOpen(false);
+  };
 
   // One greeting per session, a few seconds after arriving, then it tucks itself away.
   useEffect(() => {
@@ -73,6 +89,9 @@ export function KairosFab() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {t("kairos.mentor")}
               </p>
             </div>
+            <button onClick={openHistory} aria-label={t("kairos.history")} title={t("kairos.history")} aria-expanded={historyOpen} className={`w-8 h-8 rounded-lg flex items-center justify-center hover:text-foreground hover:bg-secondary ${historyOpen ? "text-primary bg-secondary" : "text-muted-foreground"}`}>
+              <Clock size={16} />
+            </button>
             <button onClick={newChat} aria-label={t("kairos.new")} title={t("kairos.new")} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary">
               <Plus size={17} />
             </button>
@@ -91,6 +110,29 @@ export function KairosFab() {
               <X size={17} />
             </button>
           </header>
+          {historyOpen && (
+            <div className="absolute inset-x-0 top-[57px] bottom-0 z-20 bg-card border-t border-border">
+              <KairosHistory
+                compact
+                list={list}
+                activeId={conversationId}
+                onOpen={(id) => openConversation(id)}
+                onNew={() => (newChat(), setHistoryOpen(false))}
+                onRename={async (id, title) => {
+                  const ok = await api.kairosRename(id, title);
+                  if (!ok) return toast.error(t("admin.error")), false;
+                  setList((l) => (l ?? []).map((c) => (c.id === id ? { ...c, title } : c)));
+                  return true;
+                }}
+                onDelete={async (id) => {
+                  if (!window.confirm(t("kairos.deleteOneConfirm"))) return;
+                  if (!(await api.kairosDelete(id))) return void toast.error(t("admin.error"));
+                  setList((l) => (l ?? []).filter((c) => c.id !== id));
+                  if (id === conversationId) openConversation(null);
+                }}
+              />
+            </div>
+          )}
           <div className="flex-1 min-h-0">
             <KairosChat key={chatKey} conversationId={conversationId} onConversation={(id) => setConversationId(id)} />
           </div>

@@ -7,6 +7,7 @@ import { db } from '../db/db.js';
 import { users } from '../db/schema.js';
 import { config } from '../config/env.js';
 import { syncGithubProfileInBackground } from '../services/github-profile.js';
+import { issueSession, revokeRefreshToken, rotateRefreshToken } from '../services/session.js';
 import { validateEmail, validatePassword } from '../utils/validators.js';
 
 export async function handleRegister(request: FastifyRequest, reply: FastifyReply) {
@@ -88,18 +89,12 @@ export async function handleLogin(request: FastifyRequest, reply: FastifyReply) 
       return reply.status(401).send({ error: 'Invalid email or password.' });
     }
 
-    const token = (request.server as any).jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email,
-        role: user.role
-      },
-      { expiresIn: '1d' }
-    );
+    const { token, refreshToken } = await issueSession(request.server as any, user, config.jwtExpiresIn, request.headers['user-agent']);
 
     return reply.status(200).send({ 
       message: 'Login successful!',
-      token, 
+      token,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -192,14 +187,12 @@ export async function handleGoogleAuth(request: FastifyRequest, reply: FastifyRe
       throw new Error('Failed to resolve Google user.');
     }
 
-    const token = (request.server as any).jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      { expiresIn: '1d' }
-    );
+    const { token, refreshToken } = await issueSession(request.server as any, user, config.jwtExpiresIn, request.headers['user-agent']);
 
     return reply.status(200).send({
       message: 'Google Sign-In successful!',
       token,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -253,48 +246,35 @@ export async function handleUpdateProfile(request: FastifyRequest, reply: Fastif
 
 export async function handleRefresh(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const authHeader = request.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return reply.status(401).send({ error: 'Missing token.' });
+    const { refreshToken } = (request.body ?? {}) as { refreshToken?: unknown };
+    if (typeof refreshToken !== 'string' || refreshToken.length < 20 || refreshToken.length > 200) {
+      return reply.status(401).send({ error: 'Missing refresh token.' });
     }
-
-    let payload: any;
-    try {
-      payload = await request.jwtVerify({ ignoreExpiration: true } as any);
-    } catch (err) {
-      request.log.error(err);
-      return reply.status(401).send({ error: 'Invalid or forged token.' });
+    const result = await rotateRefreshToken(request.server as any, refreshToken, config.jwtExpiresIn, request.headers['user-agent']);
+    if (!result.ok) {
+      return reply.status(401).send({
+        error: result.reason === 'expired' ? 'Session expired. Please sign in again.' : 'Invalid session. Please sign in again.',
+      });
     }
-
-    // Grace period: never resurrect a token that expired more than 30 days ago.
-    if (payload.exp) {
-      const expiredMsAgo = Date.now() - payload.exp * 1000;
-      if (expiredMsAgo > 30 * 24 * 60 * 60 * 1000) {
-        return reply.status(401).send({ error: 'Session expired. Please sign in again.' });
-      }
-    }
-
-    const [user] = await db.select().from(users).where(eq(users.id, payload.id)).limit(1);
-    if (!user) {
-      return reply.status(401).send({ error: 'User no longer exists.' });
-    }
-
-    const token = (request.server as any).jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      { expiresIn: '1d' }
-    );
-
+    const { user } = result;
     return reply.status(200).send({
       message: 'Token refreshed successfully!',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        picture: user.picture ?? null,
-      },
+      token: result.token,
+      refreshToken: result.refreshToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, picture: user.picture ?? null },
     });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/** Signs this device out for good: its refresh token stops working. */
+export async function handleLogout(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { refreshToken } = (request.body ?? {}) as { refreshToken?: unknown };
+    if (typeof refreshToken === 'string' && refreshToken.length <= 200) await revokeRefreshToken(refreshToken);
+    return reply.status(204).send();
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error.' });
@@ -502,11 +482,8 @@ export async function handleGithubCallback(request: FastifyRequest, reply: Fasti
     if (!user) return fail('persist', { githubId, email });
     syncGithubProfileInBackground(user.id, ghUser.login);
 
-    const token = (request.server as any).jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      { expiresIn: '1d' }
-    );
-    return reply.redirect(`${frontend}/login#gh_token=${encodeURIComponent(token)}`);
+    const { token, refreshToken } = await issueSession(request.server as any, user, config.jwtExpiresIn, request.headers['user-agent']);
+    return reply.redirect(`${frontend}/login#gh_token=${encodeURIComponent(token)}&gh_refresh=${encodeURIComponent(refreshToken)}`);
   } catch (error) {
     request.log.error(error);
     return fail('server');
