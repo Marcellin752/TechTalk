@@ -28,6 +28,8 @@ export const users = pgTable('users', {
   githubLogin: varchar('github_login', { length: 100 }), // public handle, shown on the profile
   picture: varchar('picture', { length: 500 }), // avatar URL (Google profile picture)
   role: varchar('role', { length: 20 }).default('user').notNull(), // 'user' or 'admin'
+  /** Set once the learner's past activity has been turned into skill evidence, so erasing it is permanent. */
+  skillsBackfilledAt: timestamp('skills_backfilled_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

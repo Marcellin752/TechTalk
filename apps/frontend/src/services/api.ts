@@ -148,7 +148,12 @@ export type KairosAction =
   | { type: 'calendar.add'; title: string; kind: CalendarKind; startsAt: string; endsAt: string; notes?: string | null }
   | { type: 'plan.sessions' }
   | { type: 'path.rebuild' }
-  | { type: 'review.open' };
+  | { type: 'review.open' }
+  | { type: 'card.add'; front: string; back: string; topic: string | null }
+  | { type: 'project.add'; title: string; description: string | null; topics: string[] }
+  | { type: 'research.add'; workspace: string; title: string; note: string }
+  | { type: 'skill.open'; slug: string }
+  | { type: 'page.open'; page: 'today' | 'skills' | 'memory' | 'lab' | 'playground' | 'community' | 'growth' | 'opportunities' | 'review' | 'calendar' | 'path' };
 export interface AdminCampusResource { id: string; title: string; subject: string; url: string; status: 'approved' | 'hidden'; reports: number; votes: number; official: boolean; school: string; author: string | null; createdAt: string }
 export interface SchoolProgramme { status?: 'draft' | 'confirmed'; years: Array<{ year: number; title: string; summary?: string; projects: Array<{ name: string; summary?: string; topics: string[]; kind?: string; hours?: number }> }> }
 export interface AdminSchool {

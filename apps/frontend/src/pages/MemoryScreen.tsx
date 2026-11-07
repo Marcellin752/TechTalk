@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Layers, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
+import { topicSlug } from "../lib/askKairos";
 import { useI18n } from "../lib/i18n";
 import { btnCls, ghostCls, inputCls, Page, PageHeader, Section } from "../components/PageHeader";
 
@@ -18,6 +20,15 @@ export function MemoryScreen() {
   const [topic, setTopic] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [params] = useSearchParams();
+  const [quizDue, setQuizDue] = useState(0);
+  // Arriving from a concept, a Kairos suggestion or a project: the card is half written.
+  useEffect(() => {
+    const f = params.get("front"), tp = params.get("topic");
+    if (f) setFront(f.slice(0, 400));
+    if (tp) setTopic(tp.slice(0, 60));
+    api.getReviews().then((r) => setQuizDue(r.dueCount ?? 0));
+  }, [params]);
 
   const load = useCallback(async () => {
     const r = await api.growth<{ due: Card[]; all: Card[] }>("/cards?all=1");
@@ -51,6 +62,11 @@ export function MemoryScreen() {
   return (
     <Page>
       <PageHeader icon={Layers} title={t("memory.title")} subtitle={t("memory.subtitle")} />
+      {quizDue > 0 && (
+        <p className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-foreground mb-5 flex items-center gap-3">
+          <span className="flex-1">{t("memory.quizDue", { n: quizDue })}</span><Link to="/review" className="font-semibold text-primary">{t("memory.goReview")}</Link>
+        </p>
+      )}
       {due === null && <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary" /></div>}
 
       {due && (
@@ -95,7 +111,7 @@ export function MemoryScreen() {
               <li key={c.id} className="rounded-xl border border-border bg-card px-4 py-3 flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground truncate">{c.front}</p>
-                  <p className="text-[12px] text-muted-foreground">{c.topic ? `${c.topic} · ` : ""}{t("memory.interval", { n: c.intervalDays })}</p>
+                  <p className="text-[12px] text-muted-foreground">{c.topic ? <><Link to={`/skills/${topicSlug(c.topic)}`} className="underline underline-offset-2">{c.topic}</Link> · </> : ""}{t("memory.interval", { n: c.intervalDays })}</p>
                 </div>
                 <button aria-label={t("memory.edit")} onClick={() => { setEditing(c.id); setFront(c.front); setBack(c.back); setTopic(c.topic ?? ""); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="p-1.5 text-muted-foreground hover:text-foreground"><Pencil size={15} /></button>
                 <button aria-label={t("common.delete")} onClick={() => remove(c.id)} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 size={15} /></button>

@@ -16,6 +16,8 @@ export function ReviewScreen() {
   const [feedback, setFeedback] = useState<{ chosen: number; correct: boolean; answer: number; explanation: string } | null>(null);
   const [score, setScore] = useState({ right: 0, seen: 0 });
   const [busy, setBusy] = useState(false);
+  const [ownDue, setOwnDue] = useState(0);
+  useEffect(() => { api.growth<{ due: unknown[] }>("/cards").then((r) => setOwnDue(r.data?.due.length ?? 0)); }, []);
 
   const load = useCallback(() => {
     api.getReviews().then((r) => {
@@ -53,6 +55,11 @@ export function ReviewScreen() {
           <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto leading-relaxed">{t("review.subtitle")}</p>
         </div>
 
+        {ownDue > 0 && (
+          <p className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm text-foreground mb-5 flex items-center gap-3">
+            <span className="flex-1">{t("review.cardsDue", { n: ownDue })}</span><Link to="/memory" className="font-semibold text-primary">{t("review.goMemory")}</Link>
+          </p>
+        )}
         {cards === null && <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>}
 
         {cards && !card && (

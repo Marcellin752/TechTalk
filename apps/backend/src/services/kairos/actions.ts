@@ -8,7 +8,22 @@ export type KairosAction =
   | { type: 'calendar.add'; title: string; kind: 'study' | 'school' | 'deadline' | 'event'; startsAt: string; endsAt: string; notes?: string | null }
   | { type: 'plan.sessions' }
   | { type: 'path.rebuild' }
-  | { type: 'review.open' };
+  | { type: 'review.open' }
+  | { type: 'card.add'; front: string; back: string; topic: string | null }
+  | { type: 'project.add'; title: string; description: string | null; topics: string[] }
+  | { type: 'research.add'; workspace: string; title: string; note: string }
+  | { type: 'skill.open'; slug: string }
+  | { type: 'page.open'; page: OpenablePage };
+
+/** Where Kairos can send the learner. Anything else is dropped. */
+export const OPENABLE_PAGES = ['today', 'skills', 'memory', 'lab', 'playground', 'community', 'growth', 'opportunities', 'review', 'calendar', 'path'] as const;
+export type OpenablePage = (typeof OPENABLE_PAGES)[number];
+
+const clean = (v: unknown, min: number, max: number): string | null => {
+  if (typeof v !== 'string') return null;
+  const s = v.replace(/\s+/g, ' ').trim();
+  return s.length >= min && s.length <= max ? s : null;
+};
 
 export const MAX_ACTIONS = 2;
 export const MAX_NOTES = 20;
@@ -29,6 +44,28 @@ function validate(raw: unknown): KairosAction | null {
       if (v.endsAt <= v.startsAt || v.startsAt.getTime() < Date.now() - 3_600_000 || v.endsAt.getTime() - v.startsAt.getTime() > 12 * 3_600_000) return null;
       return { type: 'calendar.add', title: v.title, kind: v.kind, startsAt: v.startsAt.toISOString(), endsAt: v.endsAt.toISOString(), notes: v.notes ?? null };
     }
+    case 'card.add': {
+      const front = clean(a.front, 2, 400);
+      const back = clean(a.back, 1, 600);
+      const topic = a.topic == null ? null : clean(a.topic, 1, 60)?.toLowerCase() ?? undefined;
+      return front && back && topic !== undefined ? { type: 'card.add', front, back, topic } : null;
+    }
+    case 'project.add': {
+      const title = clean(a.title, 2, 120);
+      const description = a.description == null ? null : clean(a.description, 1, 300);
+      const topics = Array.isArray(a.topics) ? a.topics.map((t) => clean(t, 1, 40)?.toLowerCase()).filter((t): t is string => !!t).slice(0, 5) : [];
+      return title && (a.description == null || description) ? { type: 'project.add', title, description, topics } : null;
+    }
+    case 'research.add': {
+      const workspace = clean(a.workspace, 1, 80);
+      const title = clean(a.title, 1, 200);
+      const note = clean(a.note, 1, 600);
+      return workspace && title && note ? { type: 'research.add', workspace, title, note } : null;
+    }
+    case 'skill.open':
+      return typeof a.slug === 'string' && /^[a-z0-9][a-z0-9-]{0,59}$/.test(a.slug) ? { type: 'skill.open', slug: a.slug } : null;
+    case 'page.open':
+      return typeof a.page === 'string' && (OPENABLE_PAGES as readonly string[]).includes(a.page) ? { type: 'page.open', page: a.page as OpenablePage } : null;
     default:
       return null;
   }

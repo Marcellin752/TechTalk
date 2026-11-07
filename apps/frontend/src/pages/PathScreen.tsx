@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, Check, ChevronDown, Circle, Clock, List, Loader2, Map as MapIcon, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { Loader2, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { api, LearningPath, LearningProfile, PathStageView, PathStep, PathSummary, StepStatus } from "../services/api";
 import { PathSwitcher } from "../components/PathSwitcher";
@@ -24,56 +24,10 @@ interface PathScreenProps {
   onProfile?: (profile: LearningProfile) => void;
 }
 
-function StepRow({ step, onStatus, onOpen }: { step: PathStep; onStatus: (s: StepStatus) => void; onOpen: () => void }) {
-  const { t } = useI18n();
-  const done = step.status === "done";
-  return (
-    <li className={`flex items-start gap-3 py-3 ${done ? "opacity-60" : ""}`}>
-      <button
-        onClick={() => onStatus(done ? "todo" : "done")}
-        aria-label={done ? t("path.markUndone") : t("path.markDone")}
-        aria-pressed={done}
-        className={`mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center flex-shrink-0 transition-colors ${done ? "bg-primary border-primary text-white" : step.status === "doing" ? "border-primary text-primary" : "border-border text-transparent hover:border-primary"}`}
-      >
-        {done ? <Check size={14} strokeWidth={3} /> : step.status === "doing" ? <Circle size={8} className="fill-current" /> : <Check size={14} />}
-      </button>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wide text-muted-foreground">
-          <span className="text-primary">{t(KIND_LABEL_KEYS[step.kind])}</span>
-          {typeLabel(t, step.content.type) !== t(KIND_LABEL_KEYS[step.kind]) && (
-            <>
-              <span>·</span>
-              <span>{typeLabel(t, step.content.type)}</span>
-            </>
-          )}
-          <span>·</span>
-          <span className="truncate normal-case tracking-normal">{step.content.source}</span>
-        </div>
-        <button onClick={onOpen} className={`text-left text-[14.5px] font-medium leading-snug mt-0.5 hover:text-primary transition-colors ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
-          {step.content.title}
-        </button>
-      </div>
-
-      <div className="flex items-center gap-3 flex-shrink-0 pt-0.5">
-        <span className="hidden sm:inline-flex items-center gap-1 text-[12px] text-muted-foreground">
-          <Clock size={12} /> {formatMinutes(step.minutes)}
-        </span>
-        {!done && (
-          <button onClick={onOpen} className="inline-flex items-center gap-1 px-3 h-8 rounded-lg bg-secondary hover:bg-muted text-[12.5px] font-semibold text-foreground">
-            {step.status === "doing" ? t("path.resumeBtn") : t("path.start")} <ArrowUpRight size={13} />
-          </button>
-        )}
-      </div>
-    </li>
-  );
-}
-
 export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile = null, onProfile }: PathScreenProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [open, setOpen] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [paths, setPaths] = useState<PathSummary[] | null>(null);
   const [max, setMax] = useState(6);
@@ -83,21 +37,6 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
   const [renaming, setRenaming] = useState(false);
   const [quiz, setQuiz] = useState<PathStageView | null>(null);
   const [weekKey, setWeekKey] = useState(0);
-  const [view, setView] = useState<"map" | "list">(() => {
-    try {
-      return localStorage.getItem("teachtalk_path_view") === "list" ? "list" : "map";
-    } catch {
-      return "map";
-    }
-  });
-  const chooseView = (v: "map" | "list") => {
-    setView(v);
-    try {
-      localStorage.setItem("teachtalk_path_view", v);
-    } catch {
-      /* remembered only when storage works */
-    }
-  };
 
   // The path on screen: the main one comes from the app; the others are fetched when chosen.
   const path = selectedId && primary && selectedId === primary.id ? primary : fetched && fetched.id === selectedId ? fetched : null;
@@ -148,7 +87,6 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
 
   // The current stage opens by itself.
   useEffect(() => {
-    if (path?.currentStage != null) setOpen((o) => (path.currentStage! in o ? o : { ...o, [path.currentStage!]: true }));
   }, [path?.currentStage, path?.id]);
 
   const update = async (step: PathStep, status: StepStatus) => {
@@ -236,7 +174,8 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-16">
+      <div className="w-full px-3 sm:px-6 py-6 pb-16">
+        <div className="max-w-4xl mx-auto">
         {paths && paths.length > 0 && (
           <div className="mb-5">
             <PathSwitcher
@@ -295,70 +234,13 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
           }}
         />
 
-        {/* The path, as a map of nodes or as a list */}
-        <div className="mt-8 flex items-center justify-between gap-3">
-          <h2 className="text-[15px] font-semibold text-foreground">{t("path.stagesTitle")}</h2>
-          <div role="radiogroup" aria-label={t("path.view")} className="flex rounded-lg border border-border bg-secondary p-0.5">
-            {([["map", MapIcon, "path.view.map"], ["list", List, "path.view.list"]] as const).map(([id, Icon, label]) => (
-              <button key={id} role="radio" aria-checked={view === id} onClick={() => chooseView(id)} className={`inline-flex items-center gap-1.5 px-3 h-7 rounded-md text-[13px] font-medium transition-colors ${view === id ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"}`}>
-                <Icon size={14} /> {t(label)}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {view === "map" && (
-          <div className="mt-4">
-            <RoadmapMap path={path} onStatus={update} onOpen={openStep} onQuiz={setQuiz} />
-          </div>
-        )}
+        {/* The path, as a map of nodes, across the whole width */}
+        <h2 className="mt-8 mb-4 text-[15px] font-semibold text-foreground max-w-4xl mx-auto">{t("path.stagesTitle")}</h2>
+        <RoadmapMap path={path} onStatus={update} onOpen={openStep} onQuiz={setQuiz} />
 
-        {/* Stages */}
-        <ol className={`mt-4 space-y-4 ${view === "map" ? "hidden" : ""}`}>
-          {path.stages.map((stage) => {
-            const isCurrent = path.currentStage === stage.index;
-            const expanded = !!open[stage.index];
-            return (
-              <li key={stage.index} className="relative pl-12">
-                <span className={`absolute left-0 top-4 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${stage.complete ? "bg-primary text-white" : isCurrent ? "bg-primary/15 text-primary border-2 border-primary" : "bg-secondary text-muted-foreground"}`}>
-                  {stage.complete ? <Check size={16} strokeWidth={3} /> : stage.index + 1}
-                </span>
-                {stage.index < path.stages.length - 1 && <span aria-hidden className="absolute left-[17px] top-14 bottom-[-1rem] w-px bg-border" />}
-
-                <section className={`rounded-2xl border bg-card ${isCurrent ? "border-primary/50" : "border-border"}`}>
-                  <button onClick={() => setOpen((o) => ({ ...o, [stage.index]: !expanded }))} aria-expanded={expanded} className="w-full text-left p-4 sm:p-5 flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-[16px] font-semibold text-foreground">{stage.title}</h2>
-                      <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">{stage.objective}</p>
-                      {stage.complete && (
-                        <span className="inline-block mt-2" onClick={(e) => e.stopPropagation()}>
-                          {stage.checkpoint.passed
-                            ? <span className="text-[12px] text-primary font-medium">{t("quiz.passedShort", { score: stage.checkpoint.bestScore ?? 0, total: stage.checkpoint.total ?? 0 })}</span>
-                            : <span role="button" tabIndex={0} onClick={() => setQuiz(stage)} onKeyDown={(e) => e.key === "Enter" && setQuiz(stage)} className="inline-flex items-center px-3 h-7 rounded-lg border border-primary/40 text-primary text-[12px] font-semibold hover:bg-primary/10 cursor-pointer">{stage.checkpoint.attempts > 0 ? t("quiz.tryAgain") : t("quiz.take")}</span>}
-                        </span>
-                      )}
-                      {stage.topics && stage.topics.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">{stage.topics.map((tp) => <span key={tp} className="px-2 h-5 inline-flex items-center rounded-full bg-primary/10 text-primary text-[11px] font-mono">{tp}</span>)}</div>
-                      )}
-                      <p className="text-[12px] text-muted-foreground mt-2">
-                        {t("path.doneOf", { done: stage.done, total: stage.total })} · {formatMinutes(stage.minutes)}
-                      </p>
-                    </div>
-                    <ChevronDown size={18} className={`text-muted-foreground mt-1 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                  </button>
-                  {expanded && (
-                    <ul className="px-4 sm:px-5 pb-3 divide-y divide-border border-t border-border">
-                      {stage.steps.map((step) => (
-                        <StepRow key={step.id} step={step} onStatus={(s) => update(step, s)} onOpen={() => openStep(step)} />
-                      ))}
-                    </ul>
-                  )}
-                </section>
-              </li>
-            );
-          })}
-        </ol>
-
+        <div className="max-w-4xl mx-auto">
         <div className="mt-8 flex flex-wrap gap-3">
           <button onClick={() => navigate(`${ROUTES.onboarding}?edit=1`)} className="inline-flex items-center gap-2 px-4 h-10 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-secondary">
             <SlidersHorizontal size={15} /> {t("path.edit")}
@@ -366,6 +248,7 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
           <button onClick={rebuild} disabled={busy} className="inline-flex items-center gap-2 px-4 h-10 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-60">
             <RefreshCw size={15} className={busy ? "animate-spin" : ""} /> {t("path.rebuild")}
           </button>
+        </div>
         </div>
       </div>
 

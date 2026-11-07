@@ -77,6 +77,11 @@ describe('next actions', () => {
     expect(r.length).toBeLessThanOrEqual(5);
     expect(r.every((a) => a.reason.length > 0)).toBe(true);
   });
+  it('brings in the project milestone and waiting mentoring requests', () => {
+    const r = nextActions({ ...ctx, project: { title: 'Shell', milestone: 'parse input' }, mentorRequests: 2 });
+    expect(r.map((a) => a.kind)).toEqual(['mentor', 'project']);
+    expect(r[1]!.title).toContain('parse input');
+  });
   it('ignores a far deadline', () => expect(nextActions({ ...ctx, deadline: { title: 'P', inDays: 30 } })).toEqual([]));
 });
 
@@ -93,4 +98,16 @@ describe('exercises', () => {
       expect(e.starter).toContain(`function ${e.fn}(`);
     }
   });
+});
+
+import { estimate } from '../skills/mastery.js';
+describe('evidence cannot be farmed', () => {
+  const at = new Date('2026-01-01T00:00:00Z');
+  const ev = (type: 'quiz' | 'review' | 'read', n: number) => Array.from({ length: n }, (_, i) => ({ type, outcome: 1, at, ref: `${type}${i}` }));
+  it('repeating reads never leaves exploring, however many', () => expect(estimate(ev('read', 500), at).level).toBe('exploring'));
+  it('one lucky answer is not understanding', () => expect(estimate(ev('quiz', 1), at).level).toBe('learning'));
+  it('the same kind repeated 500 times adds almost nothing over 8', () => {
+    expect(Math.abs(estimate(ev('quiz', 500), at).mastery - estimate(ev('quiz', 8), at).mastery)).toBeLessThan(0.05);
+  });
+  it('a real quiz set still reaches understood', () => expect(estimate(ev('quiz', 5), at).level).toBe('understood'));
 });

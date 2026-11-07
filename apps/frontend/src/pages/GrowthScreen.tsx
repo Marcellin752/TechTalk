@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Loader2, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../services/api";
+import { askKairos } from "../lib/askKairos";
 import { useI18n } from "../lib/i18n";
 import { Page, PageHeader, Section } from "../components/PageHeader";
 
@@ -86,7 +87,7 @@ export function GrowthScreen() {
             <Section title={t("growth.movement")}>
               <div className="flex flex-wrap gap-2">
                 {a.improving.map((c) => <Link key={c.slug} to={`/skills/${c.slug}`} className="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[13px] font-medium">{c.name} ↑</Link>)}
-                {a.fading.map((c) => <Link key={c.slug} to={`/skills/${c.slug}`} className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 text-[13px] font-medium">{c.name} ↓</Link>)}
+                {a.fading.map((c) => <Link key={c.slug} to={askKairos(t("ask.fading", { name: c.name }))} title={t("ask.kairos")} className="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 text-[13px] font-medium">{c.name} ↓</Link>)}
               </div>
             </Section>
           )}

@@ -1,7 +1,8 @@
-import { and, asc, eq, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { db } from '../../db/db.js';
-import { calendarEvents, contents, kairosNotes, reviewItems, learningPaths, learningProfiles, learningSteps, githubProfiles, users } from '../../db/schema.js';
+import { calendarEvents, contents, kairosNotes, reviewItems, learningPaths, learningProfiles, learningSteps, githubProfiles, users, userCards, labProjects } from '../../db/schema.js';
 import type { CatalogHit, LearnerContext } from './prompt.js';
+import { loadGraph } from '../skills/store.js';
 
 /* What Kairos knows about the question (matching catalogue items) and about the
    learner (profile, path, languages). Retrieval is plain keyword search: it is
@@ -106,6 +107,22 @@ export async function loadLearnerContext(userId: string): Promise<LearnerContext
   for (const c of cards) if (c.lapses > 0 && c.card.topic) missed.set(c.card.topic, (missed.get(c.card.topic) ?? 0) + c.lapses);
   ctx.weakTopics = [...missed].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => t);
   ctx.reviewsDue = cards.filter((c) => c.dueAt.getTime() <= Date.now()).length;
+
+  // What the learner has shown (not merely read), their own cards and projects: one picture across the app.
+  try {
+    const g = await loadGraph(userId);
+    const lv = (levels: string[]) => g.nodes.filter((n) => levels.includes(n.level)).sort((a, b) => b.mastery - a.mastery).slice(0, 8).map((n) => n.name);
+    ctx.skills = {
+      understood: lv(['understood', 'applied']),
+      learning: lv(['learning']),
+      slipping: g.nodes.filter((n) => n.level !== 'unseen' && n.level !== 'exploring' && n.trend === 'down').slice(0, 5).map((n) => n.name),
+    };
+    const [{ n: due }] = await db.select({ n: sql<number>`count(*)::int` }).from(userCards).where(and(eq(userCards.userId, userId), lte(userCards.dueAt, new Date())));
+    ctx.cardsDue = due;
+    ctx.projects = (await db.select({ title: labProjects.title, status: labProjects.status, topics: labProjects.topics }).from(labProjects).where(and(eq(labProjects.userId, userId), sql`${labProjects.status} <> 'done'`)).orderBy(sql`${labProjects.createdAt} desc`).limit(3));
+  } catch {
+    // The mentor still answers without this extra picture.
+  }
 
   const now = new Date();
   const soon = await db

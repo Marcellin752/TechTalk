@@ -3,6 +3,7 @@ import { ArrowUp, Copy, ExternalLink, ThumbsDown, ThumbsUp } from "lucide-react"
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api, KairosAction, KairosMessage } from "../services/api";
+import { ROUTES } from "../lib/routes";
 import { Markdown } from "./Markdown";
 import { useI18n } from "../lib/i18n";
 import { KairosFace, KairosPortrait } from "./KairosArt";
@@ -116,24 +117,42 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
       toast.error(t("kairos.rateFailed"));
     }
   };
-  const labelOf = (a: KairosAction): string =>
-    a.type === "calendar.add" ? `${a.title} · ${new Date(a.startsAt).toLocaleString(lang === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
-    : a.type === "plan.sessions" ? t("kairos.act.plan") : a.type === "path.rebuild" ? t("kairos.act.rebuild") : t("kairos.act.review");
-  const verbOf = (a: KairosAction): string => (a.type === "calendar.add" ? t("kairos.act.addCal") : a.type === "plan.sessions" ? t("kairos.act.planGo") : a.type === "path.rebuild" ? t("kairos.act.rebuildGo") : t("kairos.act.reviewGo"));
+  const labelOf = (a: KairosAction): string => {
+    switch (a.type) {
+      case "calendar.add": return `${a.title} · ${new Date(a.startsAt).toLocaleString(lang === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`;
+      case "plan.sessions": return t("kairos.act.plan");
+      case "path.rebuild": return t("kairos.act.rebuild");
+      case "review.open": return t("kairos.act.review");
+      case "card.add": return a.front;
+      case "project.add": return a.title;
+      case "research.add": return `${a.workspace} · ${a.title}`;
+      case "skill.open": return a.slug.replace(/-/g, " ");
+      case "page.open": return t(`nav.${a.page}` as "nav.today");
+    }
+  };
+  const VERB: Record<KairosAction["type"], "kairos.act.addCal" | "kairos.act.planGo" | "kairos.act.rebuildGo" | "kairos.act.reviewGo" | "kairos.act.cardGo" | "kairos.act.projectGo" | "kairos.act.researchGo" | "kairos.act.skillGo" | "kairos.act.pageGo"> = {
+    "calendar.add": "kairos.act.addCal", "plan.sessions": "kairos.act.planGo", "path.rebuild": "kairos.act.rebuildGo", "review.open": "kairos.act.reviewGo",
+    "card.add": "kairos.act.cardGo", "project.add": "kairos.act.projectGo", "research.add": "kairos.act.researchGo", "skill.open": "kairos.act.skillGo", "page.open": "kairos.act.pageGo",
+  };
+  const verbOf = (a: KairosAction): string => t(VERB[a.type]);
   /** The learner pressed a button: only now does anything change, through the app's own checked endpoints. */
   const perform = async (a: KairosAction) => {
     setActions((cur) => cur.filter((x) => x !== a));
-    if (a.type === "review.open") return navigate("/review");
-    if (a.type === "calendar.add") {
-      const r = await api.createEvent({ title: a.title, kind: a.kind, startsAt: a.startsAt, endsAt: a.endsAt, notes: a.notes ?? null });
-      return r.success ? toast.success(t("cal.saved")) : toast.error(r.error || t("kairos.rateFailed"));
+    const done = (r: { success: boolean; error?: string }, ok: string) => (r.success ? toast.success(ok) : toast.error(r.error || t("kairos.rateFailed")));
+    switch (a.type) {
+      case "review.open": return navigate("/review");
+      case "skill.open": return navigate(`${ROUTES.skills}/${a.slug}`);
+      case "page.open": return navigate(ROUTES[a.page]);
+      case "calendar.add": return done(await api.createEvent({ title: a.title, kind: a.kind, startsAt: a.startsAt, endsAt: a.endsAt, notes: a.notes ?? null }), t("cal.saved"));
+      case "plan.sessions": {
+        const r = await api.planCalendar({ startHour: 18, days: [1, 2, 3, 4, 5], weeks: 4 });
+        return r.success ? toast.success(r.planned > 0 ? t("cal.planned", { n: r.planned }) : t("cal.planNone")) : toast.error(r.error || t("kairos.rateFailed"));
+      }
+      case "path.rebuild": return done(await api.regenerateLearningPath(), t("path.rebuilt"));
+      case "card.add": return done(await api.growth("/cards", "POST", { front: a.front, back: a.back, topic: a.topic }), t("kairos.done.card"));
+      case "project.add": return done(await api.growth("/projects", "POST", { title: a.title, description: a.description, topics: a.topics }), t("kairos.done.project"));
+      case "research.add": return done(await api.growth("/research", "POST", { workspace: a.workspace, kind: "note", title: a.title, note: a.note }), t("kairos.done.research"));
     }
-    if (a.type === "plan.sessions") {
-      const r = await api.planCalendar({ startHour: 18, days: [1, 2, 3, 4, 5], weeks: 4 });
-      return r.success ? toast.success(r.planned > 0 ? t("cal.planned", { n: r.planned }) : t("cal.planNone")) : toast.error(r.error || t("kairos.rateFailed"));
-    }
-    const r = await api.regenerateLearningPath();
-    return r.success ? toast.success(t("path.rebuilt")) : toast.error(r.error || t("kairos.rateFailed"));
   };
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 

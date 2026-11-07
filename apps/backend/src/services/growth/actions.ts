@@ -9,8 +9,11 @@ export interface NextContext {
   ready: Array<{ slug: string; name: string }>;
   streak: number;
   doneToday: number;
+  /** A project they are building that still has a milestone to do. */
+  project?: { title: string; milestone: string } | null;
+  mentorRequests?: number;
 }
-export interface NextAction { id: string; kind: 'review' | 'cards' | 'step' | 'deadline' | 'strengthen' | 'learn'; title: string; reason: string; link: string; priority: number }
+export interface NextAction { id: string; kind: 'review' | 'cards' | 'step' | 'deadline' | 'strengthen' | 'learn' | 'project' | 'mentor'; title: string; reason: string; link: string; priority: number }
 
 export function nextActions(c: NextContext): NextAction[] {
   const out: NextAction[] = [];
@@ -21,6 +24,8 @@ export function nextActions(c: NextContext): NextAction[] {
   }
   if (c.weak[0]) out.push({ id: `strengthen:${c.weak[0].slug}`, kind: 'strengthen', title: `Strengthen ${c.weak[0].name}`, reason: 'your last answers on it were shaky', link: `/skills/${c.weak[0].slug}`, priority: 70 });
   if (c.nextStep) out.push({ id: 'step', kind: 'step', title: c.nextStep.title, reason: c.doneToday === 0 ? (c.streak > 0 ? `keeps your ${c.streak}-day streak alive` : 'the next step of your path') : 'the next step of your path', link: '/path', priority: c.doneToday === 0 ? 75 : 50 });
+  if (c.mentorRequests) out.push({ id: 'mentor', kind: 'mentor', title: `${c.mentorRequests} mentoring request${c.mentorRequests === 1 ? '' : 's'} waiting`, reason: 'someone is counting on your answer', link: '/community', priority: 60 });
+  if (c.project) out.push({ id: 'project', kind: 'project', title: `${c.project.title}: ${c.project.milestone}`, reason: 'the next milestone of the project you are building', link: '/lab', priority: 45 });
   if (c.ready[0]) out.push({ id: `learn:${c.ready[0].slug}`, kind: 'learn', title: `Start ${c.ready[0].name}`, reason: 'you know what it needs first', link: `/skills/${c.ready[0].slug}`, priority: 40 });
   return out.sort((a, b) => b.priority - a.priority).slice(0, 5);
 }

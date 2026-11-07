@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
-import { calendarEvents, contents, labProjects, learningProfiles, learningSteps, profileSettings, reviewItems, skillEvidence, userCards, users } from '../db/schema.js';
+import { calendarEvents, contents, labProjects, mentorRequests, learningProfiles, learningSteps, profileSettings, reviewItems, skillEvidence, userCards, users } from '../db/schema.js';
 import { backfill, loadGraph, recordEvidence } from '../services/skills/store.js';
 import { computeStreak, localDay } from '../services/learning/habits.js';
 import { risingTopics } from '../services/growth/trends.js';
@@ -79,6 +79,9 @@ async function nextContext(uid: string, tz: number) {
   const days = await activeDays(uid, tz);
   const today = localDay(now, tz);
   const streak = computeStreak(days, today);
+  const building = await db.select({ title: labProjects.title, milestones: labProjects.milestones }).from(labProjects).where(and(eq(labProjects.userId, uid), eq(labProjects.status, 'building'))).orderBy(desc(labProjects.createdAt)).limit(5);
+  const proj = building.map((p) => ({ title: p.title, milestone: p.milestones.find((m) => !m.done)?.title })).find((p) => p.milestone);
+  const [{ pending }] = await db.select({ pending: sql<number>`count(*)::int` }).from(mentorRequests).where(and(eq(mentorRequests.toId, uid), eq(mentorRequests.status, 'pending')));
   const weak = g.nodes.filter((n) => n.level === 'learning' && n.trend === 'down').slice(0, 3).map((n) => ({ slug: n.slug, name: n.name }));
   const nameOf = new Map(g.nodes.map((n) => [n.slug, n.name]));
   return {
@@ -87,6 +90,7 @@ async function nextContext(uid: string, tz: number) {
       dueReviews: due, dueCards: cards, nextStep,
       deadline: ev ? { title: ev.title, inDays: Math.max(0, Math.ceil((ev.startsAt.getTime() - now.getTime()) / DAY)) } : null,
       weak, ready: g.ready.slice(0, 3).map((s) => ({ slug: s, name: nameOf.get(s) ?? s })), streak: streak.current, doneToday: streak.todayDone ? 1 : 0,
+      project: proj ? { title: proj.title, milestone: proj.milestone! } : null, mentorRequests: pending,
     },
   };
 }

@@ -116,7 +116,8 @@ export async function handleSubmitQuiz(request: FastifyRequest, reply: FastifyRe
         await db.update(reviewItems).set({ box: 1, dueAt: first.dueAt, lastAt: now, lapses: existing.lapses + 1 }).where(eq(reviewItems.id, existing.id));
       }
     }
-    await recordEvidence(uid, graded.results.filter((r) => r.topic).map((r, i) => ({ topic: r.topic, type: 'quiz' as const, outcome: r.correct ? 1 : 0, ref: `quiz:${id}:${quiz.attempts + 1}:${i}` }))).catch((e) => request.log.warn(e));
+    // Only the first attempt on a set of questions is evidence: afterwards the answers have been shown.
+    if (quiz.attempts === 0) await recordEvidence(uid, graded.results.filter((r) => r.topic).map((r, i) => ({ topic: r.topic, type: 'quiz' as const, outcome: r.correct ? 1 : 0, ref: `quiz:${id}:${i}:${quiz.questions[i]?.question.slice(0, 40) ?? ''}` }))).catch((e) => request.log.warn(e));
     return reply.status(200).send({ score: graded.score, total: graded.total, passed: graded.passed || !!quiz.passedAt, results: graded.results, path: await pathView(uid, quiz.pathId) });
   } catch (e) {
     return fail(request, reply, e);
@@ -149,7 +150,8 @@ export async function handleAnswerReview(request: FastifyRequest, reply: Fastify
     const correct = choice === item.card.answer;
     const next = nextReview(item.box, correct);
     await db.update(reviewItems).set({ box: next.box, dueAt: next.dueAt, lastAt: new Date(), lapses: correct ? item.lapses : item.lapses + 1 }).where(eq(reviewItems.id, id));
-    if (item.card.topic) await recordEvidence(uid, [{ topic: item.card.topic, type: 'review', outcome: correct ? 1 : 0, ref: `review:${id}:${Date.now()}` }]).catch((e) => request.log.warn(e));
+    // A card answered before it is due, or again the same day, shows nothing new (the answer was just shown).
+    if (item.card.topic && item.dueAt <= new Date()) await recordEvidence(uid, [{ topic: item.card.topic, type: 'review', outcome: correct ? 1 : 0, ref: `review:${id}:${new Date().toISOString().slice(0, 10)}` }]).catch((e) => request.log.warn(e));
     return reply.status(200).send({ correct, answer: item.card.answer, explanation: item.card.explanation, nextBox: next.box, nextDueAt: next.dueAt });
   } catch (e) {
     return fail(request, reply, e);

@@ -35,11 +35,23 @@ export interface Estimate {
   reasons: string[];
 }
 
+/** Each further piece of the same kind counts a little less, so repeating one thing many times cannot stand in for variety. */
+const REPEAT = 0.75;
+function weighted(evidence: Evidence[], now: Date): Array<{ e: Evidence; w: number }> {
+  const seen: Partial<Record<EvidenceType, number>> = {};
+  return [...evidence]
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .map((e) => {
+      const n = seen[e.type] ?? 0;
+      seen[e.type] = n + 1;
+      return { e, w: WEIGHT[e.type] * decay(e.at, now) * Math.pow(REPEAT, n) };
+    });
+}
+
 function score(evidence: Evidence[], now: Date) {
   let sum = 0;
   let support = 0;
-  for (const e of evidence) {
-    const w = WEIGHT[e.type] * decay(e.at, now);
+  for (const { e, w } of weighted(evidence, now)) {
     sum += w * Math.max(0, Math.min(1, e.outcome));
     support += w;
   }
@@ -55,8 +67,9 @@ export function estimate(all: Evidence[], now = new Date()): Estimate {
   const confidence = 1 - Math.exp(-support / 2);
   const lastAt = all.reduce((m, e) => (e.at > m ? e.at : m), all[0]!.at);
 
-  const shown = all.filter((e) => DEMONSTRATES.includes(e.type) && e.outcome >= GOOD);
-  const shownWeight = shown.reduce((n, e) => n + WEIGHT[e.type] * decay(e.at, now), 0);
+  const shownW = weighted(all, now).filter(({ e }) => DEMONSTRATES.includes(e.type) && e.outcome >= GOOD);
+  const shown = shownW.map((x) => x.e);
+  const shownWeight = shownW.reduce((n, x) => n + x.w, 0);
   const applied = shown.some((e) => APPLIES.includes(e.type));
   const attempted = all.some((e) => DEMONSTRATES.includes(e.type));
 

@@ -4,6 +4,8 @@ import { ArrowLeft, Check, EyeOff, Loader2, Network, Sparkles, X } from "lucide-
 import { toast } from "sonner";
 import { api, SkillDetail, SkillEvaluation, SkillLevel, SkillsOverview } from "../services/api";
 import { ROUTES } from "../lib/routes";
+import { askKairos } from "../lib/askKairos";
+import { SkillGraph } from "../components/SkillGraph";
 import { useI18n } from "../lib/i18n";
 
 const LEVELS: SkillLevel[] = ["applied", "understood", "learning", "exploring"];
@@ -23,13 +25,15 @@ function LevelChip({ level }: { level: SkillLevel }) {
 /** What the learner knows, and how we know. Consulting a resource is not understanding; only quizzes, reviews, exercises and explanations raise a level. */
 export function SkillsScreen() {
   const { slug } = useParams();
-  return <div className="flex-1 overflow-y-auto"><div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-16">{slug ? <Detail slug={slug} /> : <Overview />}</div></div>;
+  // The graph takes all the width there is; the detail of one concept stays a readable column.
+  return <div className="flex-1 overflow-y-auto"><div className={slug ? "max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-16" : "w-full px-3 sm:px-6 py-6 pb-12"}>{slug ? <Detail slug={slug} /> : <Overview />}</div></div>;
 }
 
 function Overview() {
   const { t } = useI18n();
   const [data, setData] = useState<SkillsOverview | null>(null);
   const [failed, setFailed] = useState(false);
+  const nav = useNavigate();
   useEffect(() => {
     api.getSkills().then((r) => (r.data ? setData(r.data) : setFailed(true)));
   }, []);
@@ -39,46 +43,18 @@ function Overview() {
     setData(null);
     api.getSkills().then((r) => r.data && setData(r.data));
   };
-  const name = (s: string) => data?.nodes.find((n) => n.slug === s)?.name ?? s;
   return (
     <>
-      <div className="text-center mb-8">
+      <div className="text-center mb-5">
         <span className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto"><Network size={24} /></span>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-3">{t("skills.title")}</h1>
         <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto leading-relaxed">{t("skills.subtitle")}</p>
       </div>
       {!data && !failed && <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>}
       {failed && <p className="text-center text-sm text-muted-foreground">{t("admin.error")}</p>}
-      {data && data.nodes.filter((n) => n.level !== "unseen").length === 0 && <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">{t("skills.empty")}</p>}
-      {data && (
-        <div className="space-y-6">
-          {LEVELS.map((lv) => {
-            const list = data.nodes.filter((n) => n.level === lv);
-            if (list.length === 0) return null;
-            return (
-              <section key={lv}>
-                <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">{t(`skills.level.${lv}`)} · {list.length}</h2>
-                <div className="flex flex-wrap gap-2">
-                  {list.map((n) => (
-                    <Link key={n.slug} to={`${ROUTES.skills}/${n.slug}`} className={`px-3 py-1.5 rounded-xl text-[13px] font-medium hover:opacity-80 ${TONE[lv]}`}>
-                      {n.name}{n.trend === "up" ? " ↑" : n.trend === "down" ? " ↓" : ""}
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-          {data.ready.length > 0 && (
-            <section>
-              <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">{t("skills.ready")}</h2>
-              <div className="flex flex-wrap gap-2">
-                {data.ready.map((s) => <Link key={s} to={`${ROUTES.skills}/${s}`} className="px-3 py-1.5 rounded-xl text-[13px] font-medium border border-dashed border-border text-foreground hover:bg-secondary">{name(s)}</Link>)}
-              </div>
-            </section>
-          )}
-          <button onClick={forgetAll} className="text-[12px] text-muted-foreground underline underline-offset-2 hover:text-foreground">{t("skills.forgetAll")}</button>
-        </div>
-      )}
+      {data && data.nodes.filter((n) => n.level !== "unseen").length === 0 && <p className="max-w-xl mx-auto mb-4 rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">{t("skills.empty")}</p>}
+      {data && data.nodes.length > 0 && <SkillGraph nodes={data.nodes} edges={data.edges} ready={data.ready} onOpen={(slug) => nav(`${ROUTES.skills}/${slug}`)} />}
+      {data && data.nodes.length > 0 && <button onClick={forgetAll} className="mt-6 text-[12px] text-muted-foreground underline underline-offset-2 hover:text-foreground">{t("skills.forgetAll")}</button>}
     </>
   );
 }
@@ -128,7 +104,7 @@ function Detail({ slug }: { slug: string }) {
   if (missing) return <p className="text-center text-sm text-muted-foreground py-12">{t("skills.notFound")}</p>;
   if (!d) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>;
 
-  const Links = ({ title, list }: { title: string; list: SkillDetail["prerequisites"] }) => list.length === 0 ? null : (
+  const links = (title: string, list: SkillDetail["prerequisites"]) => list.length === 0 ? null : (
     <section>
       <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">{title}</h2>
       <ul className="space-y-1.5">
@@ -143,7 +119,7 @@ function Detail({ slug }: { slug: string }) {
     </section>
   );
 
-  const Verdict = ({ ev }: { ev: SkillEvaluation }) => (
+  const verdict = (ev: SkillEvaluation) => (
     <div className="rounded-xl border border-border bg-card p-4 space-y-2">
       {ev.text && <p className="text-[13px] text-muted-foreground italic line-clamp-3">“{ev.text}”</p>}
       <ul className="space-y-1">
@@ -173,6 +149,11 @@ function Detail({ slug }: { slug: string }) {
       <header>
         <div className="flex items-center gap-3 flex-wrap"><h1 className="text-2xl font-bold tracking-tight text-foreground">{d.name}</h1><LevelChip level={d.level} /></div>
         {d.description && <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{d.description}</p>}
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Link to={askKairos(t("ask.skill", { name: d.name }))} className="px-3 h-8 inline-flex items-center rounded-lg bg-primary/10 text-primary text-[13px] font-semibold">{t("ask.kairos")}</Link>
+          <Link to={`${ROUTES.memory}?front=${encodeURIComponent(d.name)}&topic=${encodeURIComponent(d.slug)}`} className="px-3 h-8 inline-flex items-center rounded-lg border border-border text-[13px] font-medium text-foreground hover:bg-secondary">{t("skills.makeCard")}</Link>
+          <Link to={`${ROUTES.lab}?new=${encodeURIComponent(d.name)}&topic=${encodeURIComponent(d.slug)}`} className="px-3 h-8 inline-flex items-center rounded-lg border border-border text-[13px] font-medium text-foreground hover:bg-secondary">{t("skills.startProject")}</Link>
+        </div>
       </header>
 
       <section>
@@ -196,11 +177,11 @@ function Detail({ slug }: { slug: string }) {
         <button disabled={busy || text.trim().length < 40} onClick={explain} className="inline-flex items-center gap-2 px-4 h-10 rounded-xl bg-primary text-white text-sm font-semibold disabled:opacity-50">
           {busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} {t("skills.explainSend")}
         </button>
-        {d.evaluations.map((ev) => <Verdict key={ev.id} ev={ev} />)}
+        {d.evaluations.map((ev) => <div key={ev.id}>{verdict(ev)}</div>)}
       </section>
 
-      <Links title={t("skills.prereq")} list={d.prerequisites} />
-      <Links title={t("skills.unlocks")} list={d.unlocks} />
+      {links(t("skills.prereq"), d.prerequisites)}
+      {links(t("skills.unlocks"), d.unlocks)}
 
       {d.resources.length > 0 && (
         <section>

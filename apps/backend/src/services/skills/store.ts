@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../../db/db.js';
-import { conceptEdges, concepts, contents, edgeFeedback, learningPaths, learningProfiles, learningQuizzes, learningSteps, skillEvidence } from '../../db/schema.js';
+import { conceptEdges, concepts, contents, edgeFeedback, learningPaths, learningProfiles, learningQuizzes, learningSteps, skillEvidence, users } from '../../db/schema.js';
 import { ONTOLOGY, bySlug, conceptSlug, titleCase } from './ontology.js';
 import { estimate, type Estimate, type Evidence, type EvidenceType } from './mastery.js';
 import { readyToLearn, type GEdge } from './graph.js';
@@ -88,8 +88,11 @@ export async function recordStepEvidence(userId: string, steps: Array<{ id: stri
 
 /** First visit: turn what the learner already did (finished steps, passed quizzes) into evidence, once. */
 export async function backfill(userId: string): Promise<void> {
-  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(skillEvidence).where(eq(skillEvidence.userId, userId));
-  if (n > 0) return;
+  const [u] = await db.select({ at: users.skillsBackfilledAt }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!u || u.at) return;
+  // Claim it first: two requests at once must not import twice, and erasing the evidence later must stay erased.
+  const claimed = await db.update(users).set({ skillsBackfilledAt: new Date() }).where(and(eq(users.id, userId), sql`${users.skillsBackfilledAt} is null`)).returning({ id: users.id });
+  if (claimed.length === 0) return;
   const done = await db.select({ id: learningSteps.id, verifiedBy: learningSteps.verifiedBy, at: learningSteps.completedAt }).from(learningSteps).where(and(eq(learningSteps.userId, userId), eq(learningSteps.status, 'done')));
   const topics = await topicsOfSteps(done.map((d) => d.id));
   const items: NewEvidence[] = [];

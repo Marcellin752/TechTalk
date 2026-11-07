@@ -769,7 +769,7 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
       </div>
       {/* On the vertical feed Kairos is in the side rail ("Ask"), so the floating button would sit on top of it. */}
       {kairosAvailable && tab !== "kairos" && location.pathname !== ROUTES.home && <KairosFab />}
-      <BottomBar />
+      <BottomBar isAdmin={user?.role === "admin"} />
     </div>
   );
 }

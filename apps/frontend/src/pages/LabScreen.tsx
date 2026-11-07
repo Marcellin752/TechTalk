@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, FlaskConical, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
+import { askKairos, topicSlug } from "../lib/askKairos";
 import { useI18n } from "../lib/i18n";
 import { btnCls, ghostCls, inputCls, Page, PageHeader, Section, Tabs } from "../components/PageHeader";
 
@@ -30,6 +32,13 @@ function Projects() {
   const [topics, setTopics] = useState("");
   const [plan, setPlan] = useState<Milestone[]>([]);
   const [busy, setBusy] = useState(false);
+  const [params] = useSearchParams();
+  // Arriving from a concept or a Kairos suggestion: the idea is already there.
+  useEffect(() => {
+    const n = params.get("new"), tp = params.get("topic");
+    if (n) { setTitle(n.slice(0, 120)); setDescription(t("lab.fromSkill", { name: n })); }
+    if (tp) setTopics(tp.slice(0, 60));
+  }, [params, t]);
 
   const load = useCallback(() => { api.growth<{ projects: Project[] }>("/projects").then((r) => setList(r.data?.projects ?? [])); }, []);
   useEffect(load, [load]);
@@ -102,7 +111,8 @@ function ProjectCard({ p, onPatch, onDelete }: { p: Project; onPatch: (id: strin
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-foreground">{p.title}</h3>
           {p.description && <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{p.description}</p>}
-          {p.topics.length > 0 && <p className="text-[12px] text-muted-foreground mt-1">{p.topics.join(" · ")}</p>}
+          {p.topics.length > 0 && <p className="text-[12px] text-muted-foreground mt-1">{p.topics.map((tp, i) => <span key={tp}>{i > 0 && " · "}<Link to={`/skills/${topicSlug(tp)}`} className="underline underline-offset-2">{tp}</Link></span>)}</p>}
+          <Link to={askKairos(t("ask.project", { name: p.title }))} className="text-[12px] font-semibold text-primary mt-1 inline-block">{t("ask.kairos")}</Link>
         </div>
         <select aria-label={t("lab.status")} value={p.status} onChange={(e) => onPatch(p.id, { status: e.target.value })} className="rounded-lg border border-border bg-background px-2 h-8 text-[13px]">
           {(["idea", "building", "done"] as const).map((s) => <option key={s} value={s}>{t(`lab.status.${s}`)}</option>)}

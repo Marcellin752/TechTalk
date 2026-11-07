@@ -21,6 +21,13 @@ export interface LearnerContext {
   /** Topics they got wrong in checkpoint quizzes, most often first. */
   weakTopics?: string[];
   reviewsDue?: number;
+  /** What the evidence says they know: concepts at each level, and the ones that are slipping. */
+  skills?: { understood: string[]; learning: string[]; slipping: string[] };
+  /** Their own flashcards that are due now. */
+  cardsDue?: number;
+  /** Projects they are working on. */
+  projects?: Array<{ title: string; status: string; topics: string[] }>;
+  streak?: number;
 }
 
 export interface CatalogHit { n: number; id: string; type: string; title: string; url: string; source: string; summary: string }
@@ -73,6 +80,10 @@ Use exactly these names when you point to a place, and never claim a feature tha
 - My path: a summary card with a progress bar and a "Next up" button, a card for their school ("Add my school" / "Edit"), then numbered stages that open to show steps; each step has a circle to mark it done.
 - Calendar: a bar on top with the month arrows, "Today", "Add event", "Plan my sessions" and "Export (.ics)"; a month grid; the selected day's agenda under the grid. "Plan my sessions" lays the rest of their path over the weeks they choose.
 - Campus (only when their school has joined TechTalk): three tabs. "Revisions": study sessions students organise (join with one tap; joined ones appear in the Calendar). "Past exams": a library of links to past exams, corrections and notes for their school, with votes and a report button. "People": an opt-in directory of students from the same school, with suggestions by shared topics. Never invent campus content; if they have no school linked, point them to "Add my school" on My path.
+- Review: the quiz questions that are due, one at a time (spaced review). Opportunities: internships, jobs and open-source issues matching their demonstrated skills and year of study.
+- Today: what to do next, each with its reason, plus things worth reading. Skills: a floating graph of bubbles, one per concept; the colour is the level (applied, understood, learning, exploring), a dashed bubble is something they are ready to learn; a concept's page shows why it has that level and lets them explain it in their own words, which you judge against visible criteria, and contest.
+- Memory: their own flashcards, scheduled to come back before they forget. Playground: small JavaScript exercises that run in their browser. Lab: their projects (a finished project with a repository link counts as proof) and research workspaces. Community: text study rooms and opt-in mentoring. Growth: activity by week, what they consulted against what they showed, what is rising in tech, and their public portfolio switch.
+- Levels come from evidence, never from reading or time spent: only quizzes, reviews, exercises, explanations and projects raise a level. Say so when they ask why a level is low, and suggest the quickest honest way up.
 - Profile: their public profile, projects and path summary. Settings: language, theme, name, linked accounts (email, Google, GitHub), public-profile choices.
 
 # SUGGESTED FOLLOW-UPS
@@ -87,7 +98,13 @@ You cannot change anything yourself. When it clearly helps (the learner asked, o
 @@ACTION {"type":"plan.sessions"}
 @@ACTION {"type":"path.rebuild"}
 @@ACTION {"type":"review.open"}
+@@ACTION {"type":"card.add","front":"What does malloc return?","back":"A pointer to the block, or NULL on failure","topic":"pointers"}
+@@ACTION {"type":"project.add","title":"Mini shell","description":"A shell in C","topics":["c","processes"]}
+@@ACTION {"type":"research.add","workspace":"Process scheduling","title":"Key idea","note":"Round robin trades throughput for response time"}
+@@ACTION {"type":"skill.open","slug":"pointers"}
+@@ACTION {"type":"page.open","page":"memory"}
 The app shows each one as a button and the learner decides. Never say an action is done, only that you suggest it. Use times in the future, in UTC, from the calendar information under LEARNER. Do not propose an action for something that is only informational.
+Use them to connect the app's parts: after explaining something they struggle with, offer a flashcard (card.add); when they want to practise or show a skill, suggest a project (project.add) or open the concept (skill.open); for notes worth keeping, research.add; to send them somewhere useful, page.open with one of today, skills, memory, lab, playground, community, growth, opportunities, review, calendar, path. Use concept slugs only from the ones named under LEARNER or that you are sure exist (lower case, hyphens). Keep flashcards short and correct.
 
 # MEMORY
 If the learner tells you something lasting about how they learn or where they struggle ("I never understand pointers", "I only have weekends"), write one line AFTER your answer: @@NOTE <one short sentence, under 150 characters, in the third person, e.g. "Finds pointer arithmetic hard">. At most one note, and only for lasting facts, never for passing remarks. They can read and delete everything you remember.
@@ -150,6 +167,15 @@ function learnerBlock(l: LearnerContext): string {
   if (l.notes?.length) lines.push(`- What you remember about them (from earlier conversations): ${l.notes.map((n) => sanitizeForPrompt(n, 160)).join('; ')}`);
   if (l.weakTopics?.length) lines.push(`- Topics they missed in recent checkpoint quizzes: ${l.weakTopics.map((t) => sanitizeForPrompt(t, 40)).join(', ')}`);
   if (l.reviewsDue) lines.push(`- Review questions waiting for them: ${l.reviewsDue} (the Review page)`);
+  if (l.skills) {
+    const names = (xs: string[]) => xs.map((x) => sanitizeForPrompt(x, 40)).join(', ');
+    if (l.skills.understood.length) lines.push(`- Concepts they have SHOWN they understand (evidence: quizzes, exercises, explanations, projects): ${names(l.skills.understood)}`);
+    if (l.skills.learning.length) lines.push(`- Concepts they are still learning (not proven yet): ${names(l.skills.learning)}`);
+    if (l.skills.slipping.length) lines.push(`- Concepts that are slipping (evidence getting old or weaker): ${names(l.skills.slipping)}`);
+  }
+  if (l.cardsDue) lines.push(`- Their own flashcards due now: ${l.cardsDue} (the Memory page)`);
+  if (l.projects?.length) lines.push(`- Their projects: ${l.projects.map((p) => `${sanitizeForPrompt(p.title, 60)} (${p.status}${p.topics.length ? `; ${p.topics.map((t) => sanitizeForPrompt(t, 30)).join(', ')}` : ''})`).join('; ')}`);
+  if (l.streak) lines.push(`- Streak: ${l.streak} days in a row`);
   if (l.page) lines.push(`- They are asking from the "${l.page}" page.`);
   if (l.path) {
     const p = l.path;
@@ -231,7 +257,7 @@ export function mentorNote(message: string, history: Array<{ role: string; conte
 
 const PAGE_NAMES: Record<string, string> = {
   '/': 'Home', '/learn': 'Learn', '/path': 'My path', '/practice': 'Practice', '/calendar': 'Calendar', '/campus': 'Campus', '/kairos': 'Kairos',
-  '/people': 'People', '/saved': 'Saved', '/profile': 'Profile', '/settings': 'Settings', '/about': 'About', '/onboarding': 'Setup',
+  '/people': 'People', '/review': 'Review', '/opportunities': 'Opportunities', '/today': 'Today', '/skills': 'Skills', '/memory': 'Memory', '/playground': 'Playground', '/lab': 'Lab', '/community': 'Community', '/growth': 'Growth', '/explore': 'Explore', '/saved': 'Saved', '/profile': 'Profile', '/settings': 'Settings', '/about': 'About', '/onboarding': 'Setup',
 };
 
 /** The page name for a route the client reports; unknown routes are ignored. */
@@ -241,6 +267,9 @@ export function pageName(path: unknown): string | undefined {
   if (PAGE_NAMES[clean]) return PAGE_NAMES[clean];
   if (/^\/(watch|project|article)\//.test(clean)) return 'a content page';
   if (clean.startsWith('/u/')) return "someone's public profile";
+  if (clean.startsWith('/p/')) return "someone's public portfolio";
+  const concept = /^\/skills\/([a-z0-9][a-z0-9-]{0,59})$/.exec(clean);
+  if (concept) return `Skills, on the page of the concept "${concept[1]}"`;
   return undefined;
 }
 
