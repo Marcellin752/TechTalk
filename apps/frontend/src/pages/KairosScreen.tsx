@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { History } from "lucide-react";
+import { Brain, History } from "lucide-react";
 import { toast } from "sonner";
 import { api, KairosConversation } from "../services/api";
 import { KairosAvatar, KairosChat } from "../components/KairosChat";
 import { KairosHistory } from "../components/KairosHistory";
+import { KairosMemory } from "../components/KairosMemory";
 import { KairosPortrait } from "../components/KairosArt";
 import { dateLocale, useI18n, type Lang, type T } from "../lib/i18n";
 
@@ -22,6 +23,7 @@ export function KairosScreen({ available }: { available: boolean | null }) {
   const conversationId = params.get("c");
   const [list, setList] = useState<KairosConversation[] | null>(null);
   const [showList, setShowList] = useState(false);
+  const [memory, setMemory] = useState(false);
   const [chatKey, setChatKey] = useState(0);
 
   const refresh = useCallback(() => {
@@ -92,6 +94,9 @@ export function KairosScreen({ available }: { available: boolean | null }) {
             <h1 className="text-[16px] font-semibold text-foreground leading-tight">Kairos</h1>
             <p className="text-[12px] text-muted-foreground leading-tight">{t("kairos.knows")}</p>
           </div>
+          <button onClick={() => setMemory(true)} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border border-border text-[13px] text-foreground hover:bg-secondary" title={t("kairos.memory.title")}>
+            <Brain size={15} /> <span className="hidden sm:inline">{t("kairos.memory.title")}</span>
+          </button>
           <button onClick={() => setShowList(true)} className="md:hidden inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border border-border text-sm text-foreground">
             <History size={15} /> {t("kairos.history")}
           </button>
@@ -107,6 +112,7 @@ export function KairosScreen({ available }: { available: boolean | null }) {
           />
         </div>
       </section>
+      {memory && <KairosMemory onClose={() => setMemory(false)} />}
     </div>
   );
 }

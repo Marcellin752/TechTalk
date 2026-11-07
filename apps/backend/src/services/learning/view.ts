@@ -7,6 +7,7 @@ export interface StepRow {
   kind: string;
   minutes: number;
   status: string;
+  verifiedBy?: string | null;
   completedAt: Date | null;
   content: {
     id: string;
@@ -35,12 +36,17 @@ export interface PathRow {
 }
 
 /** Groups steps into stages and computes progress: what is done, what is next, how long is left. */
-export function assemblePathView(path: PathRow, steps: StepRow[]) {
+export interface QuizState { id: string; passedAt: Date | null; bestScore: number | null; attempts: number; total: number }
+
+export function assemblePathView(path: PathRow, steps: StepRow[], quizzes: Map<number, QuizState> = new Map()) {
   const ordered = [...steps].sort((a, b) => a.position - b.position);
   const stages = path.stages.map((stage) => {
     const own = ordered.filter((s) => s.stage === stage.index);
     const done = own.filter((s) => s.status === 'done').length;
-    return { ...stage, steps: own, done, total: own.length, complete: own.length > 0 && done === own.length };
+    const quiz = quizzes.get(stage.index);
+    // The checkpoint: a stage is "passed" once its quiz is. It needs every step done to be taken.
+    const checkpoint = { quizId: quiz?.id ?? null, passed: !!quiz?.passedAt, bestScore: quiz?.bestScore ?? null, total: quiz?.total ?? null, attempts: quiz?.attempts ?? 0 };
+    return { ...stage, steps: own, done, total: own.length, complete: own.length > 0 && done === own.length, checkpoint };
   });
 
   const doneSteps = ordered.filter((s) => s.status === 'done');

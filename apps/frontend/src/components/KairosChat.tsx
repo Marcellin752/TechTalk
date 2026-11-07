@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Copy, ExternalLink, ThumbsDown, ThumbsUp } from "lucide-react";
 import { toast } from "sonner";
-import { useLocation } from "react-router-dom";
-import { api, KairosMessage } from "../services/api";
+import { useLocation, useNavigate } from "react-router-dom";
+import { api, KairosAction, KairosMessage } from "../services/api";
 import { Markdown } from "./Markdown";
 import { useI18n } from "../lib/i18n";
 import { KairosFace, KairosPortrait } from "./KairosArt";
@@ -24,6 +24,10 @@ interface Props {
 export function KairosChat({ conversationId, onConversation, compact = false }: Props) {
   const { t, lang } = useI18n();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  /** What Kairos proposes after its latest answer, and what it noted to remember. The learner decides. */
+  const [actions, setActions] = useState<KairosAction[]>([]);
+  const [remembered, setRemembered] = useState<string[]>([]);
   const suggestions = [t("kairos.s1"), t("kairos.s2"), t("kairos.s3"), t("kairos.s4")];
   const [messages, setMessages] = useState<KairosMessage[]>([]);
   // Arriving with ?ask=… (from a card in the feed) puts the question in the box, ready to send.
@@ -69,6 +73,8 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
       if (!message || sending) return;
       setError(null);
       setFollowUps([]);
+      setActions([]);
+      setRemembered([]);
       setDraft("");
       setSending(true);
       const optimistic: KairosMessage = { id: `local-${Date.now()}`, role: "user", content: message, createdAt: new Date().toISOString() };
@@ -87,6 +93,8 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
       }
       setMessages((m) => [...m, res.message!]);
       setFollowUps(res.suggestions ?? []);
+      setActions(res.actions ?? []);
+      setRemembered(res.remembered ?? []);
       inputRef.current?.focus();
     },
     [sending, onConversation, lang, pathname],
@@ -107,6 +115,25 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
     } catch {
       toast.error(t("kairos.rateFailed"));
     }
+  };
+  const labelOf = (a: KairosAction): string =>
+    a.type === "calendar.add" ? `${a.title} · ${new Date(a.startsAt).toLocaleString(lang === "fr" ? "fr-FR" : "en-US", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+    : a.type === "plan.sessions" ? t("kairos.act.plan") : a.type === "path.rebuild" ? t("kairos.act.rebuild") : t("kairos.act.review");
+  const verbOf = (a: KairosAction): string => (a.type === "calendar.add" ? t("kairos.act.addCal") : a.type === "plan.sessions" ? t("kairos.act.planGo") : a.type === "path.rebuild" ? t("kairos.act.rebuildGo") : t("kairos.act.reviewGo"));
+  /** The learner pressed a button: only now does anything change, through the app's own checked endpoints. */
+  const perform = async (a: KairosAction) => {
+    setActions((cur) => cur.filter((x) => x !== a));
+    if (a.type === "review.open") return navigate("/review");
+    if (a.type === "calendar.add") {
+      const r = await api.createEvent({ title: a.title, kind: a.kind, startsAt: a.startsAt, endsAt: a.endsAt, notes: a.notes ?? null });
+      return r.success ? toast.success(t("cal.saved")) : toast.error(r.error || t("kairos.rateFailed"));
+    }
+    if (a.type === "plan.sessions") {
+      const r = await api.planCalendar({ startHour: 18, days: [1, 2, 3, 4, 5], weeks: 4 });
+      return r.success ? toast.success(r.planned > 0 ? t("cal.planned", { n: r.planned }) : t("cal.planNone")) : toast.error(r.error || t("kairos.rateFailed"));
+    }
+    const r = await api.regenerateLearningPath();
+    return r.success ? toast.success(t("path.rebuilt")) : toast.error(r.error || t("kairos.rateFailed"));
   };
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
@@ -163,6 +190,20 @@ export function KairosChat({ conversationId, onConversation, compact = false }: 
                       <button onClick={() => rate(m, -1)} aria-pressed={m.feedback === -1} aria-label={t("kairos.notHelpful")} title={t("kairos.notHelpful")} className={`w-7 h-7 rounded-md flex items-center justify-center hover:bg-secondary hover:text-foreground ${m.feedback === -1 ? "text-destructive" : ""}`}><ThumbsDown size={14} /></button>
                       <button onClick={() => copy(m.content)} aria-label={t("kairos.copy")} title={t("kairos.copy")} className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-secondary hover:text-foreground"><Copy size={14} /></button>
                     </div>
+                  )}
+                  {m.id === lastAssistantId && actions.length > 0 && !sending && (
+                    <div className="mt-2.5 flex flex-col gap-1.5">
+                      {actions.map((a, k) => (
+                        <div key={k} className="flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2">
+                          <span className="flex-1 min-w-0 text-[13px] text-foreground truncate">{labelOf(a)}</span>
+                          <button onClick={() => perform(a)} className="px-3 h-8 rounded-lg bg-primary text-white text-[12.5px] font-semibold flex-shrink-0">{verbOf(a)}</button>
+                          <button onClick={() => setActions((cur) => cur.filter((x) => x !== a))} aria-label={t("common.cancel")} className="w-7 h-7 rounded-md text-muted-foreground hover:text-foreground flex-shrink-0">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {m.id === lastAssistantId && remembered.length > 0 && !sending && (
+                    <p className="mt-2 text-[12px] text-muted-foreground">{t("kairos.noted", { note: remembered[0]! })}</p>
                   )}
                   {m.id === lastAssistantId && followUps.length > 0 && !sending && (
                     <div className="mt-2 flex flex-wrap gap-1.5">

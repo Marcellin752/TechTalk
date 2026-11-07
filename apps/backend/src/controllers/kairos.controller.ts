@@ -1,7 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { and, asc, desc, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
-import { kairosConversations, kairosMessages } from '../db/schema.js';
+import { kairosConversations, kairosMessages, kairosNotes } from '../db/schema.js';
+import { MAX_NOTES, splitDirectives } from '../services/kairos/actions.js';
 import { config } from '../config/env.js';
 import { generate, LlmUnavailableError, providerChain, type ChatMessage } from '../services/kairos/llm.js';
 import { buildSystemPrompt, mentorNote, pageName, splitSuggestions, usedSources, wrapLearnerMessage } from '../services/kairos/prompt.js';
@@ -86,7 +87,17 @@ export async function handleKairosChat(request: FastifyRequest, reply: FastifyRe
       throw err;
     }
 
-    const answer = splitSuggestions(result.text);
+    // Directives (proposed actions, notes to remember) are taken out before the learner reads anything.
+    const directives = splitDirectives(result.text);
+    const answer = splitSuggestions(directives.text);
+    for (const note of directives.notes) {
+      await db.insert(kairosNotes).values({ userId: uid, note }).onConflictDoNothing();
+    }
+    if (directives.notes.length > 0) {
+      // Keep the most recent notes only.
+      const all = await db.select({ id: kairosNotes.id }).from(kairosNotes).where(eq(kairosNotes.userId, uid)).orderBy(desc(kairosNotes.createdAt));
+      for (const old of all.slice(MAX_NOTES)) await db.delete(kairosNotes).where(eq(kairosNotes.id, old.id));
+    }
     const sources = usedSources(answer.text, hits);
     await db.insert(kairosMessages).values({ conversationId: conversationId!, userId: uid, role: 'user', content: message });
     const [reply_] = await db
@@ -100,6 +111,8 @@ export async function handleKairosChat(request: FastifyRequest, reply: FastifyRe
       title: isNew ? titleFrom(message) : undefined,
       message: { id: reply_!.id, role: 'assistant', content: answer.text, sources, feedback: null, createdAt: reply_!.createdAt },
       suggestions: answer.suggestions,
+      actions: directives.actions,
+      remembered: directives.notes,
     });
   } catch (error) {
     request.log.error(error);
@@ -193,6 +206,29 @@ export async function handleRenameConversation(request: FastifyRequest, reply: F
     const updated = await db.update(kairosConversations).set({ title }).where(and(eq(kairosConversations.id, id), eq(kairosConversations.userId, userId(request)))).returning({ id: kairosConversations.id });
     if (updated.length === 0) return reply.status(404).send({ error: 'Conversation not found.' });
     return reply.status(200).send({ id, title });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/** What Kairos remembers about the learner: shown to them, deletable one by one or all at once. */
+export async function handleListMemory(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const notes = await db.select({ id: kairosNotes.id, note: kairosNotes.note, createdAt: kairosNotes.createdAt }).from(kairosNotes).where(eq(kairosNotes.userId, userId(request))).orderBy(desc(kairosNotes.createdAt));
+    return reply.status(200).send({ notes });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+export async function handleDeleteMemory(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { id } = request.params as { id?: string };
+    if (id !== undefined && !UUID_RE.test(id)) return reply.status(400).send({ error: 'Invalid note id.' });
+    await db.delete(kairosNotes).where(id ? and(eq(kairosNotes.id, id), eq(kairosNotes.userId, userId(request))) : eq(kairosNotes.userId, userId(request)));
+    return reply.status(204).send();
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error.' });

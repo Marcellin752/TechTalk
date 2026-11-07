@@ -237,6 +237,7 @@ const sessionRows = (c: Campus, where: ReturnType<typeof and>) =>
       id: campusSessions.id, title: campusSessions.title, subject: campusSessions.subject, description: campusSessions.description,
       startsAt: campusSessions.startsAt, endsAt: campusSessions.endsAt, place: campusSessions.place, onlineUrl: campusSessions.onlineUrl,
       capacity: campusSessions.capacity, hostId: campusSessions.hostId, hostName: users.name, hostPicture: users.picture,
+      hostAmbassador: sql<boolean>`coalesce((select cp.ambassador from campus_profiles cp where cp.user_id = ${campusSessions.hostId}), false)`,
       members: sql<number>`(select count(*)::int from campus_session_members m where m.session_id = ${campusSessions.id})`,
       joined: sql<boolean>`exists (select 1 from campus_session_members m where m.session_id = ${campusSessions.id} and m.user_id = ${c.uid})`,
     })
@@ -370,7 +371,7 @@ export async function handleListPeople(request: FastifyRequest, reply: FastifyRe
     const rows = await db
       .select({
         userId: users.id, name: users.name, picture: users.picture, year: learningProfiles.schoolYear, topics: learningProfiles.schoolTopics,
-        headline: campusProfiles.headline, lookingFor: campusProfiles.lookingFor, contact: campusProfiles.contact, handle: sql<string | null>`(select ps.handle from profile_settings ps where ps.user_id = ${users.id} and ps.is_public)`,
+        headline: campusProfiles.headline, lookingFor: campusProfiles.lookingFor, contact: campusProfiles.contact, ambassador: campusProfiles.ambassador, handle: sql<string | null>`(select ps.handle from profile_settings ps where ps.user_id = ${users.id} and ps.is_public)`,
       })
       .from(campusProfiles)
       .innerJoin(learningProfiles, eq(learningProfiles.userId, campusProfiles.userId))

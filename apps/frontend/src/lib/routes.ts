@@ -13,6 +13,16 @@ export const ROUTES = {
   people: "/people",
   calendar: "/calendar",
   campus: "/campus",
+  review: "/review",
+  today: "/today",
+  growth: "/growth",
+  memory: "/memory",
+  lab: "/lab",
+  playground: "/playground",
+  community: "/community",
+  skills: "/skills",
+  portfolio: "/p",
+  opportunities: "/opportunities",
   admin: "/admin",
   saved: "/saved",
   profile: "/profile",
@@ -30,6 +40,15 @@ export const TAB_PATHS: Record<AppTab, string> = {
   people: ROUTES.people,
   calendar: ROUTES.calendar,
   campus: ROUTES.campus,
+  review: ROUTES.review,
+  today: ROUTES.today,
+  growth: ROUTES.growth,
+  memory: ROUTES.memory,
+  lab: ROUTES.lab,
+  playground: ROUTES.playground,
+  community: ROUTES.community,
+  skills: ROUTES.skills,
+  opportunities: ROUTES.opportunities,
   admin: ROUTES.admin,
   saved: ROUTES.saved,
   profile: ROUTES.profile,
@@ -57,6 +76,16 @@ export function tabFor(pathname: string): AppTab {
   if (pathname.startsWith(ROUTES.people) || pathname.startsWith("/u/")) return "people";
   if (pathname.startsWith(ROUTES.calendar)) return "calendar";
   if (pathname.startsWith(ROUTES.campus)) return "campus";
+  if (pathname.startsWith(ROUTES.review)) return "review";
+  if (pathname.startsWith(ROUTES.today)) return "today";
+  if (pathname.startsWith(ROUTES.growth)) return "growth";
+  if (pathname.startsWith(ROUTES.memory)) return "memory";
+  if (pathname.startsWith(ROUTES.lab)) return "lab";
+  if (pathname.startsWith(ROUTES.playground)) return "playground";
+  if (pathname.startsWith(ROUTES.community)) return "community";
+  if (pathname.startsWith(ROUTES.skills)) return "skills";
+  if (pathname.startsWith(ROUTES.portfolio + "/")) return "people";
+  if (pathname.startsWith(ROUTES.opportunities)) return "opportunities";
   if (pathname.startsWith(ROUTES.admin)) return "admin";
   if (pathname.startsWith(ROUTES.saved)) return "saved";
   if (pathname.startsWith(ROUTES.profile)) return "profile";

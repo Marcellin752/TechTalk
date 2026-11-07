@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from '../../db/db.js';
-import { calendarEvents, contents, learningPaths, learningProfiles, learningSteps, githubProfiles, users } from '../../db/schema.js';
+import { calendarEvents, contents, kairosNotes, reviewItems, learningPaths, learningProfiles, learningSteps, githubProfiles, users } from '../../db/schema.js';
 import type { CatalogHit, LearnerContext } from './prompt.js';
 
 /* What Kairos knows about the question (matching catalogue items) and about the
@@ -98,6 +98,14 @@ export async function loadLearnerContext(userId: string): Promise<LearnerContext
     school: profile?.school ? { name: profile.school, year: profile.schoolYear, topics: profile.schoolTopics ?? [] } : null,
     path: null,
   };
+
+  // What Kairos remembers, and where the learner keeps slipping.
+  ctx.notes = (await db.select({ note: kairosNotes.note }).from(kairosNotes).where(eq(kairosNotes.userId, userId)).orderBy(sql`${kairosNotes.createdAt} desc`).limit(8)).map((n) => n.note);
+  const cards = await db.select({ card: reviewItems.card, lapses: reviewItems.lapses, dueAt: reviewItems.dueAt }).from(reviewItems).where(eq(reviewItems.userId, userId)).limit(200);
+  const missed = new Map<string, number>();
+  for (const c of cards) if (c.lapses > 0 && c.card.topic) missed.set(c.card.topic, (missed.get(c.card.topic) ?? 0) + c.lapses);
+  ctx.weakTopics = [...missed].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => t);
+  ctx.reviewsDue = cards.filter((c) => c.dueAt.getTime() <= Date.now()).length;
 
   const now = new Date();
   const soon = await db

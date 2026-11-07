@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Check, ChevronDown, Circle, Clock, List, Loader2, Map as MapIcon, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
-import { api, LearningPath, LearningProfile, PathStep, PathSummary, StepStatus } from "../services/api";
+import { api, LearningPath, LearningProfile, PathStageView, PathStep, PathSummary, StepStatus } from "../services/api";
 import { PathSwitcher } from "../components/PathSwitcher";
 import { NewPathDialog } from "../components/NewPathDialog";
 import { Modal } from "../components/Modal";
 import { SchoolCard } from "../components/SchoolCard";
 import { RoadmapMap } from "../components/RoadmapMap";
+import { QuizDialog } from "../components/QuizDialog";
+import { WeekCard } from "../components/WeekCard";
+import { UpcomingBand } from "../components/UpcomingBand";
 import { KIND_LABEL_KEYS, formatMinutes, typeLabel } from "../lib/learning";
 import { useI18n } from "../lib/i18n";
 import { pathFor, ROUTES } from "../lib/routes";
@@ -78,6 +81,8 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
   const [fetched, setFetched] = useState<LearningPath | null>(null);
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [quiz, setQuiz] = useState<PathStageView | null>(null);
+  const [weekKey, setWeekKey] = useState(0);
   const [view, setView] = useState<"map" | "list">(() => {
     try {
       return localStorage.getItem("teachtalk_path_view") === "list" ? "list" : "map";
@@ -135,6 +140,7 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
 
   /** A path changed: keep the app's main path and the switcher in step. */
   const setCurrent = (v: LearningPath) => {
+    setWeekKey((k) => k + 1);
     if (v.active) onPrimary(v);
     else setFetched(v);
     void refreshList();
@@ -247,6 +253,11 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
           </div>
         )}
 
+        <div className="mb-5 space-y-4">
+          <WeekCard refreshKey={weekKey} />
+          {path.kind === "school" && <UpcomingBand />}
+        </div>
+
         {/* Summary */}
         <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
           <p className="text-[11px] font-mono uppercase tracking-[0.15em] text-primary">{path.kind === "school" ? t("paths.kind.school") : path.kind === "custom" ? t("paths.kind.custom") : t("path.eyebrow")}{path.active ? ` · ${t("paths.main")}` : ""}</p>
@@ -298,7 +309,7 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
 
         {view === "map" && (
           <div className="mt-4">
-            <RoadmapMap path={path} onStatus={update} onOpen={openStep} />
+            <RoadmapMap path={path} onStatus={update} onOpen={openStep} onQuiz={setQuiz} />
           </div>
         )}
 
@@ -319,6 +330,13 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
                     <div className="min-w-0 flex-1">
                       <h2 className="text-[16px] font-semibold text-foreground">{stage.title}</h2>
                       <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">{stage.objective}</p>
+                      {stage.complete && (
+                        <span className="inline-block mt-2" onClick={(e) => e.stopPropagation()}>
+                          {stage.checkpoint.passed
+                            ? <span className="text-[12px] text-primary font-medium">{t("quiz.passedShort", { score: stage.checkpoint.bestScore ?? 0, total: stage.checkpoint.total ?? 0 })}</span>
+                            : <span role="button" tabIndex={0} onClick={() => setQuiz(stage)} onKeyDown={(e) => e.key === "Enter" && setQuiz(stage)} className="inline-flex items-center px-3 h-7 rounded-lg border border-primary/40 text-primary text-[12px] font-semibold hover:bg-primary/10 cursor-pointer">{stage.checkpoint.attempts > 0 ? t("quiz.tryAgain") : t("quiz.take")}</span>}
+                        </span>
+                      )}
                       {stage.topics && stage.topics.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">{stage.topics.map((tp) => <span key={tp} className="px-2 h-5 inline-flex items-center rounded-full bg-primary/10 text-primary text-[11px] font-mono">{tp}</span>)}</div>
                       )}
@@ -351,6 +369,9 @@ export function PathScreen({ path: primary, loaded, onPath: onPrimary, profile =
         </div>
       </div>
 
+      {quiz && (
+        <QuizDialog pathId={path.id} stage={quiz.index} stageTitle={quiz.title} onClose={() => setQuiz(null)} onDone={(p) => setCurrent(p)} />
+      )}
       {creating && paths && (
         <NewPathDialog
           profile={profile}

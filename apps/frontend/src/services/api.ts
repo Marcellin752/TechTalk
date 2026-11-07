@@ -57,6 +57,7 @@ export interface LearningProfile {
   schoolId?: string | null;
   schoolYear?: number | null;
   schoolTopics?: string[];
+  codewarsUsername?: string | null;
   /** Consent switches, off until the learner turns them on. */
   shareWithSchool?: boolean;
   shareForRecommendations?: boolean;
@@ -99,7 +100,7 @@ export interface AdminStats {
 }
 export interface AdminUser {
   id: string; name: string; email: string; role: 'user' | 'admin'; createdAt: string;
-  hasPassword: boolean; google: boolean; github: boolean; githubLogin: string | null; isPublic: boolean; handle: string | null;
+  hasPassword: boolean; google: boolean; github: boolean; githubLogin: string | null; isPublic: boolean; handle: string | null; ambassador?: boolean;
 }
 export interface AdminComment {
   id: string; body: string; createdAt: string;
@@ -114,9 +115,9 @@ export interface CampusResource {
 }
 export interface CampusSession {
   id: string; title: string; subject: string; description: string | null; startsAt: string; endsAt: string; place: string | null; onlineUrl: string | null;
-  capacity: number; hostId: string; hostName: string; hostPicture: string | null; members: number; joined: boolean; mine: boolean; full: boolean;
+  capacity: number; hostId: string; hostName: string; hostPicture: string | null; hostAmbassador?: boolean; members: number; joined: boolean; mine: boolean; full: boolean;
 }
-export interface CampusPerson { id: string; name: string; picture: string | null; year: number | null; topics: string[]; headline: string | null; lookingFor: CampusMe['lookingFor']; contact: string | null; handle: string | null; shared: string[] }
+export interface CampusPerson { id: string; name: string; picture: string | null; ambassador?: boolean; year: number | null; topics: string[]; headline: string | null; lookingFor: CampusMe['lookingFor']; contact: string | null; handle: string | null; shared: string[] }
 export interface CampusProgramme {
   school: { name: string }; myYear: number | null; status: 'draft' | 'confirmed' | null;
   years: Array<{
@@ -124,6 +125,30 @@ export interface CampusProgramme {
     projects: Array<{ name: string; summary: string | null; topics: string[]; kind: string; hours: number | null; progress: { done: number; total: number } | null }>;
   }>;
 }
+export interface QuizQuestionView { question: string; options: string[]; topic: string }
+export interface QuizView { quizId: string; questions: QuizQuestionView[]; attempts: number; bestScore: number | null; passed: boolean }
+export interface QuizResult { score: number; total: number; passed: boolean; results: Array<{ correct: boolean; chosen: number | null; answer: number; explanation: string; topic: string }>; path: LearningPath }
+export interface ReviewCard { id: string; box: number; question: string; options: string[]; topic: string }
+export interface WeekSummary {
+  streak: { current: number; best: number; week: Array<{ date: string; active: boolean }>; todayDone: boolean };
+  goal: { target: number; done: number; percent: number; reached: boolean };
+  week: { steps: number; reviews: number; quizzesPassed: number };
+  reviewsDue: number;
+  challenge: { students: number; hours: number; changePercent: number | null; reachedGoal: number | null } | null;
+  isSunday: boolean;
+}
+export interface UpcomingItem {
+  event: { id: string; title: string; kind: string; startsAt: string };
+  daysLeft: number;
+  stage: { pathId: string; index: number; title: string; topics: string[]; done: number; total: number; checkpointPassed: boolean } | null;
+  todo: Array<{ id: string; title: string; type: string; url: string; minutes: number }>;
+}
+export interface OpportunityItem { id: string; title: string; summary: string | null; url: string; source: string; kind: 'job' | 'issue'; internship: boolean; matched: string[]; company: string | null; location: string | null; repo: string | null; labels: string[] }
+export type KairosAction =
+  | { type: 'calendar.add'; title: string; kind: CalendarKind; startsAt: string; endsAt: string; notes?: string | null }
+  | { type: 'plan.sessions' }
+  | { type: 'path.rebuild' }
+  | { type: 'review.open' };
 export interface AdminCampusResource { id: string; title: string; subject: string; url: string; status: 'approved' | 'hidden'; reports: number; votes: number; official: boolean; school: string; author: string | null; createdAt: string }
 export interface SchoolProgramme { status?: 'draft' | 'confirmed'; years: Array<{ year: number; title: string; summary?: string; projects: Array<{ name: string; summary?: string; topics: string[]; kind?: string; hours?: number }> }> }
 export interface AdminSchool {
@@ -140,10 +165,14 @@ export interface PathStep {
   kind: 'orient' | 'learn' | 'practice' | 'project' | 'read';
   minutes: number;
   status: StepStatus;
+  /** "codewars" when a solved kata ticked the step by itself. */
+  verifiedBy?: string | null;
   completedAt: string | null;
   content: { id: string; type: string; title: string; url: string; source: string; summary: string | null; image: string | null; meta: Record<string, any> | null };
 }
+export interface Checkpoint { quizId: string | null; passed: boolean; bestScore: number | null; total: number | null; attempts: number }
 export interface PathStageView {
+  checkpoint: Checkpoint;
   /** For school paths: what the project teaches, and what sort of stage it is. */
   topics?: string[];
   kind?: string;
@@ -686,6 +715,96 @@ export const api = {
     return { success: r.success, profile: r.data?.profile, path: r.data?.path ?? null, paths: r.data?.paths ?? [], error: r.error };
   },
 
+  // --- Proof of progress
+  async getQuiz(pathId: string, stage: number) {
+    const r = await this.call<QuizView>(`/learning/paths/${pathId}/stages/${stage}/quiz`, { method: 'POST' });
+    return { success: r.success, quiz: r.data, error: r.error };
+  },
+  async renewQuiz(quizId: string) {
+    const r = await this.call<QuizView>(`/learning/quizzes/${quizId}/renew`, { method: 'POST' });
+    return { success: r.success, quiz: r.data, error: r.error };
+  },
+  async submitQuiz(quizId: string, answers: Array<number | null>) {
+    const r = await this.call<QuizResult>(`/learning/quizzes/${quizId}/submit`, { method: 'POST', json: { answers } });
+    return { success: r.success, result: r.data, error: r.error };
+  },
+  /** Memory, projects, research, community, insights: one thin door to /api/growth. */
+  async growth<T = unknown>(path: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'GET', json?: unknown) {
+    return this.call<T>(`/growth${path}`, { method, ...(json !== undefined ? { json } : {}) });
+  },
+  async publicPortfolio(handle: string) {
+    try {
+      const res = await fetch(`${API_URL}/public/portfolio/${encodeURIComponent(handle)}`);
+      return res.ok ? ((await res.json()) as unknown) : null;
+    } catch {
+      return null;
+    }
+  },
+  async getSkills() {
+    return this.call<SkillsOverview>('/skills');
+  },
+  async getSkill(slug: string) {
+    return this.call<SkillDetail>(`/skills/${encodeURIComponent(slug)}`);
+  },
+  async explainSkill(slug: string, text: string) {
+    return this.call<{ evaluation: SkillEvaluation }>(`/skills/${encodeURIComponent(slug)}/explain`, { method: 'POST', json: { text } });
+  },
+  async contestEvaluation(id: string, reason: string) {
+    return this.call<{ evaluation: SkillEvaluation }>(`/skills/evaluations/${id}/contest`, { method: 'POST', json: { reason } });
+  },
+  async hideSkillEdge(id: string, hidden: boolean) {
+    return this.call(`/skills/edges/${id}/hide`, { method: 'POST', json: { hidden } });
+  },
+  async forgetSkills(slug?: string) {
+    return this.call(slug ? `/skills/${encodeURIComponent(slug)}` : '/skills', { method: 'DELETE' });
+  },
+  async getReviews() {
+    const r = await this.call<{ due: ReviewCard[]; dueCount: number; cards: number }>('/learning/reviews');
+    return r.data ?? { due: [], dueCount: 0, cards: 0 };
+  },
+  async answerReview(id: string, choice: number) {
+    const r = await this.call<{ correct: boolean; answer: number; explanation: string; nextBox: number; nextDueAt: string }>(`/learning/reviews/${id}/answer`, { method: 'POST', json: { choice } });
+    return { success: r.success, result: r.data, error: r.error };
+  },
+  async linkCodewars(username: string) {
+    return this.call<{ username: string }>('/learning/codewars', { method: 'PUT', json: { username } });
+  },
+  async unlinkCodewars() {
+    return this.call('/learning/codewars', { method: 'DELETE' });
+  },
+  async syncCodewars() {
+    return this.call<{ solved: number; inYourPaths: number; newlyDone: number }>('/learning/codewars/sync', { method: 'POST' });
+  },
+  async getWeek(): Promise<WeekSummary | null> {
+    const r = await this.call<WeekSummary>(`/learning/week?tz=${new Date().getTimezoneOffset()}`);
+    return r.data ?? null;
+  },
+  async getUpcoming(): Promise<UpcomingItem[]> {
+    const r = await this.call<{ items: UpcomingItem[] }>('/learning/upcoming');
+    return r.data?.items ?? [];
+  },
+  async getOpportunities() {
+    const r = await this.call<{ skills: string[]; year: number | null; items: OpportunityItem[] }>('/learning/opportunities');
+    return r.data ?? { skills: [], year: null, items: [] };
+  },
+  async getMissed(): Promise<number> {
+    const r = await this.call<{ count: number }>('/calendar/missed');
+    return r.data?.count ?? 0;
+  },
+  async reschedule() {
+    const r = await this.call<{ moved: number; steps: number }>('/calendar/reschedule', { method: 'POST', json: { tzOffset: new Date().getTimezoneOffset() } });
+    return { success: r.success, moved: r.data?.moved ?? 0, error: r.error };
+  },
+  async kairosMemory() {
+    const r = await this.call<{ notes: Array<{ id: string; note: string; createdAt: string }> }>('/kairos/memory');
+    return r.data?.notes ?? [];
+  },
+  async kairosForget(id?: string) {
+    return (await this.call(id ? `/kairos/memory/${id}` : '/kairos/memory', { method: 'DELETE' })).success;
+  },
+  adminImportEvents: (id: string, format: 'csv' | 'ics', content: string) => api.call<{ imported: number; errors: string[] }>(`/admin/schools/${id}/events/import`, { method: 'POST', json: { format, content } }),
+  adminSetAmbassador: (id: string, value: boolean) => api.call(`/admin/users/${id}/ambassador`, { method: 'PATCH', json: { value } }),
+
   // --- Several paths
   async getPaths(): Promise<{ paths: PathSummary[]; max: number }> {
     const r = await this.call<{ paths: PathSummary[]; max: number }>('/learning/paths');
@@ -813,7 +932,7 @@ export const api = {
     }
   },
 
-  async kairosChat(message: string, conversationId?: string, lang?: string, page?: string): Promise<{ success: boolean; conversationId?: string; title?: string; message?: KairosMessage; suggestions?: string[]; error?: string }> {
+  async kairosChat(message: string, conversationId?: string, lang?: string, page?: string): Promise<{ success: boolean; conversationId?: string; title?: string; message?: KairosMessage; suggestions?: string[]; actions?: KairosAction[]; remembered?: string[]; error?: string }> {
     try {
       const res = await this.fetchWithAuth('/kairos/chat', {
         method: 'POST',
@@ -822,7 +941,7 @@ export const api = {
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Kairos could not answer.' };
-      return { success: true, conversationId: data.conversationId, title: data.title, message: data.message, suggestions: data.suggestions ?? [] };
+      return { success: true, conversationId: data.conversationId, title: data.title, message: data.message, suggestions: data.suggestions ?? [], actions: data.actions ?? [], remembered: data.remembered ?? [] };
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error' };
     }
@@ -1016,3 +1135,18 @@ export const api = {
     }
   }
 };
+
+export type SkillLevel = 'unseen' | 'exploring' | 'learning' | 'understood' | 'applied';
+export interface SkillNodeView { slug: string; name: string; area: string; level: SkillLevel; mastery: number; confidence: number; trend: "up" | "flat" | "down" | null; lastAt: string | null; evidenceCount: number }
+export interface SkillEdgeView { id: string; from: string; to: string; type: 'prerequisite' | 'related'; source: string; hidden: boolean }
+export interface SkillsOverview { summary: Record<'applied' | 'understood' | 'learning' | 'exploring', number>; nodes: SkillNodeView[]; edges: SkillEdgeView[]; ready: string[] }
+export interface SkillCriterion { id: string; label: string; met?: boolean; comment?: string }
+export interface SkillEvaluation { id: string; criteria: SkillCriterion[]; feedback: string; score: number; revised: boolean; text?: string; createdAt?: string }
+export interface SkillLink { edgeId: string; hidden: boolean; slug: string; name: string; level: SkillLevel }
+export interface SkillDetail {
+  slug: string; name: string; area: string; description: string | null; level: SkillLevel; mastery: number; confidence: number; trend: "up" | "flat" | "down" | null; reasons: string[];
+  evidence: Array<{ id: string; type: string; outcome: number; at: string }>;
+  prerequisites: SkillLink[]; unlocks: SkillLink[]; missing: Array<{ slug: string; name: string }>;
+  criteria: Array<{ id: string; label: string }>; evaluations: SkillEvaluation[];
+  resources: Array<{ id: string; title: string; url: string; source: string; type: string }>;
+}

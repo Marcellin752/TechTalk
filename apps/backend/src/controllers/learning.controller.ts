@@ -1,3 +1,4 @@
+import { recordStepEvidence } from '../services/skills/store.js';
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
@@ -142,6 +143,7 @@ export async function handleUpdateStep(request: FastifyRequest, reply: FastifyRe
         completedAt: status === 'done' ? new Date() : null,
       })
       .where(eq(learningSteps.id, stepId));
+    if (status !== 'todo') await recordStepEvidence(userId(request), [{ id: stepId, verifiedBy: step.verifiedBy, done: status === 'done' }]).catch((e) => request.log.warn(e));
     return reply.status(200).send({ path: await pathView(userId(request), step.pathId) });
   } catch (error) {
     request.log.error(error);

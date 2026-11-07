@@ -1,7 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { and, desc, eq, gt, gte, ilike, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
-import { adminAudit, comments, contents, kairosMessages, learningPaths, learningProfiles, profileSettings, refreshTokens, schools, users, campusResources } from '../db/schema.js';
+import { adminAudit, comments, contents, kairosMessages, learningPaths, learningProfiles, profileSettings, refreshTokens, schools, users, campusResources, campusProfiles, schoolEvents } from '../db/schema.js';
+import { parseCsvEvents, parseIcsEvents } from '../services/events-import.js';
 import { generateApiKey, parseCurriculum, presetCurriculum, slugify } from '../services/schools.js';
 import { revokeAllRefreshTokens } from '../services/session.js';
 import { startSync, syncState } from '../services/automation/index.js';
@@ -73,9 +74,11 @@ export async function handleListUsers(request: FastifyRequest, reply: FastifyRep
         hasPassword: sql<boolean>`${users.password} is not null`, google: sql<boolean>`${users.googleId} is not null`,
         githubLogin: users.githubLogin, github: sql<boolean>`${users.githubId} is not null`,
         isPublic: sql<boolean>`coalesce(${profileSettings.isPublic}, false)`, handle: profileSettings.handle,
+        ambassador: sql<boolean>`coalesce(${campusProfiles.ambassador}, false)`,
       })
       .from(users)
       .leftJoin(profileSettings, eq(profileSettings.userId, users.id))
+      .leftJoin(campusProfiles, eq(campusProfiles.userId, users.id))
       .where(where)
       .orderBy(desc(users.createdAt))
       .limit(limit)
@@ -378,6 +381,49 @@ export async function handleDeleteCampusResource(request: FastifyRequest, reply:
     if (deleted.length === 0) return reply.status(404).send({ error: 'Not found.' });
     await audit(request, 'campus:delete', deleted[0]!.title);
     return reply.status(204).send();
+  } catch (e) {
+    return fail(request, reply, e);
+  }
+}
+
+/** Loads a school's deadlines from a calendar export (.ics) or a spreadsheet (.csv). Importing again updates the same events. */
+export async function handleImportEvents(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { id } = request.params as { id?: string };
+    const b = (request.body ?? {}) as { format?: unknown; content?: unknown };
+    if (!id || !UUID_RE.test(id)) return reply.status(400).send({ error: 'Invalid school id.' });
+    if (b.format !== 'csv' && b.format !== 'ics') return reply.status(400).send({ error: 'format must be csv or ics.' });
+    if (typeof b.content !== 'string' || b.content.length === 0 || b.content.length > 500_000) return reply.status(400).send({ error: 'Send the file content (500 kB at most).' });
+    const [school] = await db.select({ name: schools.name }).from(schools).where(eq(schools.id, id)).limit(1);
+    if (!school) return reply.status(404).send({ error: 'School not found.' });
+
+    const { events, errors } = b.format === 'csv' ? parseCsvEvents(b.content) : parseIcsEvents(b.content);
+    if (events.length > 500) return reply.status(400).send({ error: 'At most 500 events per import.' });
+    for (const e of events) {
+      await db
+        .insert(schoolEvents)
+        .values({ schoolId: id, ...e })
+        .onConflictDoUpdate({ target: [schoolEvents.schoolId, schoolEvents.externalId], set: { title: e.title, kind: e.kind, startsAt: e.startsAt, endsAt: e.endsAt, notes: e.notes, year: e.year } });
+    }
+    if (events.length > 0) await audit(request, 'school:import-events', `${school.name}: ${events.length}`);
+    return reply.status(200).send({ imported: events.length, errors: errors.slice(0, 20) });
+  } catch (e) {
+    return fail(request, reply, e);
+  }
+}
+
+/** Marks a student as a campus ambassador (or takes it back). */
+export async function handleSetAmbassador(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { id } = request.params as { id?: string };
+    const value = ((request.body ?? {}) as { value?: unknown }).value;
+    if (!id || !UUID_RE.test(id)) return reply.status(400).send({ error: 'Invalid user id.' });
+    if (typeof value !== 'boolean') return reply.status(400).send({ error: 'value must be true or false.' });
+    const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id)).limit(1);
+    if (!u) return reply.status(404).send({ error: 'User not found.' });
+    await db.insert(campusProfiles).values({ userId: id, ambassador: value }).onConflictDoUpdate({ target: campusProfiles.userId, set: { ambassador: value, updatedAt: new Date() } });
+    await audit(request, value ? 'user:ambassador' : 'user:ambassador-off', u.email);
+    return reply.status(200).send({ id, ambassador: value });
   } catch (e) {
     return fail(request, reply, e);
   }

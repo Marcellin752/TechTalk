@@ -70,4 +70,4 @@ export interface ContentItem {
 }
 
 export type AppScreen = "auth" | "app";
-export type AppTab = "feed" | "explore" | "learn" | "path" | "practice" | "kairos" | "people" | "calendar" | "campus" | "admin" | "saved" | "profile" | "settings" | "about";
+export type AppTab = "feed" | "explore" | "learn" | "path" | "practice" | "kairos" | "people" | "calendar" | "campus" | "review" | "today" | "growth" | "memory" | "lab" | "playground" | "community" | "skills" | "opportunities" | "admin" | "saved" | "profile" | "settings" | "about";

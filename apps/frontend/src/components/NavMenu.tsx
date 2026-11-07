@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { NavLink } from "react-router-dom";
-import { BookOpen, Bookmark, CalendarDays, Code2, Compass, GraduationCap, Home, Info, Route, Settings, ShieldCheck, User, Users } from "lucide-react";
+import { BookOpen, Bookmark, Brain, Briefcase, CalendarDays, Code2, Compass, GraduationCap, Home, Info, Network, CalendarCheck,TrendingUp,Layers,FlaskConical,Terminal,MessagesSquare, Route, Settings, ShieldCheck, User, Users } from "lucide-react";
 import { KairosIcon } from "./KairosArt";
 import { ROUTES } from "../lib/routes";
 import { useI18n } from "../lib/i18n";
@@ -23,10 +23,19 @@ const MAIN: Item[] = [
   { to: ROUTES.learn, label: "nav.learn", icon: BookOpen },
   { to: ROUTES.path, label: "nav.path", icon: Route },
   { to: ROUTES.practice, label: "nav.practice", icon: Code2 },
+  { to: ROUTES.review, label: "nav.review", icon: Brain },
+  { to: ROUTES.opportunities, label: "nav.opportunities", icon: Briefcase },
   { to: ROUTES.calendar, label: "nav.calendar", icon: CalendarDays },
   { to: ROUTES.campus, label: "nav.campus", icon: GraduationCap },
   { to: ROUTES.kairos, label: "nav.kairos", icon: KairosIcon, badge: "AI" },
   { to: ROUTES.people, label: "nav.people", icon: Users },
+  { to: ROUTES.today, label: "nav.today", icon: CalendarCheck },
+  { to: ROUTES.skills, label: "nav.skills", icon: Network },
+  { to: ROUTES.memory, label: "nav.memory", icon: Layers },
+  { to: ROUTES.playground, label: "nav.playground", icon: Terminal },
+  { to: ROUTES.lab, label: "nav.lab", icon: FlaskConical },
+  { to: ROUTES.community, label: "nav.community", icon: MessagesSquare },
+  { to: ROUTES.growth, label: "nav.growth", icon: TrendingUp },
 ];
 const YOU: Item[] = [
   { to: ROUTES.saved, label: "nav.saved", icon: Bookmark },
@@ -35,7 +44,7 @@ const YOU: Item[] = [
   { to: ROUTES.about, label: "nav.about", icon: Info },
 ];
 const ADMIN: Item = { to: ROUTES.admin, label: "nav.admin", icon: ShieldCheck };
-const BOTTOM: Item[] = [MAIN[0]!, MAIN[2]!, MAIN[3]!, MAIN[4]!, MAIN[5]!, YOU[1]!]; // Explore opens from the Home screen on phones; Kairos has its floating button
+const BOTTOM: Item[] = [MAIN[0]!, MAIN[2]!, MAIN[3]!, MAIN[4]!, MAIN[7]!, YOU[1]!]; // Explore opens from the Home screen on phones; Kairos has its floating button
 
 function Row({ item, mini }: { item: Item; mini: boolean }) {
   const { t } = useI18n();

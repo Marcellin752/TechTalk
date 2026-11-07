@@ -162,6 +162,41 @@
       "when": 1794044934119,
       "tag": "0022_condemned_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794048043253,
+      "tag": "0023_fixed_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794048080852,
+      "tag": "0024_messy_the_watchers",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794050498319,
+      "tag": "0025_green_pestilence",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794051346685,
+      "tag": "0026_mean_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794051507221,
+      "tag": "0027_empty_starjammers",
+      "breakpoints": true
     }
   ]
 }

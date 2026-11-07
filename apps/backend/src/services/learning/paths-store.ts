@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { db } from '../../db/db.js';
-import { contents, learningPaths, learningProfiles, learningSteps, schools, type PathSettings, type ProgrammeYear } from '../../db/schema.js';
+import { contents, learningPaths, learningProfiles, learningQuizzes, learningSteps, schools, type PathSettings, type ProgrammeYear } from '../../db/schema.js';
 import { generatePath, generateSchoolPath, type CatalogItem, type GeneratedPath, type LearnerProfile } from './generator.js';
-import { assemblePathView, type PathRow, type StepRow } from './view.js';
+import { assemblePathView, type PathRow, type QuizState, type StepRow } from './view.js';
 import { MIN_COHORT } from '../schools.js';
 
 /* Everything that reads or writes a learner's paths. A learner can have several: one for
@@ -49,14 +49,16 @@ export async function pathView(uid: string, pathId: string) {
   const rows = await db
     .select({
       id: learningSteps.id, position: learningSteps.position, stage: learningSteps.stage, kind: learningSteps.kind,
-      minutes: learningSteps.minutes, status: learningSteps.status, completedAt: learningSteps.completedAt,
+      minutes: learningSteps.minutes, status: learningSteps.status, verifiedBy: learningSteps.verifiedBy, completedAt: learningSteps.completedAt,
       content: { id: contents.id, type: contents.type, title: contents.title, url: contents.url, source: contents.source, summary: contents.summary, image: contents.image, meta: contents.meta },
     })
     .from(learningSteps)
     .innerJoin(contents, eq(contents.id, learningSteps.contentId))
     .where(eq(learningSteps.pathId, path.id))
     .orderBy(asc(learningSteps.position));
-  return assemblePathView(path as PathRow, rows as StepRow[]);
+  const quizRows = await db.select().from(learningQuizzes).where(eq(learningQuizzes.pathId, path.id));
+  const quizzes = new Map<number, QuizState>(quizRows.map((q) => [q.stage, { id: q.id, passedAt: q.passedAt, bestScore: q.bestScore, attempts: q.attempts, total: q.questions.length }]));
+  return assemblePathView(path as PathRow, rows as StepRow[], quizzes);
 }
 
 export async function primaryPathId(uid: string): Promise<string | null> {
@@ -156,6 +158,8 @@ export async function buildPath(uid: string, o: BuildOptions): Promise<string> {
       if (!existing) throw new PathError('not_found', 'Path not found.');
       doneBefore = new Set((await tx.select({ c: learningSteps.contentId }).from(learningSteps).where(and(eq(learningSteps.pathId, pathId), eq(learningSteps.status, 'done')))).map((r) => r.c));
       await tx.delete(learningSteps).where(eq(learningSteps.pathId, pathId));
+      // Quizzes are tied to stage numbers, which a rebuild changes; the review cards they made live on.
+      await tx.delete(learningQuizzes).where(eq(learningQuizzes.pathId, pathId));
       // The title is kept: it may have been renamed.
       await tx.update(learningPaths).set({ goal: o.settings.goal, level: o.settings.level, hoursPerWeek: o.settings.hoursPerWeek, totalMinutes: generated.totalMinutes, stages, settings }).where(eq(learningPaths.id, pathId));
     } else {

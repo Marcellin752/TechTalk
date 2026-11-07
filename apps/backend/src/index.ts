@@ -15,6 +15,8 @@ import { calendarRoutes } from './routes/calendar.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
 import { partnerRoutes } from './routes/partner.routes.js';
 import { campusRoutes } from './routes/campus.routes.js';
+import { skillsRoutes } from './routes/skills.routes.js';
+import { growthRoutes } from './routes/growth.routes.js';
 import { publicRoutes } from './routes/public.routes.js';
 import { initAutomationWorkers } from './services/automation/index.js';
 
@@ -75,6 +77,8 @@ fastify.register(calendarRoutes, { prefix: '/api/calendar' });
 fastify.register(adminRoutes, { prefix: '/api/admin' });
 fastify.register(partnerRoutes, { prefix: '/api/partner' });
 fastify.register(campusRoutes, { prefix: '/api/campus' });
+fastify.register(skillsRoutes, { prefix: '/api/skills' });
+fastify.register(growthRoutes, { prefix: '/api/growth' });
 fastify.register(publicRoutes, { prefix: '/api/public' });
 
 // One shape for every failure, and no stack traces or SQL leaking to the client.

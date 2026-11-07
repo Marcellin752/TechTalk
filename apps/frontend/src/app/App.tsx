@@ -20,6 +20,16 @@ import { AdminScreen } from "../pages/AdminScreen";
 import { CampusScreen } from "../pages/CampusScreen";
 import { DesignScreen } from "../pages/DesignScreen";
 import { ReelsScreen } from "../pages/ReelsScreen";
+import { ReviewScreen } from "../pages/ReviewScreen";
+import { SkillsScreen } from "../pages/SkillsScreen";
+import { TodayScreen } from "../pages/TodayScreen";
+import { GrowthScreen } from "../pages/GrowthScreen";
+import { MemoryScreen } from "../pages/MemoryScreen";
+import { LabScreen } from "../pages/LabScreen";
+import { PlaygroundScreen } from "../pages/PlaygroundScreen";
+import { CommunityScreen } from "../pages/CommunityScreen";
+import { PortfolioScreen } from "../pages/PortfolioScreen";
+import { OpportunitiesScreen } from "../pages/OpportunitiesScreen";
 import { OnboardingScreen } from "../pages/OnboardingScreen";
 import { KairosScreen } from "../pages/KairosScreen";
 import { KairosFab } from "../components/KairosFab";
@@ -510,6 +520,15 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
     people: t("nav.people"),
     calendar: t("nav.calendar"),
     campus: t("nav.campus"),
+    review: t("nav.review"),
+    today: t("nav.today"),
+    growth: t("nav.growth"),
+    memory: t("nav.memory"),
+    lab: t("nav.lab"),
+    playground: t("nav.playground"),
+    community: t("nav.community"),
+    skills: t("nav.skills"),
+    opportunities: t("nav.opportunities"),
     admin: t("nav.admin"),
     saved: t("nav.saved"),
     profile: t("nav.profile"),
@@ -670,6 +689,17 @@ function MainApp({ user, onUserUpdate, onLogout }: { user: ApiUser | null; onUse
           <Route path={ROUTES.people} element={<PeopleScreen />} />
           <Route path={ROUTES.calendar} element={<CalendarScreen />} />
           <Route path={ROUTES.campus} element={<CampusScreen />} />
+          <Route path={ROUTES.review} element={<ReviewScreen />} />
+          <Route path={ROUTES.today} element={<TodayScreen />} />
+          <Route path={ROUTES.growth} element={<GrowthScreen />} />
+          <Route path={ROUTES.memory} element={<MemoryScreen />} />
+          <Route path={ROUTES.lab} element={<LabScreen />} />
+          <Route path={ROUTES.playground} element={<PlaygroundScreen />} />
+          <Route path={ROUTES.community} element={<CommunityScreen />} />
+          <Route path="/p/:handle" element={<PortfolioScreen />} />
+          <Route path={ROUTES.skills} element={<SkillsScreen />} />
+          <Route path={`${ROUTES.skills}/:slug`} element={<SkillsScreen />} />
+          <Route path={ROUTES.opportunities} element={<OpportunitiesScreen />} />
           <Route path={ROUTES.admin} element={<AdminScreen user={user} />} />
           <Route path="/design" element={<DesignScreen />} />
           <Route path="/u/:handle" element={<PublicProfileScreen />} />
@@ -753,6 +783,7 @@ function PublicGate() {
       <Route path="/" element={<LandingScreen />} />
       <Route path="/people" element={<PublicShell><PeopleScreen /></PublicShell>} />
       <Route path="/u/:handle" element={<PublicShell><PublicProfileScreen /></PublicShell>} />
+      <Route path="/p/:handle" element={<PublicShell><PortfolioScreen /></PublicShell>} />
       <Route path="/design" element={<PublicShell><DesignScreen /></PublicShell>} />
       <Route path="*" element={<Navigate to={ROUTES.login} replace state={{ from: location }} />} />
     </Routes>

@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { and, asc, eq, gte, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
 import { calendarEvents, contents, learningPaths, learningProfiles, learningSteps, schoolEvents, schools, campusSessions, campusSessionMembers } from '../db/schema.js';
 import { buildIcs, planSessions } from '../services/calendar.js';
@@ -244,6 +244,61 @@ export async function handleExportIcs(request: FastifyRequest, reply: FastifyRep
       .header('Content-Disposition', 'attachment; filename="techtalk.ics"')
       .status(200)
       .send(buildIcs(rows));
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/** Study sessions tied to a step that were meant to happen in the last two weeks and did not. */
+async function missedSessions(uid: string) {
+  const now = new Date();
+  return db
+    .select({ id: calendarEvents.id, stepId: calendarEvents.stepId, startsAt: calendarEvents.startsAt, title: calendarEvents.title })
+    .from(calendarEvents)
+    .innerJoin(learningSteps, eq(learningSteps.id, calendarEvents.stepId))
+    .where(and(
+      eq(calendarEvents.userId, uid), eq(calendarEvents.kind, 'study'), eq(calendarEvents.done, false), isNotNull(calendarEvents.stepId),
+      lt(calendarEvents.endsAt, now), gte(calendarEvents.endsAt, new Date(now.getTime() - 14 * 86_400_000)), ne(learningSteps.status, 'done'),
+    ))
+    .orderBy(asc(calendarEvents.startsAt));
+}
+
+export async function handleMissed(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    return reply.status(200).send({ count: (await missedSessions(userId(request))).length });
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
+  }
+}
+
+/** Puts the missed sessions back on the calendar, ahead, so a bad week does not leave holes in the plan. */
+export async function handleReschedule(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const uid = userId(request);
+    const b = (request.body ?? {}) as { tzOffset?: unknown; startHour?: unknown };
+    const tzOffset = Number.isFinite(b.tzOffset) ? Math.max(-840, Math.min(840, b.tzOffset as number)) : 0;
+    const startHour = Number.isInteger(b.startHour) && (b.startHour as number) >= 0 && (b.startHour as number) <= 21 ? (b.startHour as number) : 18;
+    const missed = await missedSessions(uid);
+    if (missed.length === 0) return reply.status(200).send({ moved: 0, steps: 0 });
+
+    const stepIds = [...new Set(missed.map((m) => m.stepId!))];
+    const steps = await db
+      .select({ id: learningSteps.id, contentId: learningSteps.contentId, minutes: learningSteps.minutes, title: contents.title })
+      .from(learningSteps)
+      .innerJoin(contents, eq(contents.id, learningSteps.contentId))
+      .where(and(eq(learningSteps.userId, uid), inArray(learningSteps.id, stepIds)));
+    const order = new Map(stepIds.map((id, i) => [id, i]));
+    steps.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+
+    const [lp] = await db.select({ h: learningProfiles.hoursPerWeek }).from(learningProfiles).where(eq(learningProfiles.userId, uid)).limit(1);
+    const sessions = planSessions(steps, { weeklyMinutes: (lp?.h ?? 5) * 60, startHour, tzOffset, days: [1, 2, 3, 4, 5], weeks: 4, from: new Date() });
+    await db.delete(calendarEvents).where(inArray(calendarEvents.id, missed.map((m) => m.id)));
+    if (sessions.length > 0) {
+      await db.insert(calendarEvents).values(sessions.map((x) => ({ userId: uid, title: x.title.slice(0, 160), kind: 'study', startsAt: x.startsAt, endsAt: x.endsAt, stepId: x.stepId, contentId: x.contentId })));
+    }
+    return reply.status(200).send({ moved: sessions.length, steps: steps.length });
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error.' });

@@ -8,6 +8,8 @@ interface Props {
   path: LearningPath;
   onStatus: (step: PathStep, status: StepStatus) => void;
   onOpen: (step: PathStep) => void;
+  /** Opens the checkpoint quiz of a finished stage. */
+  onQuiz?: (stage: PathStageView) => void;
 }
 
 const COLUMN = 288; // px, one stage
@@ -51,30 +53,38 @@ function StepNode({ step, onStatus, onOpen }: { step: PathStep; onStatus: (s: St
 
 /** The decision at the end of a stage: ready to move on (yes), or go back over it (not yet).
  *  Three rows: the question, the diamond with the "yes" line running out to the right, then what each answer means. */
-function Checkpoint({ stage, anchor }: { stage: PathStageView; anchor: (el: HTMLElement | null) => void }) {
+function Checkpoint({ stage, anchor, onQuiz }: { stage: PathStageView; anchor: (el: HTMLElement | null) => void; onQuiz?: (stage: PathStageView) => void }) {
   const { t } = useI18n();
-  const ready = stage.complete;
+  const passed = stage.checkpoint.passed;
   return (
     <div className="relative pl-10 pt-3" data-checkpoint>
-      <span aria-hidden className={`absolute left-[21px] top-0 h-[78px] w-0.5 ${ready ? "bg-primary/50" : "bg-border"}`} />
+      <span aria-hidden className={`absolute left-[21px] top-0 h-[96px] w-0.5 ${passed ? "bg-primary/50" : "bg-border"}`} />
       <p className="text-[12px] font-semibold text-foreground leading-tight">{t("path.checkpoint")}</p>
       {/* the diamond sits on the trunk; the link to the next stage starts here and runs right */}
       <div className="relative h-11">
         <span
           ref={anchor}
           aria-hidden
-          className={`absolute -left-[31px] top-[8px] w-[26px] h-[26px] rotate-45 rounded-[5px] border-2 ${ready ? "bg-primary border-primary" : "bg-card border-border"}`}
+          className={`absolute -left-[31px] top-[8px] w-[26px] h-[26px] rotate-45 rounded-[5px] border-2 ${passed ? "bg-primary border-primary" : stage.complete ? "bg-primary/20 border-primary" : "bg-card border-border"}`}
         />
       </div>
-      <p className="flex items-center gap-1.5 text-[11.5px]">
-        <span className={`px-1.5 py-0.5 rounded font-semibold ${ready ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>{t("path.yes")}</span>
-        <span className="text-muted-foreground">{ready ? t("path.yesDone") : t("path.yesWhen")}</span>
-      </p>
-      {!ready && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-          <span className="px-1.5 py-0.5 rounded bg-secondary font-semibold">{t("path.no")}</span>
-          <RotateCcw size={11} /> {t("path.noLoop")}
+      {passed ? (
+        <p className="flex items-center gap-1.5 text-[11.5px]">
+          <span className="px-1.5 py-0.5 rounded font-semibold bg-primary/15 text-primary">{t("path.yes")}</span>
+          <span className="text-muted-foreground">{t("quiz.passedShort", { score: stage.checkpoint.bestScore ?? 0, total: stage.checkpoint.total ?? 0 })}</span>
         </p>
+      ) : stage.complete ? (
+        <button onClick={() => onQuiz?.(stage)} className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg bg-primary text-white text-[12px] font-semibold shadow-md shadow-primary/25">
+          {stage.checkpoint.attempts > 0 ? t("quiz.tryAgain") : t("quiz.take")}
+        </button>
+      ) : (
+        <p className="flex items-center gap-1.5 text-[11.5px]">
+          <span className="px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-semibold">{t("path.no")}</span>
+          <span className="text-muted-foreground">{t("path.yesWhen")}</span>
+        </p>
+      )}
+      {!passed && !stage.complete && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-muted-foreground"><RotateCcw size={11} /> {t("path.noLoop")}</p>
       )}
     </div>
   );
@@ -87,7 +97,7 @@ interface Link { d: string; done: boolean; label?: { x: number; y: number; text:
  * and a yes / not yet checkpoint follows the stages that ask you to practise. It scrolls
  * sideways inside its own bordered section.
  */
-export function RoadmapMap({ path, onStatus, onOpen }: Props) {
+export function RoadmapMap({ path, onStatus, onOpen, onQuiz }: Props) {
   const { t } = useI18n();
   const scroller = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLOListElement>(null);
@@ -137,7 +147,8 @@ export function RoadmapMap({ path, onStatus, onOpen }: Props) {
       const dx = Math.max(40, (x2 - x1) * 0.55);
       next.push({
         d: `${xStart != null ? `M ${xStart} ${y1} L ${x1} ${y1}` : `M ${x1} ${y1}`} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`,
-        done: stage.complete,
+        // A link is solid once the stage is truly passed: finished, and its checkpoint cleared where it has one.
+        done: stage.complete && (!hasCheckpoint(stage) || stage.checkpoint.passed),
         label: anchor && xStart != null ? { x: xStart + 14, y: y1 - 7, text: t("path.yes") } : undefined,
       });
     }
@@ -236,7 +247,14 @@ export function RoadmapMap({ path, onStatus, onOpen }: Props) {
                             <StepNode key={step.id} step={step} onStatus={(s) => onStatus(step, s)} onOpen={() => onOpen(step)} />
                           ))}
                         </ul>
-                        {checkpoint && <Checkpoint stage={stage} anchor={(el) => void (anchors.current[i] = el)} />}
+                        {checkpoint && <Checkpoint stage={stage} anchor={(el) => void (anchors.current[i] = el)} onQuiz={onQuiz} />}
+                        {!checkpoint && stage.complete && (
+                          <div className="pl-10 pt-1 pb-1">
+                            {stage.checkpoint.passed
+                              ? <span className="inline-flex items-center gap-1.5 text-[11.5px] text-muted-foreground"><Check size={12} className="text-primary" /> {t("quiz.passedShort", { score: stage.checkpoint.bestScore ?? 0, total: stage.checkpoint.total ?? 0 })}</span>
+                              : <button onClick={() => onQuiz?.(stage)} className="inline-flex items-center gap-1.5 px-3 h-7 rounded-lg border border-primary/40 text-primary text-[12px] font-semibold hover:bg-primary/10">{stage.checkpoint.attempts > 0 ? t("quiz.tryAgain") : t("quiz.take")}</button>}
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api, LearningProfile, User as ApiUser } from "../services/api";
 import { useI18n, LANGUAGES, type Lang } from "../lib/i18n";
 import { DataSharing } from "../components/DataSharing";
+import { CodewarsLink } from "../components/CodewarsLink";
 import { PublicProfileSettings } from "../components/PublicProfileSettings";
 import type { Keys } from "../locales/en";
 import { ROUTES } from "../lib/routes";
@@ -195,6 +196,10 @@ export function SettingsScreen({ user, interests, onToggleInterest, feedMode, on
                 </button>
               </div>
             )}
+          </Section>
+
+          <Section title={t("codewars.title")} description={t("codewars.subtitle")}>
+            <CodewarsLink />
           </Section>
 
           <Section title={t("data.title")} description={t("data.subtitle")}>

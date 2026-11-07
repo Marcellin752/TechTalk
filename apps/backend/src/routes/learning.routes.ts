@@ -1,6 +1,8 @@
 import { FastifyInstance } from 'fastify';
 import { handleGetLearningProfile, handleSaveLearningProfile, handleGetPath, handleRegeneratePath, handleUpdateStep, handleListSchools, handleSetSchool, handleSetConsent,
   handleListPaths, handleGetPathById, handleCreatePath, handleRebuildPath, handleUpdatePath, handleDeletePath } from '../controllers/learning.controller.js';
+import { handleGetQuiz, handleRenewQuiz, handleSubmitQuiz, handleDueReviews, handleAnswerReview, handleLinkCodewars, handleUnlinkCodewars, handleSyncCodewars } from '../controllers/progress.controller.js';
+import { handleWeek, handleUpcoming, handleOpportunities } from '../controllers/habits.controller.js';
 
 export async function learningRoutes(fastify: FastifyInstance) {
   const auth = { preHandler: [fastify.authenticate] };
@@ -17,5 +19,17 @@ export async function learningRoutes(fastify: FastifyInstance) {
   fastify.post('/paths/:id/regenerate', { ...auth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, handleRebuildPath);
   fastify.patch('/paths/:id', auth, handleUpdatePath);
   fastify.delete('/paths/:id', auth, handleDeletePath);
+  const slow = { ...auth, config: { rateLimit: { max: 6, timeWindow: '1 minute' } } };
+  fastify.post('/paths/:id/stages/:index/quiz', slow, handleGetQuiz);
+  fastify.post('/quizzes/:id/renew', slow, handleRenewQuiz);
+  fastify.post('/quizzes/:id/submit', auth, handleSubmitQuiz);
+  fastify.get('/reviews', auth, handleDueReviews);
+  fastify.post('/reviews/:id/answer', auth, handleAnswerReview);
+  fastify.put('/codewars', auth, handleLinkCodewars);
+  fastify.delete('/codewars', auth, handleUnlinkCodewars);
+  fastify.post('/codewars/sync', auth, handleSyncCodewars);
+  fastify.get('/week', auth, handleWeek);
+  fastify.get('/upcoming', auth, handleUpcoming);
+  fastify.get('/opportunities', auth, handleOpportunities);
   fastify.patch('/steps/:stepId', auth, handleUpdateStep);
 }

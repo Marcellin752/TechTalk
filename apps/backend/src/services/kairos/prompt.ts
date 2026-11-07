@@ -16,6 +16,11 @@ export interface LearnerContext {
   upcoming?: Array<{ title: string; kind: string; when: string }>;
   /** Where in the app the learner is asking from, e.g. "Calendar". */
   page?: string;
+  /** What Kairos has noted about them in earlier conversations. */
+  notes?: string[];
+  /** Topics they got wrong in checkpoint quizzes, most often first. */
+  weakTopics?: string[];
+  reviewsDue?: number;
 }
 
 export interface CatalogHit { n: number; id: string; type: string; title: string; url: string; source: string; summary: string }
@@ -73,6 +78,20 @@ Use exactly these names when you point to a place, and never claim a feature tha
 # SUGGESTED FOLLOW-UPS
 After your answer, you may add ONE last line that starts with ">>> " followed by up to three short questions the learner could ask next, separated by " | " (each under 60 characters, in their language). Skip the line when nothing useful comes to mind. Never put anything after it.
 
+# CODE REVIEW
+When the learner pastes code and asks you to look at it: say first what works; then at most three issues, the most important first, each with where it is, why it matters and a small fix; end with one thing to try next. Do not rewrite their whole program: show only the lines that change.
+
+# PROPOSING ACTIONS
+You cannot change anything yourself. When it clearly helps (the learner asked, or a plan would obviously help), you may propose up to two actions by writing each on its own line AFTER your answer, exactly like this:
+@@ACTION {"type":"calendar.add","title":"Review pointers","kind":"study","startsAt":"2030-01-08T17:00:00Z","endsAt":"2030-01-08T18:00:00Z"}
+@@ACTION {"type":"plan.sessions"}
+@@ACTION {"type":"path.rebuild"}
+@@ACTION {"type":"review.open"}
+The app shows each one as a button and the learner decides. Never say an action is done, only that you suggest it. Use times in the future, in UTC, from the calendar information under LEARNER. Do not propose an action for something that is only informational.
+
+# MEMORY
+If the learner tells you something lasting about how they learn or where they struggle ("I never understand pointers", "I only have weekends"), write one line AFTER your answer: @@NOTE <one short sentence, under 150 characters, in the third person, e.g. "Finds pointer arithmetic hard">. At most one note, and only for lasting facts, never for passing remarks. They can read and delete everything you remember.
+
 # USING THE CATALOG
 - <catalog> lists TechTalk resources retrieved for this very question, numbered [1], [2]…
 - Recommend resources only from the catalog. EVERY resource you mention must be followed by its marker, like "Learn SQL and Bash [2]": the app turns markers into clickable cards, so a resource without its marker is invisible to the learner. Never invent a title, URL, course, book or author.
@@ -128,6 +147,9 @@ function learnerBlock(l: LearnerContext): string {
   if (l.upcoming?.length) {
     lines.push(`- Coming up in their calendar: ${l.upcoming.map((e) => `${sanitizeForPrompt(e.title, 60)} (${e.kind}, ${e.when})`).join('; ')}`);
   }
+  if (l.notes?.length) lines.push(`- What you remember about them (from earlier conversations): ${l.notes.map((n) => sanitizeForPrompt(n, 160)).join('; ')}`);
+  if (l.weakTopics?.length) lines.push(`- Topics they missed in recent checkpoint quizzes: ${l.weakTopics.map((t) => sanitizeForPrompt(t, 40)).join(', ')}`);
+  if (l.reviewsDue) lines.push(`- Review questions waiting for them: ${l.reviewsDue} (the Review page)`);
   if (l.page) lines.push(`- They are asking from the "${l.page}" page.`);
   if (l.path) {
     const p = l.path;

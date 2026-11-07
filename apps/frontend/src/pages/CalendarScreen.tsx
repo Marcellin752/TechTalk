@@ -167,6 +167,17 @@ export function CalendarScreen() {
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState<CalendarEvent | "new" | null>(null);
   const [planning, setPlanning] = useState(false);
+  const [missed, setMissed] = useState(0);
+  useEffect(() => {
+    api.getMissed().then(setMissed).catch(() => undefined);
+  }, [events]);
+  const reschedule = async () => {
+    const r = await api.reschedule();
+    if (!r.success) return void toast.error(r.error || t("admin.error"));
+    toast.success(t("cal.rescheduled", { n: r.moved }));
+    setMissed(0);
+    load();
+  };
 
   const grid = useMemo(() => monthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
   const load = useCallback(() => {
@@ -232,6 +243,13 @@ export function CalendarScreen() {
             ))}
           </div>
         </div>
+
+        {missed > 0 && (
+          <div role="status" className="mb-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
+            <p className="flex-1 min-w-[200px] text-[13.5px] text-foreground">{t("cal.missed", { n: missed })}</p>
+            <button onClick={reschedule} className="px-4 h-9 rounded-lg bg-primary text-white text-[13px] font-semibold">{t("cal.reschedule")}</button>
+          </div>
+        )}
 
         <section className="rounded-2xl border border-border bg-card p-2 sm:p-4">
           <div className="grid grid-cols-7 text-center text-[11px] sm:text-xs font-mono uppercase tracking-wide text-muted-foreground mb-1">

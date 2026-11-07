@@ -208,6 +208,7 @@ function Users({ me }: { me: User | null }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-foreground">{u.name}</span>
                     {isMe && <span className="text-[11px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{t("admin.user.you")}</span>}
+                    {u.ambassador && <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 font-semibold">{t("campus.ambassador")}</span>}
                     {u.role === "admin" && <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-semibold"><ShieldCheck size={11} /> admin</span>}
                     {u.isPublic && u.handle && <Link to={`/u/${u.handle}`} className="text-[12px] text-primary hover:underline">@{u.handle}</Link>}
                   </div>
@@ -220,6 +221,7 @@ function Users({ me }: { me: User | null }) {
                 {!isMe && (
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => act(u, "role")} className="px-3 h-8 rounded-lg border border-border text-[13px] text-foreground hover:bg-secondary">{u.role === "admin" ? t("admin.user.makeUser") : t("admin.user.makeAdmin")}</button>
+                    <button onClick={async () => { const r = await api.adminSetAmbassador(u.id, !u.ambassador); if (!r.success) return void toast.error(r.error || t("admin.error")); list.patch((x) => (x.id === u.id ? { ...x, ambassador: !u.ambassador } : x)); }} className="px-3 h-8 rounded-lg border border-border text-[13px] text-foreground hover:bg-secondary">{u.ambassador ? t("admin.user.ambassadorOff") : t("admin.user.ambassadorOn")}</button>
                     <button onClick={() => act(u, "signout")} className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg border border-border text-[13px] text-foreground hover:bg-secondary"><UserX size={14} /> {t("admin.user.signOut")}</button>
                     <button onClick={() => act(u, "delete")} className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg border border-destructive/40 text-[13px] text-destructive hover:bg-destructive/10"><Trash2 size={14} /> {t("admin.user.delete")}</button>
                   </div>
@@ -415,6 +417,18 @@ function SchoolCardAdmin({ school, onChanged, onDeleted }: { school: AdminSchool
   const [text, setText] = useState(yearsToText(school.curriculum.years));
   const [busy, setBusy] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
+  const [importText, setImportText] = useState("");
+  const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
+  const runImport = async () => {
+    const content = importText.trim();
+    if (!content) return;
+    setBusy(true);
+    const r = await api.adminImportEvents(school.id, content.startsWith("BEGIN:VCALENDAR") || content.includes("BEGIN:VEVENT") ? "ics" : "csv", content);
+    setBusy(false);
+    if (!r.success || !r.data) return void toast.error(r.error || t("admin.error"));
+    setImportResult(r.data);
+    if (r.data.imported > 0) toast.success(t("admin.school.imported", { n: r.data.imported }));
+  };
   const dirty = text !== yearsToText(school.curriculum.years);
   const [programme, setProgramme] = useState(school.curriculum.programme ? JSON.stringify(school.curriculum.programme, null, 2) : "");
   const programmeDirty = programme !== (school.curriculum.programme ? JSON.stringify(school.curriculum.programme, null, 2) : "");
@@ -477,6 +491,19 @@ function SchoolCardAdmin({ school, onChanged, onDeleted }: { school: AdminSchool
         <textarea value={programme} onChange={(e) => setProgramme(e.target.value)} rows={10} spellCheck={false} placeholder={'{ "status": "draft", "years": [ { "year": 1, "title": "...", "projects": [ { "name": "...", "topics": ["c"], "hours": 30 } ] } ] }'} className="w-full rounded-xl bg-secondary border border-border px-3 py-2.5 text-[12px] font-mono text-foreground focus:outline-none focus:border-primary" />
         <span className="block text-[12px] text-muted-foreground mt-1">{t("admin.school.programmeHelp")}</span>
       </label>
+      <details className="mt-4 rounded-xl border border-border">
+        <summary className="cursor-pointer px-3.5 py-2.5 text-[13px] font-medium text-foreground">{t("admin.school.importTitle")}</summary>
+        <div className="px-3.5 pb-3.5">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">{t("admin.school.importHelp")}</p>
+          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={6} spellCheck={false} placeholder={"title,start,end,kind,year\nZappy: final delivery,2030-02-10T09:00:00Z,2030-02-10T18:00:00Z,deadline,2"} className="w-full mt-2 rounded-xl bg-secondary border border-border px-3 py-2.5 text-[12px] font-mono text-foreground focus:outline-none focus:border-primary" />
+          <div className="flex items-center gap-3 mt-2">
+            <button onClick={runImport} disabled={busy || !importText.trim()} className="px-4 h-9 rounded-lg bg-primary text-white text-[13px] font-semibold disabled:opacity-40">{t("admin.school.import")}</button>
+            {importResult && <span className="text-[12.5px] text-muted-foreground">{t("admin.school.imported", { n: importResult.imported })}{importResult.errors.length > 0 ? ` · ${importResult.errors.length} ${t("admin.school.errors")}` : ""}</span>}
+          </div>
+          {importResult && importResult.errors.length > 0 && <ul className="mt-2 text-[12px] text-destructive space-y-0.5">{importResult.errors.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul>}
+        </div>
+      </details>
+
       <div className="flex flex-wrap gap-2 mt-4">
         <button disabled={!programmeDirty || busy} onClick={saveProgramme} className="px-4 h-9 rounded-lg bg-primary text-white text-[13px] font-semibold disabled:opacity-40">{t("admin.school.saveProgramme")}</button>
         <button disabled={!dirty || busy} onClick={() => patch({ curriculum: { years: textToYears(text) } })} className="px-4 h-9 rounded-lg bg-primary text-white text-[13px] font-semibold disabled:opacity-40">{t("common.save")}</button>

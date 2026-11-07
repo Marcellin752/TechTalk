@@ -224,7 +224,7 @@ function Revisions({ reloadOverview }: { reloadOverview: () => void }) {
               </p>
               {s.description && <p className="text-[13px] text-muted-foreground mt-2 whitespace-pre-wrap break-words">{s.description}</p>}
               <div className="flex items-center gap-3 mt-4">
-                <span className="text-[12px] text-muted-foreground mr-auto">{t("campus.hostedBy", { name: s.mine ? t("admin.user.you") : s.hostName })}</span>
+                <span className="text-[12px] text-muted-foreground mr-auto">{t("campus.hostedBy", { name: s.mine ? t("admin.user.you") : s.hostName })}{s.hostAmbassador && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 font-semibold text-[10.5px]">{t("campus.ambassador")}</span>}</span>
                 {s.mine ? (
                   <button onClick={() => window.confirm(t("campus.cancelConfirm")) && act(() => api.campusCancel(s.id), t("cal.deleted"))} className={`${btnOutline} text-destructive border-destructive/40`}><Trash2 size={14} /> {t("campus.cancel")}</button>
                 ) : s.joined ? (
@@ -470,7 +470,7 @@ function People({ me, reloadOverview }: { me: CampusMe; reloadOverview: () => vo
                 {p.picture ? <img src={p.picture} alt="" className="w-11 h-11 rounded-full object-cover" /> : <span className="w-11 h-11 rounded-full bg-primary/15 text-primary font-bold flex items-center justify-center">{p.name.slice(0, 1).toUpperCase()}</span>}
                 <div className="min-w-0">
                   {p.handle ? <Link to={`/u/${p.handle}`} className="font-semibold text-foreground hover:text-primary truncate block">{p.name}</Link> : <span className="font-semibold text-foreground truncate block">{p.name}</span>}
-                  <span className="text-[12px] text-muted-foreground">{p.year ? t("campus.yearN", { n: p.year }) : ""}{p.year && p.lookingFor ? " · " : ""}{p.lookingFor ? `${t("campus.lookingFor")}: ${t(`campus.looking.${p.lookingFor}` as Keys)}` : ""}</span>
+                  <span className="text-[12px] text-muted-foreground">{p.ambassador ? `${t("campus.ambassador")} · ` : ""}{p.year ? t("campus.yearN", { n: p.year }) : ""}{p.year && p.lookingFor ? " · " : ""}{p.lookingFor ? `${t("campus.lookingFor")}: ${t(`campus.looking.${p.lookingFor}` as Keys)}` : ""}</span>
                 </div>
               </div>
               {p.headline && <p className="text-[13px] text-foreground mt-3 leading-relaxed">{p.headline}</p>}

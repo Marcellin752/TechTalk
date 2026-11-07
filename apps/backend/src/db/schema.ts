@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, customType, integer, boolean, smallint } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, index, uniqueIndex, customType, integer, boolean, smallint, real } from 'drizzle-orm/pg-core';
 
 /** Any JSON value (arrays included) with the same double-encoding protection. */
 const jsonbOf = <T>() =>
@@ -122,6 +122,9 @@ export const learningProfiles = pgTable('learning_profiles', {
   shareWithSchool: boolean('share_with_school').default(false).notNull(),
   /** Consent: this learner's progress counts towards better recommendations for everyone. Off by default. */
   shareForRecommendations: boolean('share_for_recommendations').default(false).notNull(),
+  /** A Codewars username the learner claims: katas they solved tick their path steps. Not a proof of identity. */
+  codewarsUsername: varchar('codewars_username', { length: 40 }),
+  codewarsSyncedAt: timestamp('codewars_synced_at'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
@@ -167,6 +170,8 @@ export const learningSteps = pgTable('learning_steps', {
   kind: varchar('kind', { length: 20 }).notNull(), // orient | learn | practice | project | read
   minutes: integer('minutes').notNull(),
   status: varchar('status', { length: 12 }).default('todo').notNull(), // todo | doing | done
+  /** How a finished step was confirmed, when it was not just ticked by the learner: codewars. */
+  verifiedBy: varchar('verified_by', { length: 12 }),
   startedAt: timestamp('started_at'),
   completedAt: timestamp('completed_at'),
 }, (table) => ({
@@ -212,6 +217,8 @@ export const profileSettings = pgTable('profile_settings', {
   showInterests: boolean('show_interests').default(true).notNull(),
   /** The learning path ("roadmap") is shown only when this is on, whatever else is public. */
   pathPublic: boolean('path_public').default(false).notNull(),
+  /** The skills page (levels with their evidence) and public projects are shown only when this is on. */
+  portfolioPublic: boolean('portfolio_public').default(false).notNull(),
   interests: text('interests').array().default(sql`'{}'::text[]`).notNull(),
   // Self-written profile details; they win over what GitHub says.
   bio: varchar('bio', { length: 280 }),
@@ -402,5 +409,232 @@ export const campusProfiles = pgTable('campus_profiles', {
   lookingFor: varchar('looking_for', { length: 12 }), // study-buddy | mentor | mentee | team
   /** How to reach them outside TechTalk (a handle, never required). */
   contact: varchar('contact', { length: 60 }),
+  /** Set by an administrator: a student who helps run the campus (organises sessions, shares exams). */
+  ambassador: boolean('ambassador').default(false).notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+export interface StoredQuestion { question: string; options: string[]; answer: number; explanation: string; topic: string }
+
+/** The checkpoint quiz of one stage of a path. The answers stay here, on the server. */
+export const learningQuizzes = pgTable('learning_quizzes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  pathId: uuid('path_id').references(() => learningPaths.id, { onDelete: 'cascade' }).notNull(),
+  stage: integer('stage').notNull(),
+  questions: jsonbOf<StoredQuestion[]>()('questions').notNull(),
+  attempts: integer('attempts').default(0).notNull(),
+  bestScore: integer('best_score'),
+  passedAt: timestamp('passed_at'),
+  lastAttemptAt: timestamp('last_attempt_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pathStageUnique: uniqueIndex('learning_quizzes_path_stage_unique').on(table.pathId, table.stage),
+}));
+
+/** A quiz question that comes back for review, a little less often each time it is answered right. */
+export const reviewItems = pgTable('review_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  /** Where the card came from. The card keeps its own copy of the question, so rebuilding a path does not lose the review. */
+  quizId: uuid('quiz_id').references(() => learningQuizzes.id, { onDelete: 'set null' }),
+  qIndex: integer('q_index').notNull(),
+  card: jsonbOf<StoredQuestion>()('card').notNull(),
+  box: integer('box').default(1).notNull(),
+  dueAt: timestamp('due_at').notNull(),
+  lastAt: timestamp('last_at'),
+  lapses: integer('lapses').default(0).notNull(),
+}, (table) => ({
+  quizQuestionUnique: uniqueIndex('review_items_quiz_question_unique').on(table.quizId, table.qIndex),
+  dueIdx: index('review_items_user_due_idx').on(table.userId, table.dueAt),
+}));
+
+/** Things Kairos remembers about a learner between conversations. Visible to them, deletable by them. */
+export const kairosNotes = pgTable('kairos_notes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  note: varchar('note', { length: 160 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userNoteUnique: uniqueIndex('kairos_notes_user_note_unique').on(table.userId, table.note),
+}));
+
+/* ---- Knowledge graph and skills ---- */
+
+/** Something there is to know. Curated ones come from the ontology; the rest appear when a learner meets an unknown topic. */
+export const concepts = pgTable('concepts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  slug: varchar('slug', { length: 60 }).notNull().unique(),
+  name: varchar('name', { length: 80 }).notNull(),
+  area: varchar('area', { length: 20 }).default('general').notNull(),
+  description: varchar('description', { length: 300 }),
+  curated: boolean('curated').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+/** A link between concepts. For a prerequisite, `fromId` should be known before `toId`. */
+export const conceptEdges = pgTable('concept_edges', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  fromId: uuid('from_id').references(() => concepts.id, { onDelete: 'cascade' }).notNull(),
+  toId: uuid('to_id').references(() => concepts.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type', { length: 12 }).notNull(), // prerequisite | related
+  /** curated (from the ontology) or inferred (from what learners meet together). */
+  source: varchar('source', { length: 10 }).default('curated').notNull(),
+}, (table) => ({
+  edgeUnique: uniqueIndex('concept_edges_unique').on(table.fromId, table.toId, table.type),
+}));
+
+/** A link the learner disagrees with: hidden for them, still there for everyone else. */
+export const edgeFeedback = pgTable('edge_feedback', {
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  edgeId: uuid('edge_id').references(() => conceptEdges.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pk: uniqueIndex('edge_feedback_pk').on(table.userId, table.edgeId),
+}));
+
+/** One dated fact that bears on what a learner knows. Skill levels are always computed from these, never stored. */
+export const skillEvidence = pgTable('skill_evidence', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  conceptId: uuid('concept_id').references(() => concepts.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type', { length: 12 }).notNull(), // read | step | review | quiz | explained | exercise | project
+  outcome: real('outcome').default(1).notNull(),
+  /** What it came from, so the same fact is never counted twice. */
+  ref: varchar('ref', { length: 120 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userConceptIdx: index('skill_evidence_user_concept_idx').on(table.userId, table.conceptId, table.createdAt),
+  refUnique: uniqueIndex('skill_evidence_ref_unique').on(table.userId, table.conceptId, table.type, table.ref),
+}));
+
+export interface StoredCriterion { id: string; label: string; met: boolean; comment: string }
+
+/** A learner's explanation of a concept, and how it was judged against the criteria. */
+export const conceptEvaluations = pgTable('concept_evaluations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  conceptId: uuid('concept_id').references(() => concepts.id, { onDelete: 'cascade' }).notNull(),
+  text: text('text').notNull(),
+  criteria: jsonbOf<StoredCriterion[]>()('criteria').notNull(),
+  feedback: text('feedback'),
+  score: real('score').notNull(),
+  /** True once the learner contested it and it was evaluated again. */
+  revised: boolean('revised').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userConceptIdx: index('concept_evaluations_user_concept_idx').on(table.userId, table.conceptId, table.createdAt),
+}));
+
+/* ---------------------------- Memory, projects, community ---------------------------- */
+
+/** A flashcard the learner wrote. Scheduled with SM-2: the easier it is, the longer until it comes back. */
+export const userCards = pgTable('user_cards', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  front: varchar('front', { length: 400 }).notNull(),
+  back: text('back').notNull(),
+  topic: varchar('topic', { length: 60 }),
+  ease: real('ease').default(2.5).notNull(),
+  intervalDays: integer('interval_days').default(0).notNull(),
+  reps: integer('reps').default(0).notNull(),
+  lapses: integer('lapses').default(0).notNull(),
+  dueAt: timestamp('due_at').defaultNow().notNull(),
+  lastAt: timestamp('last_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  dueIdx: index('user_cards_due_idx').on(table.userId, table.dueAt),
+}));
+
+export interface Milestone { title: string; done: boolean }
+
+/** Something the learner builds. A finished project with a repository is the strongest evidence of a skill. */
+export const labProjects = pgTable('lab_projects', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  title: varchar('title', { length: 120 }).notNull(),
+  description: text('description'),
+  repoUrl: varchar('repo_url', { length: 300 }),
+  topics: text('topics').array().default(sql`'{}'::text[]`).notNull(),
+  status: varchar('status', { length: 10 }).default('idea').notNull(), // idea | building | done
+  milestones: jsonbOf<Milestone[]>()('milestones').notNull(),
+  isPublic: boolean('is_public').default(false).notNull(),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('lab_projects_user_idx').on(table.userId, table.createdAt),
+}));
+
+/** Sources and notes gathered while researching a question. */
+export const researchItems = pgTable('research_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  workspace: varchar('workspace', { length: 80 }).notNull(),
+  kind: varchar('kind', { length: 8 }).notNull(), // source | note
+  title: varchar('title', { length: 200 }).notNull(),
+  url: varchar('url', { length: 500 }),
+  note: text('note'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userWorkspaceIdx: index('research_items_user_ws_idx').on(table.userId, table.workspace, table.createdAt),
+}));
+
+export const studyRooms = pgTable('study_rooms', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 60 }).notNull(),
+  topic: varchar('topic', { length: 60 }).notNull(),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const roomMembers = pgTable('room_members', {
+  roomId: uuid('room_id').references(() => studyRooms.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  joinedAt: timestamp('joined_at').defaultNow().notNull(),
+}, (table) => ({
+  pk: uniqueIndex('room_members_pk').on(table.roomId, table.userId),
+}));
+
+export const roomMessages = pgTable('room_messages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  roomId: uuid('room_id').references(() => studyRooms.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  body: varchar('body', { length: 500 }).notNull(),
+  /** Hidden once enough members reported it, or by the room's creator. */
+  hidden: boolean('hidden').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  roomIdx: index('room_messages_room_idx').on(table.roomId, table.createdAt),
+}));
+
+export const roomReports = pgTable('room_reports', {
+  messageId: uuid('message_id').references(() => roomMessages.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+}, (table) => ({
+  pk: uniqueIndex('room_reports_pk').on(table.messageId, table.userId),
+}));
+
+/** Opt-in: someone who offers to help with some topics and/or looks for help with others. */
+export const mentorProfiles = pgTable('mentor_profiles', {
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).primaryKey(),
+  offering: text('offering').array().default(sql`'{}'::text[]`).notNull(),
+  seeking: text('seeking').array().default(sql`'{}'::text[]`).notNull(),
+  bio: varchar('bio', { length: 280 }),
+  active: boolean('active').default(true).notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const mentorRequests = pgTable('mentor_requests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  fromId: uuid('from_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  toId: uuid('to_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  topic: varchar('topic', { length: 60 }).notNull(),
+  message: varchar('message', { length: 400 }).notNull(),
+  status: varchar('status', { length: 10 }).default('pending').notNull(), // pending | accepted | declined
+  /** What the mentor chose to share when accepting (a way to reach them). */
+  reply: varchar('reply', { length: 200 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  toIdx: index('mentor_requests_to_idx').on(table.toId, table.status),
+  fromIdx: index('mentor_requests_from_idx').on(table.fromId),
+}));

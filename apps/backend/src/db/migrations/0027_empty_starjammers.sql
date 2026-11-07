@@ -1,0 +1,1 @@
+ALTER TABLE "mentor_requests" ADD COLUMN "reply" varchar(200);
