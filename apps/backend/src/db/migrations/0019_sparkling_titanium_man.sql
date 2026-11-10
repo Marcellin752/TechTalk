@@ -1,0 +1,1 @@
+ALTER TABLE "kairos_messages" ADD COLUMN "feedback" smallint;

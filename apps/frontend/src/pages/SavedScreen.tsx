@@ -1,4 +1,5 @@
 import { ArrowLeft, Bookmark, X } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 import { ContentItem } from "../types/content";
 
 interface SavedScreenProps {
@@ -16,6 +17,7 @@ export function SavedScreen({
   onBack,
   error,
 }: SavedScreenProps) {
+  const { t } = useI18n();
   const articles = saved.filter((i) => i.type !== "video");
   const videos = saved.filter((i) => i.type === "video");
 
@@ -25,9 +27,9 @@ export function SavedScreen({
         <div className="w-16 h-16 rounded-2xl bg-secondary border border-border flex items-center justify-center mb-5 shadow-inner">
           <Bookmark size={24} className="text-muted-foreground" />
         </div>
-        <h2 className="text-lg font-semibold text-foreground mb-2">Couldn't load your saves</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-2">{t("saved.errTitle")}</h2>
         <p className="text-sm text-muted-foreground max-w-[260px] leading-relaxed">
-          {error}. Check your connection and try again.
+          {error}. {t("saved.errText")}
         </p>
       </div>
     );
@@ -41,15 +43,15 @@ export function SavedScreen({
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-16"
         >
           <ArrowLeft size={18} />
-          <span className="text-sm">Back to Feed</span>
+          <span className="text-sm">{t("about.back")}</span>
         </button>
         <div className="flex flex-col items-center px-6 text-center">
           <div className="w-16 h-16 rounded-2xl bg-secondary border border-border flex items-center justify-center mb-5 shadow-inner">
             <Bookmark size={24} className="text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground mb-2">Nothing saved yet</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">{t("saved.emptyTitle")}</h2>
           <p className="text-sm text-muted-foreground max-w-[220px] leading-relaxed">
-            Tap the bookmark icon on any card to save it here.
+            {t("saved.emptyText")}
           </p>
         </div>
       </div>
@@ -88,7 +90,7 @@ export function SavedScreen({
               <button
                 onClick={() => onRemove(item.id)}
                 className="self-start p-2 rounded-lg bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors md:p-1.5 md:bg-transparent md:opacity-0 md:group-hover:opacity-100 flex-shrink-0"
-                aria-label="Remove from saved"
+                aria-label={t("saved.remove")}
               >
                 <X size={13} />
               </button>
@@ -107,10 +109,10 @@ export function SavedScreen({
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={18} />
-          <span className="text-sm">Back to Feed</span>
+          <span className="text-sm">{t("about.back")}</span>
         </button>
-        {articles.length > 0 && <Section title="Articles & Posts" items={articles} />}
-        {videos.length > 0 && <Section title="Videos" items={videos} />}
+        {articles.length > 0 && <Section title={t("saved.articles")} items={articles} />}
+        {videos.length > 0 && <Section title={t("saved.videos")} items={videos} />}
       </div>
     </div>
   );

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "skills_backfilled_at" timestamp;

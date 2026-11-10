@@ -1,0 +1,170 @@
+{
+  "$description": "TechTalk design tokens, generated from apps/frontend/src/styles/theme.css. Do not edit by hand.",
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "color": {
+    "background": {
+      "light": "#ffffff",
+      "dark": "#09090c"
+    },
+    "foreground": {
+      "light": "#0c0c10",
+      "dark": "#f4f4f6"
+    },
+    "card": {
+      "light": "#ffffff",
+      "dark": "#141419"
+    },
+    "card-foreground": {
+      "light": "#0c0c10",
+      "dark": "#f4f4f6"
+    },
+    "popover": {
+      "light": "#ffffff",
+      "dark": "#141419"
+    },
+    "popover-foreground": {
+      "light": "#0c0c10",
+      "dark": "#f4f4f6"
+    },
+    "primary": {
+      "light": "#e8430f",
+      "dark": "#f04f23"
+    },
+    "primary-foreground": {
+      "light": "#ffffff",
+      "dark": "#ffffff"
+    },
+    "secondary": {
+      "light": "#f1f1f4",
+      "dark": "#1e1e25"
+    },
+    "secondary-foreground": {
+      "light": "#0c0c10",
+      "dark": "#f4f4f6"
+    },
+    "muted": {
+      "light": "#e9e9ee",
+      "dark": "#26262e"
+    },
+    "muted-foreground": {
+      "light": "#55555f",
+      "dark": "#a3a3b0"
+    },
+    "accent": {
+      "light": "#e8430f",
+      "dark": "#f04f23"
+    },
+    "accent-foreground": {
+      "light": "#ffffff",
+      "dark": "#ffffff"
+    },
+    "destructive": {
+      "light": "#d4183d",
+      "dark": "#e5484d"
+    },
+    "destructive-foreground": {
+      "light": "#ffffff",
+      "dark": "#ffffff"
+    },
+    "border": {
+      "light": "rgba(12, 12, 16, 0.2)",
+      "dark": "rgba(255, 255, 255, 0.18)"
+    },
+    "input": {
+      "light": "#f1f1f4",
+      "dark": "#1e1e25"
+    },
+    "input-background": {
+      "light": "#f1f1f4",
+      "dark": "#1e1e25"
+    },
+    "switch-background": {
+      "light": "#c9c9d1",
+      "dark": "#3a3a44"
+    },
+    "ring": {
+      "light": "#e8430f",
+      "dark": "#f04f23"
+    },
+    "chart-1": {
+      "light": "#e8430f",
+      "dark": "#f04f23"
+    },
+    "chart-2": {
+      "light": "oklch(0.6 0.118 184.704)",
+      "dark": "oklch(0.696 0.17 162.48)"
+    },
+    "chart-3": {
+      "light": "oklch(0.398 0.07 227.392)",
+      "dark": "oklch(0.769 0.188 70.08)"
+    },
+    "chart-4": {
+      "light": "oklch(0.828 0.189 84.429)",
+      "dark": "oklch(0.627 0.265 303.9)"
+    },
+    "chart-5": {
+      "light": "oklch(0.769 0.188 70.08)",
+      "dark": "oklch(0.645 0.246 16.439)"
+    },
+    "sidebar": {
+      "light": "#ffffff",
+      "dark": "#141419"
+    },
+    "sidebar-foreground": {
+      "light": "#0c0c10",
+      "dark": "#f4f4f6"
+    },
+    "sidebar-primary": {
+      "light": "#e8430f",
+      "dark": "#f04f23"
+    },
+    "sidebar-primary-foreground": {
+      "light": "#ffffff",
+      "dark": "#ffffff"
+    },
+    "sidebar-accent": {
+      "light": "#f1f1f4",
+      "dark": "#1e1e25"
+    },
+    "sidebar-accent-foreground": {
+      "light": "#0c0c10",
+      "dark": "#f4f4f6"
+    },
+    "sidebar-border": {
+      "light": "rgba(12, 12, 16, 0.2)",
+      "dark": "rgba(255, 255, 255, 0.18)"
+    },
+    "sidebar-ring": {
+      "light": "#e8430f",
+      "dark": "#f04f23"
+    }
+  },
+  "radius": {
+    "base": "0.75rem",
+    "sm": "calc(var(--radius) - 4px)",
+    "md": "calc(var(--radius) - 2px)",
+    "lg": "var(--radius)",
+    "xl": "calc(var(--radius) + 4px)"
+  },
+  "typography": {
+    "fontSans": "\"Inter\", system-ui, sans-serif",
+    "fontMono": "\"JetBrains Mono\", \"Fira Code\", monospace",
+    "baseSize": "16px",
+    "weights": {
+      "normal": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    },
+    "usage": {
+      "pageTitle": "text-2xl/3xl bold, tracking-tight",
+      "sectionTitle": "text-[15–17px] semibold",
+      "body": "text-sm (14px), leading-relaxed",
+      "caption": "text-xs / 12–13px, muted-foreground",
+      "eyebrow": "font-mono 11px uppercase, tracking 0.15em, primary or muted"
+    }
+  }
+}

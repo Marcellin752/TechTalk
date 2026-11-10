@@ -71,6 +71,139 @@
       "when": 1786357630504,
       "tag": "0009_familiar_xavin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793973461624,
+      "tag": "0010_confused_fallen_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793975798268,
+      "tag": "0011_lush_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793977960495,
+      "tag": "0012_dashing_husk",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1793978866045,
+      "tag": "0013_eminent_energizer",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1793995071650,
+      "tag": "0014_fresh_baron_zemo",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1793997287172,
+      "tag": "0015_worried_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1793998266434,
+      "tag": "0016_optimal_scarlet_spider",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793998979022,
+      "tag": "0017_demonic_puff_adder",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794007201622,
+      "tag": "0018_free_virginia_dare",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794008224818,
+      "tag": "0019_sparkling_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794008595955,
+      "tag": "0020_slim_klaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794008947474,
+      "tag": "0021_windy_roughhouse",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794044934119,
+      "tag": "0022_condemned_white_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794048043253,
+      "tag": "0023_fixed_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794048080852,
+      "tag": "0024_messy_the_watchers",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794050498319,
+      "tag": "0025_green_pestilence",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794051346685,
+      "tag": "0026_mean_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794051507221,
+      "tag": "0027_empty_starjammers",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794061851716,
+      "tag": "0028_aspiring_miracleman",
+      "breakpoints": true
     }
   ]
 }

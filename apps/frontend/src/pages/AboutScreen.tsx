@@ -1,3 +1,4 @@
+import { useI18n } from "../lib/i18n";
 import { ArrowLeft, Rss, Bookmark, Search, User } from "lucide-react";
 
 interface AboutScreenProps {
@@ -7,13 +8,14 @@ interface AboutScreenProps {
 const SOURCES = ["Dev.to", "TechCrunch", "YouTube"];
 
 const FEATURES = [
-  { icon: <Rss size={16} />, title: "Curated feed", desc: "Fresh tech articles & videos from across the web." },
-  { icon: <Bookmark size={16} />, title: "Save for later", desc: "Bookmark posts and revisit them anytime." },
-  { icon: <Search size={16} />, title: "Full-text search", desc: "Find exactly what you're looking for instantly." },
-  { icon: <User size={16} />, title: "Your profile", desc: "Track reading streaks and personalize interests." },
-];
+  { icon: <Rss size={16} />, title: "about.f1", desc: "about.f1d" },
+  { icon: <Bookmark size={16} />, title: "about.f2", desc: "about.f2d" },
+  { icon: <Search size={16} />, title: "about.f3", desc: "about.f3d" },
+  { icon: <User size={16} />, title: "about.f4", desc: "about.f4d" },
+] as const;
 
 export function AboutScreen({ onBack }: AboutScreenProps) {
+  const { t } = useI18n();
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-4 py-8 pb-10">
@@ -22,7 +24,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft size={18} />
-          <span className="text-sm">Back to Feed</span>
+          <span className="text-sm">{t("about.back")}</span>
         </button>
 
         {/* App info */}
@@ -35,11 +37,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
 
         {/* About */}
         <div className="rounded-2xl border border-border overflow-hidden bg-card p-5">
-          <p className="text-sm text-foreground/85 leading-relaxed mb-4">
-            TechTalk is a <span className="font-semibold text-foreground">TikTok-style tech feed</span> — discover,
-            scroll and learn. Instead of a noisy timeline, it curates high-quality technical articles and videos
-            from across the internet into one clean, mobile-first stream.
-          </p>
+          <p className="text-sm text-foreground/85 leading-relaxed mb-4">{t("about.intro")}</p>
 
           <div className="flex flex-wrap gap-2 mb-5">
             {SOURCES.map((s) => (
@@ -59,8 +57,8 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
                   <span className="text-primary">{f.icon}</span>
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-foreground">{f.title}</div>
-                  <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">{f.desc}</div>
+                  <div className="text-sm font-semibold text-foreground">{t(f.title)}</div>
+                  <div className="text-xs text-muted-foreground leading-relaxed mt-0.5">{t(f.desc)}</div>
                 </div>
               </div>
             ))}

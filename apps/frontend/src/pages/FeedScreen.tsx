@@ -1,6 +1,14 @@
-import { useEffect, useRef, useState, type TouchEvent } from "react";
-import { FeedCard } from "../components/FeedCard";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useI18n } from "../lib/i18n";
+import type { Keys } from "../locales/en";
+import { ArticleCard, CardFor, OpportunityBand, RepoCard } from "../components/ContentCards";
+import { buildSections, type SectionKind } from "../lib/feedLayout";
 import { ContentItem } from "../types/content";
+import type { LearningPath } from "../services/api";
+import { ContinueBand } from "../components/ContinueBand";
+
+export type FeedMode = "foryou" | "latest";
+export type FeedFilter = "all" | "article" | "video" | "repo" | "opportunity";
 
 interface FeedScreenProps {
   items: ContentItem[];
@@ -12,17 +20,41 @@ interface FeedScreenProps {
   onRetry: () => void;
   hasMore: boolean;
   onLoadMore: () => void;
-  contentType: "all" | "article" | "video";
-  onFilterChange: (t: "all" | "article" | "video") => void;
+  contentType: FeedFilter;
+  feedMode: FeedMode;
+  onFeedModeChange: (m: FeedMode) => void;
+  onFilterChange: (t: FeedFilter) => void;
+  searchQuery?: string;
+  learningPath?: LearningPath | null;
+  learningLoaded?: boolean;
+  hasLearningProfile?: boolean;
+  onOpenPath?: () => void;
+  onStartOnboarding?: () => void;
 }
 
 const PULL_THRESHOLD = 72;
 
-const FILTERS: { id: "all" | "article" | "video"; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "article", label: "Articles" },
-  { id: "video", label: "Videos" },
+const FILTERS: { id: FeedFilter; label: Keys }[] = [
+  { id: "all", label: "feed.all" },
+  { id: "video", label: "feed.videos" },
+  { id: "repo", label: "feed.projects" },
+  { id: "article", label: "feed.articles" },
+  { id: "opportunity", label: "feed.opportunities" },
 ];
+
+const SECTION_TITLES: Record<SectionKind, Keys | null> = {
+  videos: null,
+  opportunity: null,
+  repos: "feed.projectsTitle",
+  articles: "feed.readTitle",
+};
+
+const ROW_GRID: Record<SectionKind, string> = {
+  opportunity: "grid-cols-1",
+  videos: "grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4",
+  repos: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4",
+  articles: "grid-cols-1 md:grid-cols-3 gap-6",
+};
 
 export function FeedScreen({
   items,
@@ -35,8 +67,17 @@ export function FeedScreen({
   hasMore,
   onLoadMore,
   contentType,
+  feedMode,
+  onFeedModeChange,
   onFilterChange,
+  searchQuery = "",
+  learningPath = null,
+  learningLoaded = false,
+  hasLearningProfile = false,
+  onOpenPath,
+  onStartOnboarding,
 }: FeedScreenProps) {
+  const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const pullStartY = useRef<number | null>(null);
@@ -82,10 +123,12 @@ export function FeedScreen({
   };
 
   const refreshing = pullDistance >= PULL_THRESHOLD;
+  const flat = contentType !== "all" || !!searchQuery.trim();
+  const sections = useMemo(() => (flat ? [] : buildSections(items, !hasMore)), [flat, items, hasMore]);
 
   return (
     <div className="flex-1 overflow-y-auto" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} ref={scrollRef}>
-      <div className="max-w-5xl mx-auto px-4 py-4 pb-8">
+      <div className="max-w-7xl mx-auto px-4 py-4 pb-8">
         {/* Pull-to-refresh indicator */}
         <div
           className="flex items-center justify-center overflow-hidden transition-all duration-200"
@@ -99,35 +142,92 @@ export function FeedScreen({
           />
         </div>
 
+        {!searchQuery.trim() && learningLoaded && (
+          <ContinueBand path={learningPath} hasProfile={hasLearningProfile} onOpenPath={onOpenPath} onStart={onStartOnboarding} />
+        )}
+
         {/* Filter bar */}
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto no-scrollbar">
+          {!searchQuery.trim() && (
+            <div role="radiogroup" aria-label="Feed order" className="flex flex-shrink-0 rounded-lg border border-border bg-secondary p-0.5 mr-2">
+              {([["foryou", "feed.forYou"], ["latest", "feed.latest"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  role="radio"
+                  aria-checked={feedMode === id}
+                  onClick={() => onFeedModeChange(id)}
+                  className={`px-3 h-7 rounded-md text-[13px] font-medium transition-colors ${
+                    feedMode === id ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t(label)}
+                </button>
+              ))}
+            </div>
+          )}
           {FILTERS.map((f) => (
             <button
               key={f.id}
               onClick={() => onFilterChange(f.id)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              className={`px-3.5 h-8 flex-shrink-0 rounded-lg text-[13px] font-medium transition-colors ${
                 contentType === f.id
-                  ? "bg-primary text-white shadow-sm shadow-primary/20"
-                  : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
+                  ? "bg-foreground text-background"
+                  : "bg-secondary text-foreground hover:bg-muted"
               }`}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
 
-        {/* Cards grid: 1 column on mobile, 2 on md+, 3 on xl+ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {items.map((item) => (
-            <FeedCard
-              key={item.id}
-              item={item}
-              onOpen={() => onOpen(item)}
-              onSave={() => onSave(item)}
-              isSaved={savedIds.has(item.id)}
-            />
-          ))}
-        </div>
+        {searchQuery.trim() && !loading && !error && items.length > 0 && (
+          <p className="text-xs text-muted-foreground font-mono mb-4">
+            {items.length}{hasMore ? "+" : ""} results for “{searchQuery.trim()}”
+          </p>
+        )}
+
+        {flat ? (
+          /* Searching or filtering: one even grid, every card in its own format. */
+          <div className={`grid gap-x-4 gap-y-6 ${contentType === "repo" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : contentType === "opportunity" ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"}`}>
+            {items.map((item) =>
+              contentType === "opportunity" ? (
+                <OpportunityBand key={item.id} item={item} />
+              ) : contentType === "repo" ? (
+                <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+              ) : (
+                <CardFor key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+              ),
+            )}
+          </div>
+        ) : (
+          /* Home: rows that alternate format, like a video site's shelves. */
+          <div className="space-y-9">
+            {sections.map((section, i) => (
+              <section
+                key={`${section.kind}-${i}`}
+                // Video bands sit on a soft panel; project shelves use outlined cards instead.
+                className={section.kind === "videos" ? "rounded-2xl bg-secondary/60 p-3 sm:p-4" : undefined}
+              >
+                {SECTION_TITLES[section.kind] && (
+                  <h2 className="text-[15px] font-semibold text-foreground mb-3.5">{t(SECTION_TITLES[section.kind]!)}</h2>
+                )}
+                <div className={`grid ${ROW_GRID[section.kind]}`}>
+                  {section.items.map((item) =>
+                    section.kind === "opportunity" ? (
+                      <OpportunityBand key={item.id} item={item} />
+                    ) : section.kind === "repos" ? (
+                      <RepoCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ) : section.kind === "articles" ? (
+                      <ArticleCard key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ) : (
+                      <CardFor key={item.id} item={item} onOpen={() => onOpen(item)} onSave={() => onSave(item)} isSaved={savedIds.has(item.id)} />
+                    ),
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
 
         {!loading && !error && hasMore && items.length > 0 && (
           <div ref={sentinelRef} className="py-4 flex justify-center">
@@ -139,7 +239,7 @@ export function FeedScreen({
           <div className="py-8 flex flex-col items-center gap-3">
             <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
             <span className="text-xs text-muted-foreground font-mono tracking-wide">
-              Loading technical feed...
+              {t("common.loading")}
             </span>
           </div>
         )}
@@ -151,14 +251,14 @@ export function FeedScreen({
               onClick={onRetry}
               className="px-4 py-2 rounded-xl bg-secondary border border-border text-foreground hover:bg-muted transition-colors"
             >
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         )}
 
         {!loading && !error && items.length === 0 && (
           <div className="py-12 text-center text-muted-foreground text-sm font-mono">
-            No technical talks found. Check back later!
+            {t("feed.empty")}
           </div>
         )}
       </div>

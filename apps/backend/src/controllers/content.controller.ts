@@ -1,12 +1,16 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { desc, eq, and, ilike, or, arrayOverlaps, inArray } from 'drizzle-orm';
+import { desc, eq, and, ilike, or, arrayOverlaps, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/db.js';
 import { contents, bookmarks, readingHistory } from '../db/schema.js';
 import { classifyContent } from '../utils/classify.js';
+import { loadRankSignals, rankContents, pickWildcards } from '../services/ranking.js';
+
+/** How many recent items of one format are scored when building a personalised page. */
+const FORYOU_POOL = 400;
 
 export async function handleGetContents(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string };
+    const query = request.query as { limit?: string; offset?: string; search?: string; type?: string; categories?: string; sort?: string; interests?: string; learn?: string; platform?: string; difficulty?: string; kind?: string };
     const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(query.offset || '0', 10) || 0, 0);
 
@@ -18,30 +22,91 @@ export async function handleGetContents(request: FastifyRequest, reply: FastifyR
       .filter(Boolean);
 
     const conditions = [];
-    if (search) {
+    // Every word must match somewhere (name, description, source, category,
+    // language/topics held in meta), so "react state" narrows as you type more.
+    const terms = search.split(/\s+/).filter(Boolean).slice(0, 6);
+    for (const term of terms) {
+      const like = `%${term.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
       conditions.push(or(
-        ilike(contents.title, `%${search}%`),
-        ilike(contents.summary, `%${search}%`),
-        ilike(contents.source, `%${search}%`)
+        ilike(contents.title, like),
+        ilike(contents.summary, like),
+        ilike(contents.source, like),
+        sql`array_to_string(${contents.categories}, ' ') ilike ${like}`,
+        sql`${contents.meta}::text ilike ${like}`,
       ));
     }
     if (type) {
       conditions.push(eq(contents.type, type));
     }
+    // Facts providers keep in `meta`: Learn and Practice pages narrow by these.
+    if (query.learn === '1') conditions.push(sql`${contents.meta}->>'learn' = 'true'`);
+    for (const key of ['platform', 'difficulty', 'kind'] as const) {
+      const value = (query[key] || '').trim();
+      if (value) conditions.push(sql`${contents.meta}->>${key} = ${value}`);
+    }
     if (categories.length > 0) {
       conditions.push(arrayOverlaps(contents.categories, categories));
+    }
+
+    // "Something different": quality items from outside the learner's domains, to widen the feed.
+    if (query.sort === 'wildcard') {
+      // Videos qualify only if they are lectures; filter in SQL so the pool is not just the newest shorts.
+      if (type === 'video') conditions.push(sql`${contents.meta}->>'learn' = 'true'`);
+      const userId = (request.user as { id: string }).id;
+      const interests = (query.interests || '').split(',').map((c) => c.trim()).filter(Boolean);
+      const [signals, pool] = await Promise.all([
+        loadRankSignals(userId, interests),
+        (conditions.length > 0 ? db.select().from(contents).where(and(...conditions)) : db.select().from(contents))
+          .orderBy(desc(contents.createdAt))
+          .limit(FORYOU_POOL),
+      ]);
+      return reply.status(200).send(pickWildcards(pool, signals, Math.min(limit, 10)));
+    }
+
+    // Personalised ordering ("For you"): score a pool of recent items against what
+    // we know about the user. A text search keeps its own relevance ordering.
+    if (query.sort === 'foryou' && !search) {
+      const userId = (request.user as { id: string }).id;
+      const interests = (query.interests || '').split(',').map((c) => c.trim()).filter(Boolean);
+      const [signals, pool] = await Promise.all([
+        loadRankSignals(userId, interests),
+        (conditions.length > 0 ? db.select().from(contents).where(and(...conditions)) : db.select().from(contents))
+          .orderBy(desc(contents.createdAt))
+          .limit(FORYOU_POOL),
+      ]);
+      return reply.status(200).send(rankContents(pool, signals).slice(offset, offset + limit));
     }
 
     const filtered = conditions.length > 0
       ? db.select().from(contents).where(and(...conditions))
       : db.select().from(contents);
 
-    const allContents = await filtered.orderBy(desc(contents.createdAt)).limit(limit).offset(offset);
+    // Name matches first, then the newest.
+    const order = search
+      ? [sql`(${contents.title} ilike ${'%' + search + '%'}) desc`, desc(contents.createdAt)]
+      : [desc(contents.createdAt)];
+    const allContents = await filtered.orderBy(...order).limit(limit).offset(offset);
 
     return reply.status(200).send(allContents);
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ error: 'Internal server error while fetching content.' });
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** One item by id, so a shared or reloaded link can open its own page. */
+export async function handleGetContent(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const { contentId } = request.params as { contentId?: string };
+    if (!contentId || !UUID_RE.test(contentId)) return reply.status(400).send({ error: 'Invalid content id.' });
+    const [content] = await db.select().from(contents).where(eq(contents.id, contentId)).limit(1);
+    if (!content) return reply.status(404).send({ error: 'Content not found.' });
+    return reply.status(200).send(content);
+  } catch (error) {
+    request.log.error(error);
+    return reply.status(500).send({ error: 'Internal server error.' });
   }
 }
 

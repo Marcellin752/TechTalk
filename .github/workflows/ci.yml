@@ -22,13 +22,19 @@ jobs:
           cache: 'npm' # Met en cache les dépendances npm pour accélérer les futurs builds
 
       - name: Install Monorepo Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Check Backend Compilation
         run: npm run build:backend
+
+      - name: Type-check Frontend
+        run: npm run typecheck
 
       - name: Check Frontend Build
         run: npm run build:frontend
 
       - name: Run Backend Tests
         run: npm run test:backend
+
+      - name: Run Frontend Tests
+        run: npm run test:frontend
